@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType } from "./theme.js";
+import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifiedBorderStyle, verifiedMarker } from "./theme.js";
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin } from "./models/project.js";
 import { exportGedcom, parseGedcom } from "./gedcom.js";
@@ -78,12 +78,12 @@ function PeriodBar({ p, x, ppy, color, top, onOpen }) {
   const w = Math.max(2, (p.end - p.start) * ppy);
   const c = p.color || color;
   return (
-    <div onPointerDown={stopPD} onClick={onOpen} title={`${p.label} · ${p.start}–${p.end}${p.verified ? " ✓ verified" : ""}`} style={{
+    <div onPointerDown={stopPD} onClick={onOpen} title={`${p.label} · ${p.start}–${p.end}${verifiedTick(p.verified, "suffix")}${p.verified ? " verified" : ""}`} style={{
       position: "absolute", left: x(p.start), top, width: w, height: 13, cursor: "pointer",
-      background: hexA(c, 0.16), border: `1px ${p.verified ? "solid" : "dashed"} ${hexA(c, 0.6)}`, borderRadius: 3,
+      background: hexA(c, 0.16), border: `1px ${verifiedBorderStyle(p.verified)} ${hexA(c, 0.6)}`, borderRadius: 3,
       font: "600 9.5px Archivo, sans-serif", color: C.ink, lineHeight: "12px",
       padding: "0 5px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
-    }}>{w > 44 ? `${p.verified ? "✓ " : ""}${p.label}` : ""}</div>
+    }}>{w > 44 ? `${verifiedTick(p.verified)}${p.label}` : ""}</div>
   );
 }
 
@@ -93,8 +93,8 @@ function EventDot({ e, x, color, cy, showLabel, labelRow, onHover, onLeave, onOp
   const c = e.color || et.color || color;
   return (
     <React.Fragment>
-      <div onPointerDown={stopPD} onClick={onOpen} onMouseEnter={(ev) => onHover(ev, [`${et.icon} ${e.label}${e.verified ? " ✓" : ""}`, `${e.year} · ${et.label}`])} onMouseLeave={onLeave}
-        style={{ position: "absolute", left: px - 5, top: cy - 5, width: 10, height: 10, transform: "rotate(45deg)", background: e.verified ? c : C.paperHi, border: `1.8px ${e.verified ? "solid" : "dashed"} ${hexA(c, e.verified ? 1 : 0.6)}`, zIndex: 3, cursor: "pointer" }} />
+      <div onPointerDown={stopPD} onClick={onOpen} onMouseEnter={(ev) => onHover(ev, [`${et.icon} ${e.label}${verifiedTick(e.verified, "suffix")}`, `${e.year} · ${et.label}`])} onMouseLeave={onLeave}
+        style={{ position: "absolute", left: px - 5, top: cy - 5, width: 10, height: 10, transform: "rotate(45deg)", zIndex: 3, cursor: "pointer", ...verifiedMarker(e.verified, c, { width: 1.8, fill: true, borderAlpha: 0.6 }) }} />
       {showLabel && (
         <div style={{ position: "absolute", left: px + 6, top: cy + 7 + labelRow * 13, font: "500 9.5px Archivo, sans-serif", color: C.inkSoft, whiteSpace: "nowrap", zIndex: 2 }}>
           <span style={{ font: "500 9px 'IBM Plex Mono', monospace", color: c, marginRight: 3 }}>{e.year}</span>{e.label}
@@ -164,7 +164,7 @@ function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, a
             position: "absolute", left: x(g.start), top: braceZone - 4, width: Math.max(4, (g.end - g.start) * ppy),
             height: height - braceZone - 6, border: `1px dashed ${hexA(gc, 0.5)}`, background: hexA(gc, 0.05), borderRadius: 4, zIndex: 0,
           }}>
-            <span onPointerDown={stopPD} onClick={() => open("group", g)} style={{ position: "absolute", top: -1, left: 6, font: "700 8.5px Archivo, sans-serif", letterSpacing: ".08em", textTransform: "uppercase", color: hexA(gc, 0.95), background: C.paper, padding: "0 4px", transform: "translateY(-55%)", cursor: "pointer", pointerEvents: "auto" }}>{g.verified ? "✓ " : ""}{g.label}</span>
+            <span onPointerDown={stopPD} onClick={() => open("group", g)} style={{ position: "absolute", top: -1, left: 6, font: "700 8.5px Archivo, sans-serif", letterSpacing: ".08em", textTransform: "uppercase", color: hexA(gc, 0.95), background: C.paper, padding: "0 4px", transform: "translateY(-55%)", cursor: "pointer", pointerEvents: "auto" }}>{verifiedTick(g.verified)}{g.label}</span>
           </div>
         );
       })}
@@ -182,12 +182,12 @@ function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, a
         }} />
       )}
       {person.birth?.year && (
-        <div onPointerDown={stopPD} onClick={() => open("birth", person.birth)} onMouseEnter={(ev) => onHover(ev, [`Born ${person.birth.year}${person.birth.verified ? " ✓" : ""}`, person.birth.place || ""])} onMouseLeave={onLeave}
-          style={{ position: "absolute", left: x(person.birth.year) - 5, top: lifeY - 2.5, width: 10, height: 10, borderRadius: "50%", background: C.paperHi, border: `2px ${person.birth.verified ? "solid" : "dashed"} ${color}`, zIndex: 3, cursor: "pointer" }} />
+        <div onPointerDown={stopPD} onClick={() => open("birth", person.birth)} onMouseEnter={(ev) => onHover(ev, [`Born ${person.birth.year}${verifiedTick(person.birth.verified, "suffix")}`, person.birth.place || ""])} onMouseLeave={onLeave}
+          style={{ position: "absolute", left: x(person.birth.year) - 5, top: lifeY - 2.5, width: 10, height: 10, borderRadius: "50%", zIndex: 3, cursor: "pointer", ...verifiedMarker(person.birth.verified, color, { width: 2 }) }} />
       )}
       {person.death?.year && (
-        <div onPointerDown={stopPD} onClick={() => open("death", person.death)} onMouseEnter={(ev) => onHover(ev, [`Died ${person.death.year}${person.death.verified ? " ✓" : ""}`, person.death.place || ""])} onMouseLeave={onLeave}
-          style={{ position: "absolute", left: x(person.death.year) - 4, top: lifeY - 2, width: 9, height: 9, background: person.death.verified ? color : C.paperHi, border: `1.5px ${person.death.verified ? "solid" : "dashed"} ${color}`, zIndex: 3, cursor: "pointer" }} />
+        <div onPointerDown={stopPD} onClick={() => open("death", person.death)} onMouseEnter={(ev) => onHover(ev, [`Died ${person.death.year}${verifiedTick(person.death.verified, "suffix")}`, person.death.place || ""])} onMouseLeave={onLeave}
+          style={{ position: "absolute", left: x(person.death.year) - 4, top: lifeY - 2, width: 9, height: 9, zIndex: 3, cursor: "pointer", ...verifiedMarker(person.death.verified, color, { width: 1.5, fill: true }) }} />
       )}
 
       {placed.filter((p) => visible(p.start, p.end)).map((p) => (
