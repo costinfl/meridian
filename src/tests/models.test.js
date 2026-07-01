@@ -74,6 +74,8 @@ describe("createSource", () => {
     expect(s.linkedPersonIds).toEqual([]);
     expect(s.linkedYearRange).toBeNull();
     expect(s.tags).toEqual([]);
+    expect(s.verified).toBe(false);
+    expect(s.fileMissing).toBe(false);
   });
 
   it("uses 'Untitled source' as the default title", () => {
@@ -135,6 +137,17 @@ describe("timeline item factories", () => {
     const m = createMediaPin({ year: 1920, sourceId: "s2" });
     expect(m.year).toBe(1920);
     expect(m.sourceId).toBe("s2");
+  });
+
+  it("event/period/group default to unverified", () => {
+    expect(createEvent({ year: 1 }).verified).toBe(false);
+    expect(createPeriod({ start: 1, end: 2 }).verified).toBe(false);
+    expect(createGroup({ start: 1, end: 2 }).verified).toBe(false);
+  });
+
+  it("verified can be set explicitly on a factory", () => {
+    expect(createEvent({ year: 1, verified: true }).verified).toBe(true);
+    expect(createPeriod({ start: 1, end: 2, verified: true }).verified).toBe(true);
   });
 
   it("all factories mint unique ids", () => {

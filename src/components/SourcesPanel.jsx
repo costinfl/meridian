@@ -33,6 +33,7 @@ function AddSourceModal({ people, storage, onSave, onClose }) {
   const [repository, setRepository] = useState("");
   const [description, setDescription] = useState("");
   const [citation, setCitation] = useState("");
+  const [verified, setVerified] = useState(false);
   const [url, setUrl] = useState("");
   const [text, setText] = useState("");
   const [file, setFile] = useState(null);
@@ -72,6 +73,7 @@ function AddSourceModal({ people, storage, onSave, onClose }) {
         repository: repository.trim(),
         description: description.trim(),
         citation: citation.trim(),
+        verified,
         url: type === "url" ? url.trim() || null : null,
         text: type === "text" ? text.trim() || null : null,
         blobKey,
@@ -164,8 +166,15 @@ function AddSourceModal({ people, storage, onSave, onClose }) {
           <label style={labelStyle}>Description</label>
           <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description" style={fieldStyle} />
 
-          <label style={labelStyle}>Citation</label>
-          <input value={citation} onChange={(e) => setCitation(e.target.value)} placeholder="Formal citation" style={fieldStyle} />
+          <label style={labelStyle}>Citation (APA7)</label>
+          <input value={citation} onChange={(e) => setCitation(e.target.value)} placeholder="Author, A. A. (Year). Title. Publisher." style={fieldStyle} />
+
+          <label style={{ ...labelStyle, marginTop: 12 }}>Verification</label>
+          <button onClick={() => setVerified((v) => !v)} title="Verified sources can be cited in standard GEDCOM export"
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", background: "none", border: "none", padding: 0 }}>
+            <span style={{ width: 16, height: 16, borderRadius: 3, border: `1.5px solid ${verified ? "#34635C" : C.rule}`, background: verified ? "#34635C" : "#fff", color: C.paperHi, font: "700 11px Archivo", display: "flex", alignItems: "center", justifyContent: "center" }}>{verified ? "✓" : ""}</span>
+            <span style={{ font: "500 12px Archivo, sans-serif", color: C.ink }}>Verified source</span>
+          </button>
 
           {/* Link to people */}
           {people.length > 0 && (
@@ -204,7 +213,7 @@ function AddSourceModal({ people, storage, onSave, onClose }) {
   );
 }
 
-export function SourcesPanel({ sources = [], people = [], storage, onAdd, onDelete, onClose }) {
+export function SourcesPanel({ sources = [], people = [], storage, onAdd, onDelete, onUpdate, onClose }) {
   const [filter, setFilter] = useState("all");
   const [addOpen, setAddOpen] = useState(false);
 
@@ -271,8 +280,18 @@ export function SourcesPanel({ sources = [], people = [], storage, onAdd, onDele
                   <div style={{ font: "600 12px Fraunces, Georgia, serif", color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {s.title}
                   </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
+                    <button onClick={() => onUpdate?.(s.id, { verified: !s.verified })} title="Toggle verified — verified sources may be cited in GEDCOM export"
+                      style={{ font: "700 8.5px Archivo, sans-serif", letterSpacing: ".06em", textTransform: "uppercase", cursor: "pointer", borderRadius: 2, padding: "1px 5px",
+                        color: s.verified ? C.paperHi : C.inkSoft, background: s.verified ? "#34635C" : "none", border: `1px solid ${s.verified ? "#34635C" : C.rule}` }}>
+                      {s.verified ? "✓ Verified" : "Unverified"}
+                    </button>
+                    {s.fileMissing && (
+                      <span title="The media file is not stored; only its citation is kept" style={{ font: "700 8.5px Archivo, sans-serif", letterSpacing: ".06em", textTransform: "uppercase", color: C.focus, border: `1px solid ${hexA(C.focus, 0.5)}`, borderRadius: 2, padding: "1px 5px" }}>File missing</span>
+                    )}
+                  </div>
                   {s.date && (
-                    <div style={{ font: "400 10px 'IBM Plex Mono', monospace", color: C.inkSoft, marginTop: 1 }}>{s.date}</div>
+                    <div style={{ font: "400 10px 'IBM Plex Mono', monospace", color: C.inkSoft, marginTop: 2 }}>{s.date}</div>
                   )}
                   {s.description && (
                     <div style={{ font: "400 11px Archivo, sans-serif", color: C.inkSoft, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{s.description}</div>

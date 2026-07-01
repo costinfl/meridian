@@ -28,15 +28,17 @@ export function createSource({ title = "Untitled source", type = "text", ...rest
     date: "",
     repository: "",
     description: "",
-    citation: "",
+    citation: "", // APA7-style reference — always retained in the native share JSON
     url: null,
     text: null,
     blobKey: null,
     fileName: null,
     mimeType: null,
+    fileMissing: false, // true when the media file was removed from a shared bundle
     linkedPersonIds: [],
     linkedYearRange: null,
     tags: [],
+    verified: false,
     createdAt: new Date().toISOString(),
     ...rest,
   };
@@ -46,18 +48,18 @@ export function createSource({ title = "Untitled source", type = "text", ...rest
    Every timeline item carries a stable `id` so it can be edited/deleted, plus
    optional `color`, `note`, and `sourceId` (a reference into project.sources). */
 
-export function createEvent({ year, label = "", type = "note", note = "", color = null, sourceId = null } = {}) {
-  return { id: crypto.randomUUID(), year, label, type, note, color, sourceId };
+export function createEvent({ year, label = "", type = "note", note = "", color = null, sourceId = null, verified = false } = {}) {
+  return { id: crypto.randomUUID(), year, label, type, note, color, sourceId, verified };
 }
 
 // Role / occupation bar (person.periods) — e.g. "Mayor of Ploiești".
-export function createPeriod({ start, end, label = "", note = "", color = null, sourceId = null } = {}) {
-  return { id: crypto.randomUUID(), start, end, label, note, color, sourceId };
+export function createPeriod({ start, end, label = "", note = "", color = null, sourceId = null, verified = false } = {}) {
+  return { id: crypto.randomUUID(), start, end, label, note, color, sourceId, verified };
 }
 
 // Event-group band (person.groups) — e.g. "Communist regime", "Săhăteni estate".
-export function createGroup({ start, end, label = "", note = "", color = null, sourceId = null } = {}) {
-  return { id: crypto.randomUUID(), start, end, label, note, color, sourceId };
+export function createGroup({ start, end, label = "", note = "", color = null, sourceId = null, verified = false } = {}) {
+  return { id: crypto.randomUUID(), start, end, label, note, color, sourceId, verified };
 }
 
 // Accolade bracket (project.annotations) — spans a lane, not tied to a group/events.

@@ -110,6 +110,18 @@ export function useProject(storage) {
     return p;
   }, [storage]);
 
+  // Save an already-built project object (e.g. imported from a share bundle) and open it.
+  const importProject = useCallback(async (projectObj) => {
+    const p = normalizeProject(projectObj);
+    await storage.saveProject(p);
+    skipAutoSave.current = true;
+    setProjectState(p);
+    setIsDirty(false);
+    const list = await storage.listProjects();
+    setProjectList(list);
+    return p;
+  }, [storage]);
+
   const saveNow = useCallback(async () => {
     const p = latestProject.current;
     if (!p) return;
@@ -147,6 +159,10 @@ export function useProject(storage) {
 
   const deleteSource = useCallback((id) => {
     mutate((prev) => ({ ...prev, sources: (prev.sources ?? []).filter((s) => s.id !== id) }));
+  }, [mutate]);
+
+  const updateSource = useCallback((id, patch) => {
+    mutate((prev) => ({ ...prev, sources: (prev.sources ?? []).map((s) => (s.id === id ? { ...s, ...patch } : s)) }));
   }, [mutate]);
 
   // ── Convenience setters (mirror useState API: accept value OR fn) ────────
@@ -209,11 +225,13 @@ export function useProject(storage) {
     isLoading,
     openProject,
     createProject: createNewProject,
+    importProject,
     saveNow,
     deleteProject,
     renameProject,
     addSource,
     deleteSource,
+    updateSource,
     setPeople,
     updatePerson,
     setAnnotations,

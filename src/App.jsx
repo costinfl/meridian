@@ -2,6 +2,8 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType } from "./theme.js";
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin } from "./models/project.js";
+import { exportGedcom, parseGedcom } from "./gedcom.js";
+import { exportProjectZip, importProjectZip } from "./share.js";
 import { storage } from "./storage/StorageService.js";
 import { useProject } from "./hooks/useProject.js";
 import { Modal } from "./components/Modal.jsx";
@@ -70,83 +72,18 @@ function relationTo(p, f, byId) {
   return "relative";
 }
 
-/* ---------------- GEDCOM ---------------- */
-
-function exportGedcom(people) {
-  const L = ["0 HEAD", "1 SOUR MERIDIAN", "1 GEDC", "2 VERS 5.5.1", "2 FORM LINEAGE-LINKED", "1 CHAR UTF-8"];
-  const famKey = (f, m) => `${f || ""}|${m || ""}`;
-  const fams = new Map();
-  people.forEach((p) => {
-    if (p.fatherId || p.motherId) {
-      const k = famKey(p.fatherId, p.motherId);
-      if (!fams.has(k)) fams.set(k, { husb: p.fatherId, wife: p.motherId, chil: [] });
-      fams.get(k).chil.push(p.id);
-    }
-  });
-  people.forEach((p) => (p.spouseIds || []).forEach((s) => {
-    const a = p.sex === "F" ? s : p.id, b = p.sex === "F" ? p.id : s;
-    const k = famKey(a, b);
-    if (!fams.has(k)) fams.set(k, { husb: a, wife: b, chil: [] });
-  }));
-  const famIds = new Map([...fams.keys()].map((k, i) => [k, `F${i + 1}`]));
-  people.forEach((p) => {
-    const parts = p.name.replace(/\s*\(b\..*\)$/, "").trim().split(" ");
-    const surname = parts.pop() || "";
-    L.push(`0 @${p.id.toUpperCase()}@ INDI`, `1 NAME ${parts.join(" ")} /${surname}/`, `1 SEX ${p.sex || "U"}`);
-    if (p.birth?.year) { L.push("1 BIRT", `2 DATE ${p.birth.year}`); if (p.birth.place) L.push(`2 PLAC ${p.birth.place}`); }
-    if (p.death?.year) { L.push("1 DEAT", `2 DATE ${p.death.year}`); if (p.death.place) L.push(`2 PLAC ${p.death.place}`); }
-    const k = famKey(p.fatherId, p.motherId);
-    if ((p.fatherId || p.motherId) && famIds.has(k)) L.push(`1 FAMC @${famIds.get(k)}@`);
-    fams.forEach((f, kk) => { if (f.husb === p.id || f.wife === p.id) L.push(`1 FAMS @${famIds.get(kk)}@`); });
-  });
-  fams.forEach((f, k) => {
-    L.push(`0 @${famIds.get(k)}@ FAM`);
-    if (f.husb) L.push(`1 HUSB @${f.husb.toUpperCase()}@`);
-    if (f.wife) L.push(`1 WIFE @${f.wife.toUpperCase()}@`);
-    f.chil.forEach((c) => L.push(`1 CHIL @${c.toUpperCase()}@`));
-  });
-  L.push("0 TRLR");
-  return L.join("\n");
-}
-
-function parseGedcom(text) {
-  const out = [];
-  let cur = null, ctx = null;
-  text.split(/\r?\n/).forEach((line) => {
-    const m = line.match(/^(\d+)\s+(@[^@]+@\s+)?(\S+)(\s+(.*))?$/);
-    if (!m) return;
-    const lvl = +m[1], xref = m[2]?.trim().replace(/@/g, ""), tag = m[3], val = m[5] || "";
-    if (lvl === 0) {
-      if (cur) out.push(cur);
-      cur = tag === "INDI" ? { id: "imp_" + (xref || out.length), name: "Unnamed", sex: "U", birth: {}, death: {}, events: [], periods: [], groups: [], spouseIds: [] } : null;
-      ctx = null;
-    } else if (cur) {
-      if (tag === "NAME") cur.name = val.replace(/\//g, "").trim() || cur.name;
-      else if (tag === "SEX") cur.sex = val.trim();
-      else if (tag === "BIRT" || tag === "DEAT") ctx = tag;
-      else if (tag === "DATE" && ctx) {
-        const y = val.match(/\d{4}/);
-        if (y) cur[ctx === "BIRT" ? "birth" : "death"].year = +y[0];
-      } else if (tag === "PLAC" && ctx) cur[ctx === "BIRT" ? "birth" : "death"].place = val;
-      else if (lvl === 1) ctx = null;
-    }
-  });
-  if (cur) out.push(cur);
-  return out.filter((p) => p.birth?.year);
-}
-
 /* ---------------- lane sub-components ---------------- */
 
 function PeriodBar({ p, x, ppy, color, top, onOpen }) {
   const w = Math.max(2, (p.end - p.start) * ppy);
   const c = p.color || color;
   return (
-    <div onPointerDown={stopPD} onClick={onOpen} title={`${p.label} · ${p.start}–${p.end}`} style={{
+    <div onPointerDown={stopPD} onClick={onOpen} title={`${p.label} · ${p.start}–${p.end}${p.verified ? " ✓ verified" : ""}`} style={{
       position: "absolute", left: x(p.start), top, width: w, height: 13, cursor: "pointer",
-      background: hexA(c, 0.16), border: `1px solid ${hexA(c, 0.6)}`, borderRadius: 3,
+      background: hexA(c, 0.16), border: `1px ${p.verified ? "solid" : "dashed"} ${hexA(c, 0.6)}`, borderRadius: 3,
       font: "600 9.5px Archivo, sans-serif", color: C.ink, lineHeight: "12px",
       padding: "0 5px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
-    }}>{w > 44 ? p.label : ""}</div>
+    }}>{w > 44 ? `${p.verified ? "✓ " : ""}${p.label}` : ""}</div>
   );
 }
 
@@ -156,8 +93,8 @@ function EventDot({ e, x, color, cy, showLabel, labelRow, onHover, onLeave, onOp
   const c = e.color || et.color || color;
   return (
     <React.Fragment>
-      <div onPointerDown={stopPD} onClick={onOpen} onMouseEnter={(ev) => onHover(ev, [`${et.icon} ${e.label}`, `${e.year} · ${et.label}`])} onMouseLeave={onLeave}
-        style={{ position: "absolute", left: px - 5, top: cy - 5, width: 10, height: 10, transform: "rotate(45deg)", background: C.paperHi, border: `1.8px solid ${c}`, zIndex: 3, cursor: "pointer" }} />
+      <div onPointerDown={stopPD} onClick={onOpen} onMouseEnter={(ev) => onHover(ev, [`${et.icon} ${e.label}${e.verified ? " ✓" : ""}`, `${e.year} · ${et.label}`])} onMouseLeave={onLeave}
+        style={{ position: "absolute", left: px - 5, top: cy - 5, width: 10, height: 10, transform: "rotate(45deg)", background: e.verified ? c : C.paperHi, border: `1.8px ${e.verified ? "solid" : "dashed"} ${hexA(c, e.verified ? 1 : 0.6)}`, zIndex: 3, cursor: "pointer" }} />
       {showLabel && (
         <div style={{ position: "absolute", left: px + 6, top: cy + 7 + labelRow * 13, font: "500 9.5px Archivo, sans-serif", color: C.inkSoft, whiteSpace: "nowrap", zIndex: 2 }}>
           <span style={{ font: "500 9px 'IBM Plex Mono', monospace", color: c, marginRight: 3 }}>{e.year}</span>{e.label}
@@ -227,7 +164,7 @@ function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, a
             position: "absolute", left: x(g.start), top: braceZone - 4, width: Math.max(4, (g.end - g.start) * ppy),
             height: height - braceZone - 6, border: `1px dashed ${hexA(gc, 0.5)}`, background: hexA(gc, 0.05), borderRadius: 4, zIndex: 0,
           }}>
-            <span onPointerDown={stopPD} onClick={() => open("group", g)} style={{ position: "absolute", top: -1, left: 6, font: "700 8.5px Archivo, sans-serif", letterSpacing: ".08em", textTransform: "uppercase", color: hexA(gc, 0.95), background: C.paper, padding: "0 4px", transform: "translateY(-55%)", cursor: "pointer", pointerEvents: "auto" }}>{g.label}</span>
+            <span onPointerDown={stopPD} onClick={() => open("group", g)} style={{ position: "absolute", top: -1, left: 6, font: "700 8.5px Archivo, sans-serif", letterSpacing: ".08em", textTransform: "uppercase", color: hexA(gc, 0.95), background: C.paper, padding: "0 4px", transform: "translateY(-55%)", cursor: "pointer", pointerEvents: "auto" }}>{g.verified ? "✓ " : ""}{g.label}</span>
           </div>
         );
       })}
@@ -245,12 +182,12 @@ function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, a
         }} />
       )}
       {person.birth?.year && (
-        <div onMouseEnter={(ev) => onHover(ev, [`Born ${person.birth.year}`, person.birth.place || ""])} onMouseLeave={onLeave}
-          style={{ position: "absolute", left: x(person.birth.year) - 5, top: lifeY - 2.5, width: 10, height: 10, borderRadius: "50%", background: C.paperHi, border: `2px solid ${color}`, zIndex: 3 }} />
+        <div onPointerDown={stopPD} onClick={() => open("birth", person.birth)} onMouseEnter={(ev) => onHover(ev, [`Born ${person.birth.year}${person.birth.verified ? " ✓" : ""}`, person.birth.place || ""])} onMouseLeave={onLeave}
+          style={{ position: "absolute", left: x(person.birth.year) - 5, top: lifeY - 2.5, width: 10, height: 10, borderRadius: "50%", background: C.paperHi, border: `2px ${person.birth.verified ? "solid" : "dashed"} ${color}`, zIndex: 3, cursor: "pointer" }} />
       )}
       {person.death?.year && (
-        <div onMouseEnter={(ev) => onHover(ev, [`Died ${person.death.year}`, person.death.place || ""])} onMouseLeave={onLeave}
-          style={{ position: "absolute", left: x(person.death.year) - 4, top: lifeY - 2, width: 9, height: 9, background: color, zIndex: 3 }} />
+        <div onPointerDown={stopPD} onClick={() => open("death", person.death)} onMouseEnter={(ev) => onHover(ev, [`Died ${person.death.year}${person.death.verified ? " ✓" : ""}`, person.death.place || ""])} onMouseLeave={onLeave}
+          style={{ position: "absolute", left: x(person.death.year) - 4, top: lifeY - 2, width: 9, height: 9, background: person.death.verified ? color : C.paperHi, border: `1.5px ${person.death.verified ? "solid" : "dashed"} ${color}`, zIndex: 3, cursor: "pointer" }} />
       )}
 
       {placed.filter((p) => visible(p.start, p.end)).map((p) => (
@@ -315,8 +252,8 @@ function ContextLane({ lane, x, ppy, viewRange, focusLife, onHover, onLeave }) {
 export default function App() {
   const {
     projectList, project, isDirty, isLoading,
-    openProject, createProject, deleteProject, renameProject,
-    addSource, deleteSource,
+    openProject, createProject, importProject, deleteProject, renameProject,
+    addSource, deleteSource, updateSource,
     setPeople, updatePerson, setAnnotations, setEras, setFocusId, setRelativeIds, setView, setCtxOn,
   } = useProject(storage);
 
@@ -338,6 +275,7 @@ export default function App() {
   const [draft, setDraft] = useState(null);
   const [itemModal, setItemModal] = useState(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [addRelOpen, setAddRelOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [projectManagerOpen, setProjectManagerOpen] = useState(false);
@@ -480,7 +418,9 @@ export default function App() {
   });
 
   const saveItem = ({ kind, mode, id, laneKey, laneId, values }) => {
-    if (kind === "era") {
+    if (kind === "birth" || kind === "death") {
+      updatePerson(laneId, (p) => ({ ...p, [kind]: { ...p[kind], ...values } }));
+    } else if (kind === "era") {
       if (mode === "edit") setEras((es) => es.map((x) => (x.id === id ? { ...x, ...values } : x)));
       else setEras((es) => [...es, createEra(values)]);
     } else if (kind === "annotation") {
@@ -510,27 +450,60 @@ export default function App() {
   const hideTip = () => setTooltip(null);
   const flash = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3500); };
 
-  /* GEDCOM */
-  const doExport = () => {
-    const blob = new Blob([exportGedcom(people)], { type: "text/plain" });
+  /* export / import */
+  const downloadBlob = (blob, filename) => {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${project?.name ?? "family-atlas"}.ged`;
+    a.download = filename;
     a.click();
     URL.revokeObjectURL(a.href);
-    flash("Exported GEDCOM 5.5.1");
   };
-  const doImport = (e) => {
+  const safeProjectName = (project?.name ?? "family-atlas").replace(/[^a-zA-Z0-9._-]+/g, "-");
+
+  const verifiedFactCount = useMemo(() => people.reduce((n, p) =>
+    n + (p.birth?.verified ? 1 : 0) + (p.death?.verified ? 1 : 0)
+    + (p.events || []).filter((e) => e.verified).length
+    + (p.periods || []).filter((r) => r.verified).length
+    + (p.groups || []).filter((g) => g.verified).length, 0), [people]);
+
+  const doExportGedcom = () => {
+    downloadBlob(new Blob([exportGedcom(people, { sources })], { type: "text/plain" }), `${safeProjectName}.ged`);
+    flash(`Exported GEDCOM 5.5.1 — ${verifiedFactCount} verified fact${verifiedFactCount === 1 ? "" : "s"} across ${people.length} people`);
+    setExportMenuOpen(false);
+  };
+  const doExportZip = async () => {
+    try {
+      const blob = await exportProjectZip(project, storage);
+      downloadBlob(blob, `${safeProjectName}.meridian.zip`);
+      flash("Exported Meridian bundle (.zip) — full fidelity");
+    } catch (err) {
+      console.error("Meridian: bundle export failed", err);
+      flash("Bundle export failed — see console.");
+    }
+    setExportMenuOpen(false);
+  };
+  const doImportFile = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
-    const r = new FileReader();
-    r.onload = () => {
-      const imported = parseGedcom(String(r.result));
-      if (!imported.length) return flash("No individuals with dates found in that file.");
-      setPeople((ps) => [...ps, ...imported.filter((p) => !ps.some((q) => q.id === p.id))]);
-      flash(`Imported ${imported.length} people — add them from "+ relative".`);
-    };
-    r.readAsText(f);
+    try {
+      if (f.name.toLowerCase().endsWith(".zip")) {
+        const proj = await importProjectZip(f, storage);
+        await importProject(proj);
+        initRef.current = false;
+        flash(`Imported project "${proj.name}".`);
+      } else {
+        const { people: imp, sources: impSrc } = parseGedcom(await f.text());
+        if (!imp.length) { flash("No individuals found in that file."); }
+        else {
+          setPeople((ps) => [...ps, ...imp.filter((p) => !ps.some((q) => q.id === p.id))]);
+          impSrc.forEach((s) => addSource(s));
+          flash(`Imported ${imp.length} people${impSrc.length ? ` and ${impSrc.length} source${impSrc.length === 1 ? "" : "s"}` : ""} — add them from "+ relative".`);
+        }
+      }
+    } catch (err) {
+      console.error("Meridian: import failed", err);
+      flash("Import failed — is the file a valid GEDCOM or Meridian bundle?");
+    }
     e.target.value = "";
   };
 
@@ -632,9 +605,29 @@ export default function App() {
           <option disabled>time.graphics — coming soon</option>
         </select>
 
-        <button style={btnStyle(false)} onClick={() => fileRef.current?.click()}>Import GEDCOM</button>
-        <input ref={fileRef} type="file" accept=".ged,.gedcom,.txt" onChange={doImport} style={{ display: "none" }} />
-        <button style={btnStyle(false)} onClick={doExport}>Export GEDCOM</button>
+        <button style={btnStyle(false)} onClick={() => fileRef.current?.click()} title="Import a Meridian bundle (.zip) or a GEDCOM (.ged)">Import</button>
+        <input ref={fileRef} type="file" accept=".zip,.ged,.gedcom,.txt" onChange={doImportFile} style={{ display: "none" }} />
+
+        <div style={{ position: "relative" }}>
+          <button style={btnStyle(exportMenuOpen)} onClick={() => setExportMenuOpen((o) => !o)} title="Export this project">Export ▾</button>
+          {exportMenuOpen && (
+            <>
+              <div onClick={() => setExportMenuOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 19 }} />
+              <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, zIndex: 20, minWidth: 230,
+                background: C.paperHi, border: `1px solid ${C.ink}`, borderRadius: 4, boxShadow: "0 6px 18px rgba(0,0,0,.18)",
+                display: "flex", flexDirection: "column", padding: 4, gap: 2 }}>
+                <button onClick={doExportZip} style={{ ...btnStyle(false), border: "none", textAlign: "left", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, padding: "6px 8px" }}>
+                  <span style={{ font: "600 12px Archivo, sans-serif", color: C.ink }}>Meridian project (.zip)</span>
+                  <span style={{ font: "400 10.5px Archivo, sans-serif", color: C.inkSoft }}>Full fidelity — everything, incl. media</span>
+                </button>
+                <button onClick={doExportGedcom} style={{ ...btnStyle(false), border: "none", textAlign: "left", display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 1, padding: "6px 8px" }}>
+                  <span style={{ font: "600 12px Archivo, sans-serif", color: C.ink }}>GEDCOM (.ged)</span>
+                  <span style={{ font: "400 10.5px Archivo, sans-serif", color: C.inkSoft }}>Standard 5.5.1 — verified facts only</span>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
 
         <button
           style={{ ...btnStyle(sourcesOpen), position: "relative" }}
@@ -871,6 +864,7 @@ export default function App() {
           storage={storage}
           onAdd={addSource}
           onDelete={deleteSource}
+          onUpdate={updateSource}
           onClose={() => setSourcesOpen(false)}
         />
       )}

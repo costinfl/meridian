@@ -3,3 +3,4 @@ dist
 .DS_Store
 *.local
 .idea/
+/docs/markdown-preview.pdf
