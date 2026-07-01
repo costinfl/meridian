@@ -28,6 +28,24 @@ export const btnStyle = (active) => ({
   whiteSpace: "nowrap",
 });
 
+/* Event marker types — icon + color per `event.type`. `note` is the neutral
+   fallback for unknown/legacy types. */
+export const EVENT_TYPES = {
+  marriage:     { label: "Marriage",   icon: "⚭", color: "#8A6A2F" },
+  office:       { label: "Office/role", icon: "★", color: "#445A75" },
+  property:     { label: "Property",   icon: "◈", color: "#34635C" },
+  military:     { label: "Military",   icon: "⚔", color: "#6B4A2F" },
+  birth:        { label: "Birth",      icon: "◉", color: "#34635C" },
+  "death-note": { label: "Death",      icon: "✝", color: "#8A3033" },
+  media:        { label: "Media",      icon: "❏", color: "#5C4A6E" },
+  note:         { label: "Note",       icon: "•", color: "#54656C" },
+};
+
+export const eventType = (type) => EVENT_TYPES[type] ?? EVENT_TYPES.note;
+
+/* Swatches offered by the item color picker. */
+export const ITEM_COLORS = ["#8A3033", "#5C4A6E", "#8A6A2F", "#34635C", "#6B4A2F", "#445A75", "#54656C"];
+
 export const SOURCE_TYPES = ["image", "document", "audio", "video", "url", "text"];
 
 export const SOURCE_TYPE_LABELS = {

@@ -1,11 +1,17 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { C, hexA, clamp, btnStyle } from "./theme.js";
-import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, CONTEXT_LANES } from "./sampleData.js";
+import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType } from "./theme.js";
+import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
+import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin } from "./models/project.js";
 import { storage } from "./storage/StorageService.js";
 import { useProject } from "./hooks/useProject.js";
 import { Modal } from "./components/Modal.jsx";
+import { ItemModal } from "./components/ItemModal.jsx";
 import { ProjectManager } from "./components/ProjectManager.jsx";
 import { SourcesPanel } from "./components/SourcesPanel.jsx";
+
+/* Stop a click on an interactive timeline item from starting a board pan/drag. */
+const stopPD = (e) => e.stopPropagation();
+const ARR_KEY = { event: "events", period: "periods", group: "groups", media: "media" };
 
 /* ============================================================
    MERIDIAN — a family time atlas
@@ -23,6 +29,7 @@ const CTX_H = 56;
 const AXIS_H = 32;
 const FOCUS_H = 152;
 const REL_H = 116;
+const LIFE_TAIL = 44;
 
 /* ---------------- small helpers ---------------- */
 
@@ -130,49 +137,77 @@ function parseGedcom(text) {
 
 /* ---------------- lane sub-components ---------------- */
 
-function PeriodBar({ p, x, ppy, color, top }) {
+function PeriodBar({ p, x, ppy, color, top, onOpen }) {
   const w = Math.max(2, (p.end - p.start) * ppy);
+  const c = p.color || color;
   return (
-    <div title={`${p.label} · ${p.start}–${p.end}`} style={{
-      position: "absolute", left: x(p.start), top, width: w, height: 13,
-      background: hexA(color, 0.16), border: `1px solid ${hexA(color, 0.6)}`, borderRadius: 3,
+    <div onPointerDown={stopPD} onClick={onOpen} title={`${p.label} · ${p.start}–${p.end}`} style={{
+      position: "absolute", left: x(p.start), top, width: w, height: 13, cursor: "pointer",
+      background: hexA(c, 0.16), border: `1px solid ${hexA(c, 0.6)}`, borderRadius: 3,
       font: "600 9.5px Archivo, sans-serif", color: C.ink, lineHeight: "12px",
       padding: "0 5px", overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis",
     }}>{w > 44 ? p.label : ""}</div>
   );
 }
 
-function EventDot({ e, x, color, cy, showLabel, labelRow, onHover, onLeave }) {
+function EventDot({ e, x, color, cy, showLabel, labelRow, onHover, onLeave, onOpen }) {
   const px = x(e.year);
+  const et = eventType(e.type);
+  const c = e.color || et.color || color;
   return (
     <React.Fragment>
-      <div onMouseEnter={(ev) => onHover(ev, [`${e.label}`, `${e.year}`])} onMouseLeave={onLeave}
-        style={{ position: "absolute", left: px - 4, top: cy - 4, width: 8, height: 8, transform: "rotate(45deg)", background: C.paperHi, border: `1.6px solid ${color}`, zIndex: 3, cursor: "default" }} />
+      <div onPointerDown={stopPD} onClick={onOpen} onMouseEnter={(ev) => onHover(ev, [`${et.icon} ${e.label}`, `${e.year} · ${et.label}`])} onMouseLeave={onLeave}
+        style={{ position: "absolute", left: px - 5, top: cy - 5, width: 10, height: 10, transform: "rotate(45deg)", background: C.paperHi, border: `1.8px solid ${c}`, zIndex: 3, cursor: "pointer" }} />
       {showLabel && (
         <div style={{ position: "absolute", left: px + 6, top: cy + 7 + labelRow * 13, font: "500 9.5px Archivo, sans-serif", color: C.inkSoft, whiteSpace: "nowrap", zIndex: 2 }}>
-          <span style={{ font: "500 9px 'IBM Plex Mono', monospace", color, marginRight: 3 }}>{e.year}</span>{e.label}
+          <span style={{ font: "500 9px 'IBM Plex Mono', monospace", color: c, marginRight: 3 }}>{e.year}</span>{e.label}
         </div>
       )}
     </React.Fragment>
   );
 }
 
-function Brace({ a, x, ppy, onDelete }) {
+function MediaPin({ m, x, source, storage, onOpen }) {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let dead = false, made = null;
+    if (source?.blobKey && storage) {
+      storage.loadBlob(source.blobKey).then((blob) => {
+        if (!dead && blob && (source.type === "image" || blob.type?.startsWith("image/"))) {
+          made = URL.createObjectURL(blob); setUrl(made);
+        }
+      }).catch(() => {});
+    }
+    return () => { dead = true; if (made) URL.revokeObjectURL(made); };
+  }, [source, storage]);
+  return (
+    <div onPointerDown={stopPD} onClick={onOpen} title={source?.title || m.label || "Media"}
+      style={{ position: "absolute", left: x(m.year) - 9, top: 4, width: 18, height: 18, borderRadius: 3, overflow: "hidden", zIndex: 4, cursor: "pointer",
+        border: `1.5px solid ${m.color || C.slate}`, background: C.paperHi, display: "flex", alignItems: "center", justifyContent: "center", font: "11px" }}>
+      {url ? <img src={url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : "❏"}
+    </div>
+  );
+}
+
+function Brace({ a, x, ppy, research, onOpen, onDelete }) {
   const w = Math.max(18, (a.end - a.start) * ppy);
+  const c = a.color || C.focus;
   return (
     <div style={{ position: "absolute", left: x(a.start), top: 3, width: w, zIndex: 6 }}>
-      <div title={a.note} style={{ font: "italic 500 10px Fraunces, Georgia, serif", color: C.focus, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: Math.max(w, 220), marginBottom: 1 }}>
-        ❧ {a.note}
-        <span onClick={onDelete} title="Remove research note" style={{ cursor: "pointer", marginLeft: 5, color: C.inkSoft, fontStyle: "normal" }}>×</span>
+      <div onPointerDown={stopPD} onClick={onOpen} title={a.note} style={{ font: "italic 500 10px Fraunces, Georgia, serif", color: c, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: Math.max(w, 220), marginBottom: 1, cursor: "pointer" }}>
+        ❧ {a.title || a.note}
+        {research && (
+          <span onPointerDown={stopPD} onClick={(e) => { e.stopPropagation(); onDelete(); }} title="Remove bracket" style={{ cursor: "pointer", marginLeft: 5, color: C.inkSoft, fontStyle: "normal" }}>×</span>
+        )}
       </div>
       <svg width={w} height={11} style={{ display: "block", overflow: "visible" }}>
-        <path d={bracePath(w, 11)} fill="none" stroke={C.focus} strokeWidth="1.4" strokeLinecap="round" />
+        <path d={bracePath(w, 11)} fill="none" stroke={c} strokeWidth="1.4" strokeLinecap="round" />
       </svg>
     </div>
   );
 }
 
-function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, annotations, onDeleteAnn, onHover, onLeave }) {
+function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, annotations, sourcesById, storage, research, onOpenItem, onDeleteAnn, onHover, onLeave }) {
   const braceZone = 30;
   const lifeY = height - 46;
   const { placed } = useMemo(() => packRows(person.periods || []), [person]);
@@ -180,22 +215,33 @@ function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, a
   const showLabels = ppy >= 4.5;
   const lifeEnd = person.death?.year || new Date().getFullYear();
   const events = useMemo(() => [...(person.events || [])].sort((a, b) => a.year - b.year), [person]);
+  const laneKey = "p:" + person.id;
+  const open = (kind, item) => onOpenItem({ kind, item, laneKey, laneId: person.id });
 
   return (
     <React.Fragment>
-      {(person.groups || []).filter((g) => visible(g.start, g.end)).map((g, i) => (
-        <div key={"g" + i} style={{
-          position: "absolute", left: x(g.start), top: braceZone - 4, width: Math.max(4, (g.end - g.start) * ppy),
-          height: height - braceZone - 6, border: `1px dashed ${hexA(color, 0.5)}`, background: hexA(color, 0.05), borderRadius: 4, zIndex: 0,
-        }}>
-          <span style={{ position: "absolute", top: -1, left: 6, font: "700 8.5px Archivo, sans-serif", letterSpacing: ".08em", textTransform: "uppercase", color: hexA(color, 0.85), background: C.paper, padding: "0 4px", transform: "translateY(-55%)" }}>{g.label}</span>
-        </div>
-      ))}
+      {(person.groups || []).filter((g) => visible(g.start, g.end)).map((g) => {
+        const gc = g.color || color;
+        return (
+          <div key={g.id} style={{
+            position: "absolute", left: x(g.start), top: braceZone - 4, width: Math.max(4, (g.end - g.start) * ppy),
+            height: height - braceZone - 6, border: `1px dashed ${hexA(gc, 0.5)}`, background: hexA(gc, 0.05), borderRadius: 4, zIndex: 0,
+          }}>
+            <span onPointerDown={stopPD} onClick={() => open("group", g)} style={{ position: "absolute", top: -1, left: 6, font: "700 8.5px Archivo, sans-serif", letterSpacing: ".08em", textTransform: "uppercase", color: hexA(gc, 0.95), background: C.paper, padding: "0 4px", transform: "translateY(-55%)", cursor: "pointer", pointerEvents: "auto" }}>{g.label}</span>
+          </div>
+        );
+      })}
 
       {person.birth?.year && visible(person.birth.year, lifeEnd) && (
         <div title={`${person.name} · ${person.birth.year}–${person.death?.year || "…"}`} style={{
-          position: "absolute", left: x(person.birth.year), top: lifeY, width: Math.max(2, (lifeEnd - person.birth.year) * ppy), height: 6, borderRadius: 3, zIndex: 1,
-          background: person.death?.year ? hexA(color, 0.75) : `linear-gradient(90deg, ${hexA(color, 0.75)}, ${hexA(color, 0)})`,
+          position: "absolute", left: x(person.birth.year), top: lifeY, width: Math.max(2, (lifeEnd - person.birth.year) * ppy), height: 6,
+          borderRadius: person.death?.year ? 3 : "3px 0 0 3px", zIndex: 1, background: hexA(color, 0.75),
+        }} />
+      )}
+      {!person.death?.year && person.birth?.year && visible(person.birth.year, lifeEnd) && (
+        <div style={{
+          position: "absolute", left: x(lifeEnd), top: lifeY, width: LIFE_TAIL, height: 6, borderRadius: "0 3px 3px 0", zIndex: 1,
+          background: `linear-gradient(90deg, ${hexA(color, 0.75)}, ${hexA(color, 0)})`,
         }} />
       )}
       {person.birth?.year && (
@@ -207,16 +253,22 @@ function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, a
           style={{ position: "absolute", left: x(person.death.year) - 4, top: lifeY - 2, width: 9, height: 9, background: color, zIndex: 3 }} />
       )}
 
-      {placed.filter((p) => visible(p.start, p.end)).map((p, i) => (
-        <PeriodBar key={"p" + i} p={p} x={x} ppy={ppy} color={color} top={braceZone + 4 + p.row * 17} />
+      {placed.filter((p) => visible(p.start, p.end)).map((p) => (
+        <PeriodBar key={p.id} p={p} x={x} ppy={ppy} color={color} top={braceZone + 4 + p.row * 17} onOpen={() => open("period", p)} />
       ))}
 
       {events.filter((e) => visible(e.year, e.year)).map((e, i) => (
-        <EventDot key={"e" + i} e={e} x={x} color={color} cy={lifeY + 3} showLabel={showLabels} labelRow={i % 2} onHover={onHover} onLeave={onLeave} />
+        <EventDot key={e.id} e={e} x={x} color={color} cy={lifeY + 3} showLabel={showLabels} labelRow={i % 2} onHover={onHover} onLeave={onLeave} onOpen={() => open("event", e)} />
+      ))}
+
+      {(person.media || []).filter((m) => visible(m.year, m.year)).map((m) => (
+        <MediaPin key={m.id} m={m} x={x} source={sourcesById[m.sourceId]} storage={storage} onOpen={() => open("media", m)} />
       ))}
 
       {annotations.filter((a) => visible(a.start, a.end)).map((a) => (
-        <Brace key={a.id} a={a} x={x} ppy={ppy} onDelete={() => onDeleteAnn(a.id)} />
+        <Brace key={a.id} a={a} x={x} ppy={ppy} research={research}
+          onOpen={() => onOpenItem({ kind: "annotation", item: a, laneKey: a.laneKey, laneId: person.id })}
+          onDelete={() => onDeleteAnn(a.id)} />
       ))}
 
       {crosshairYear != null && person.birth?.year && crosshairYear >= person.birth.year && crosshairYear <= lifeEnd && (
@@ -265,12 +317,13 @@ export default function App() {
     projectList, project, isDirty, isLoading,
     openProject, createProject, deleteProject, renameProject,
     addSource, deleteSource,
-    setPeople, setAnnotations, setFocusId, setRelativeIds, setView, setCtxOn,
+    setPeople, updatePerson, setAnnotations, setEras, setFocusId, setRelativeIds, setView, setCtxOn,
   } = useProject(storage);
 
   // Derive working state from project (fallbacks keep UI stable during load)
   const people = project?.people ?? SAMPLE_PEOPLE;
   const annotations = project?.annotations ?? SAMPLE_ANNOTATIONS;
+  const eras = project?.eras ?? SAMPLE_ERAS;
   const focusId = project?.settings?.focusPersonId ?? people[0]?.id ?? "i1";
   const relativeIds = project?.settings?.relativeIds ?? [];
   const view = project?.settings?.view ?? { left: 1842, ppy: 8 };
@@ -283,8 +336,8 @@ export default function App() {
   const [crosshair, setCrosshair] = useState(null);
   const [tooltip, setTooltip] = useState(null);
   const [draft, setDraft] = useState(null);
-  const [noteModal, setNoteModal] = useState(null);
-  const [noteText, setNoteText] = useState("");
+  const [itemModal, setItemModal] = useState(null);
+  const [legendOpen, setLegendOpen] = useState(false);
   const [addRelOpen, setAddRelOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [projectManagerOpen, setProjectManagerOpen] = useState(false);
@@ -298,6 +351,7 @@ export default function App() {
   const initRef = useRef(false);
 
   const byId = useMemo(() => Object.fromEntries(people.map((p) => [p.id, p])), [people]);
+  const sourcesById = useMemo(() => Object.fromEntries(sources.map((s) => [s.id, s])), [sources]);
   const focus = byId[focusId] || people[0];
   const relatives = relativeIds.map((id) => byId[id]).filter(Boolean);
   const ctxLanes = CONTEXT_LANES.filter((l) => ctxOn[l.id]);
@@ -401,11 +455,55 @@ export default function App() {
   const onPointerUp = () => {
     const d = dragRef.current;
     dragRef.current = null;
-    if (d?.kind === "ann" && draft && draft.end - draft.start > 0.15) {
-      setNoteModal({ ...draft, start: Math.round(draft.start * 2) / 2, end: Math.round(draft.end * 2) / 2 });
-      setNoteText("");
+    if (d?.kind === "ann") {
+      const laneKey = d.laneKey;
+      const laneIsPerson = laneKey.startsWith("p:");
+      const laneId = laneIsPerson ? laneKey.slice(2) : null;
+      if (draft && draft.end - draft.start > 0.75) {
+        const start = Math.round(draft.start), end = Math.round(draft.end);
+        setItemModal({ mode: "create", kind: laneIsPerson ? "group" : "era", laneKey, laneId, laneIsPerson, item: { start, end } });
+      } else if (laneIsPerson) {
+        // a click on empty person-lane space → new point event at that year
+        const year = Math.round(d.startYear);
+        setItemModal({ mode: "create", kind: "event", laneKey, laneId, laneIsPerson, item: { year, start: year, end: year } });
+      }
     }
     setDraft(null);
+  };
+
+  /* open an existing item: read-only in view mode, editable in research mode */
+  const openItem = (descriptor) => setItemModal({
+    ...descriptor,
+    mode: research ? "edit" : "view",
+    id: descriptor.item?.id,
+    laneIsPerson: descriptor.laneKey ? descriptor.laneKey.startsWith("p:") : false,
+  });
+
+  const saveItem = ({ kind, mode, id, laneKey, laneId, values }) => {
+    if (kind === "era") {
+      if (mode === "edit") setEras((es) => es.map((x) => (x.id === id ? { ...x, ...values } : x)));
+      else setEras((es) => [...es, createEra(values)]);
+    } else if (kind === "annotation") {
+      if (mode === "edit") setAnnotations((as) => as.map((x) => (x.id === id ? { ...x, ...values } : x)));
+      else setAnnotations((as) => [...as, createAnnotation({ laneKey, ...values })]);
+    } else {
+      const arrKey = ARR_KEY[kind];
+      const factory = { event: createEvent, period: createPeriod, group: createGroup, media: createMediaPin }[kind];
+      updatePerson(laneId, (p) => {
+        const arr = p[arrKey] ?? [];
+        return mode === "edit"
+          ? { ...p, [arrKey]: arr.map((x) => (x.id === id ? { ...x, ...values } : x)) }
+          : { ...p, [arrKey]: [...arr, factory(values)] };
+      });
+    }
+    setItemModal(null);
+  };
+
+  const deleteItem = ({ kind, id, laneId }) => {
+    if (kind === "era") setEras((es) => es.filter((x) => x.id !== id));
+    else if (kind === "annotation") setAnnotations((as) => as.filter((x) => x.id !== id));
+    else updatePerson(laneId, (p) => ({ ...p, [ARR_KEY[kind]]: (p[ARR_KEY[kind]] ?? []).filter((x) => x.id !== id) }));
+    setItemModal(null);
   };
 
   const showTip = (e, lines) => setTooltip({ x: e.clientX, y: e.clientY, lines: lines.filter(Boolean) });
@@ -520,9 +618,10 @@ export default function App() {
         </select>
 
         <button style={btnStyle(false)} onClick={() => setAddRelOpen(true)}>+ relative</button>
-        <button style={btnStyle(research)} onClick={() => setResearch((r) => !r)} title="Drag across any lane to mark a period for investigation">
+        <button style={btnStyle(research)} onClick={() => setResearch((r) => !r)} title="Drag across a lane to add items · click items to edit">
           {research ? "✓ research mode" : "❧ research mode"}
         </button>
+        <button style={btnStyle(legendOpen)} onClick={() => setLegendOpen(true)} title="Event marker legend">Legend</button>
 
         <span style={{ flex: 1 }} />
 
@@ -565,6 +664,17 @@ export default function App() {
             )}
             {ticks.minor.map((y) => <div key={"m" + y} style={{ position: "absolute", left: x(y), top: 0, bottom: 0, width: 1, background: C.ruleFaint }} />)}
             {ticks.major.map((y) => <div key={"M" + y} style={{ position: "absolute", left: x(y), top: 0, bottom: 0, width: 1, background: y % 100 === 0 ? hexA(C.ink, 0.35) : C.rule }} />)}
+
+            {/* era bands — full-board shared periods */}
+            {eras.filter((e) => e.end >= viewRange[0] && e.start <= viewRange[1]).map((e) => {
+              const ec = e.color || C.slate;
+              return (
+                <div key={e.id} style={{ position: "absolute", left: x(e.start), width: Math.max(2, (e.end - e.start) * view.ppy), top: 0, bottom: 0, background: hexA(ec, 0.07), borderLeft: `1px solid ${hexA(ec, 0.4)}`, borderRight: `1px solid ${hexA(ec, 0.4)}` }}>
+                  <span onPointerDown={stopPD} onClick={() => openItem({ kind: "era", item: e, laneKey: null, laneId: null })}
+                    style={{ position: "absolute", top: 2, left: 5, font: "700 8.5px Archivo, sans-serif", letterSpacing: ".1em", textTransform: "uppercase", color: C.paperHi, background: hexA(ec, 0.92), padding: "1px 5px", borderRadius: 2, cursor: "pointer", pointerEvents: "auto", whiteSpace: "nowrap" }}>{e.label}</span>
+                </div>
+              );
+            })}
           </div>
 
           {/* context lanes */}
@@ -608,6 +718,7 @@ export default function App() {
                 {track("p:" + focus.id, FOCUS_H,
                   <PersonLane person={focus} color={C.focus} height={FOCUS_H} x={x} ppy={view.ppy} viewRange={viewRange}
                     crosshairYear={crosshair?.year} annotations={laneFor("p:" + focus.id)}
+                    sourcesById={sourcesById} storage={storage} research={research} onOpenItem={openItem}
                     onDeleteAnn={(id) => setAnnotations((a) => a.filter((q) => q.id !== id))} onHover={showTip} onLeave={hideTip} />
                 )}
               </>
@@ -640,6 +751,7 @@ export default function App() {
               {track("p:" + p.id, REL_H,
                 <PersonLane person={p} color={relColor(i)} height={REL_H} x={x} ppy={view.ppy} viewRange={viewRange}
                   crosshairYear={crosshair?.year} annotations={laneFor("p:" + p.id)}
+                  sourcesById={sourcesById} storage={storage} research={research} onOpenItem={openItem}
                   onDeleteAnn={(id) => setAnnotations((a) => a.filter((q) => q.id !== id))} onHover={showTip} onLeave={hideTip} />
               )}
             </div>
@@ -669,7 +781,7 @@ export default function App() {
       {/* status / hints */}
       <div style={{ borderTop: `1.5px solid ${C.ink}`, padding: "5px 14px", display: "flex", gap: 18, font: "500 10.5px Archivo, sans-serif", color: C.inkSoft, background: C.paper }}>
         <span>scroll · zoom</span><span>drag · pan</span>
-        <span>{research ? "research mode: drag across a lane to mark a question" : "hover the board for the year & everyone's age"}</span>
+        <span>{research ? "research mode: drag a lane to add · click an item to edit" : "click any item for details · hover for the year & ages"}</span>
         <span style={{ flex: 1 }} />
         <label style={{ display: "flex", gap: 10 }}>
           {CONTEXT_LANES.map((l) => (
@@ -690,20 +802,32 @@ export default function App() {
         </div>
       )}
 
-      {/* note modal */}
-      {noteModal && (
-        <Modal title={`Research note · ${noteModal.start}–${noteModal.end}`} onClose={() => setNoteModal(null)}>
-          <textarea autoFocus value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3}
-            placeholder="What needs investigating in this period? Sources to check, hypotheses, gaps…"
-            style={{ width: "100%", boxSizing: "border-box", font: "500 12px Archivo, sans-serif", color: C.ink, background: "#fff", border: `1px solid ${C.ink}`, borderRadius: 3, padding: 8, resize: "vertical" }} />
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end", marginTop: 12 }}>
-            <button style={btnStyle(false)} onClick={() => setNoteModal(null)}>Cancel</button>
-            <button style={btnStyle(true)} onClick={() => {
-              if (noteText.trim()) {
-                setAnnotations((a) => [...a, { id: "a" + Date.now(), laneKey: noteModal.laneKey, start: noteModal.start, end: noteModal.end, note: noteText.trim() }]);
-              }
-              setNoteModal(null);
-            }}>Save note</button>
+      {/* item modal — create / edit / view */}
+      {itemModal && (
+        <ItemModal
+          descriptor={itemModal}
+          sources={sources}
+          storage={storage}
+          onSave={saveItem}
+          onDelete={deleteItem}
+          onClose={() => setItemModal(null)}
+        />
+      )}
+
+      {/* event marker legend */}
+      {legendOpen && (
+        <Modal title="Event markers" onClose={() => setLegendOpen(false)} width={300}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {Object.entries(EVENT_TYPES).map(([t, def]) => (
+              <div key={t} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ width: 18, textAlign: "center", color: def.color, font: "600 13px Archivo, sans-serif" }}>{def.icon}</span>
+                <span style={{ width: 12, height: 12, transform: "rotate(45deg)", background: C.paperHi, border: `1.8px solid ${def.color}`, display: "inline-block" }} />
+                <span style={{ font: "500 12px Archivo, sans-serif", color: C.ink }}>{def.label}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ font: "italic 500 11px Fraunces, Georgia, serif", color: C.inkSoft, marginTop: 12 }}>
+            In research mode, drag across a lane to add roles, groups, brackets, or eras; click any item to edit.
           </div>
         </Modal>
       )}

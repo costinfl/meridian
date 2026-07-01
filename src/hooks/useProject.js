@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { createProject } from "../models/project.js";
-import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS } from "../sampleData.js";
+import { createProject, normalizeProject } from "../models/project.js";
+import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS } from "../sampleData.js";
 
 const AUTOSAVE_MS = 1500;
 
@@ -24,16 +24,17 @@ export function useProject(storage) {
 
         let loaded;
         if (list.length === 0) {
-          const seed = createProject("Hariton Family", {
+          const seed = normalizeProject(createProject("Hariton Family", {
             people: SAMPLE_PEOPLE,
             annotations: SAMPLE_ANNOTATIONS,
+            eras: SAMPLE_ERAS,
             settings: { focusPersonId: "i1", relativeIds: ["i2", "i5"] },
-          });
+          }));
           await storage.saveProject(seed);
           list = [{ id: seed.id, name: seed.name, updatedAt: seed.updatedAt, personCount: seed.people.length }];
           loaded = seed;
         } else {
-          loaded = await storage.loadProject(list[0].id);
+          loaded = normalizeProject(await storage.loadProject(list[0].id));
         }
 
         if (!cancelled) {
@@ -87,7 +88,7 @@ export function useProject(storage) {
 
   const openProject = useCallback(async (id) => {
     try {
-      const p = await storage.loadProject(id);
+      const p = normalizeProject(await storage.loadProject(id));
       if (p) {
         skipAutoSave.current = true;
         setProjectState(p);
@@ -154,8 +155,17 @@ export function useProject(storage) {
     mutate((prev) => ({ ...prev, people: typeof fn === "function" ? fn(prev.people) : fn }));
   }, [mutate]);
 
+  // Update a single person by id (add/edit/delete their events/periods/groups/media).
+  const updatePerson = useCallback((id, fn) => {
+    mutate((prev) => ({ ...prev, people: prev.people.map((p) => (p.id === id ? fn(p) : p)) }));
+  }, [mutate]);
+
   const setAnnotations = useCallback((fn) => {
     mutate((prev) => ({ ...prev, annotations: typeof fn === "function" ? fn(prev.annotations) : fn }));
+  }, [mutate]);
+
+  const setEras = useCallback((fn) => {
+    mutate((prev) => ({ ...prev, eras: typeof fn === "function" ? fn(prev.eras ?? []) : fn }));
   }, [mutate]);
 
   const setFocusId = useCallback((id) => {
@@ -205,7 +215,9 @@ export function useProject(storage) {
     addSource,
     deleteSource,
     setPeople,
+    updatePerson,
     setAnnotations,
+    setEras,
     setFocusId,
     setRelativeIds,
     setView,

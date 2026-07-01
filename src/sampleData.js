@@ -5,15 +5,15 @@ export const SAMPLE_PEOPLE = [
     fatherId: "i2", motherId: "i3", spouseIds: ["i4"],
     events: [
       { year: 1875, label: "Marries Elena Băltăceanu", type: "marriage" },
-      { year: 1893, label: "Elected mayor of Ploiești", type: "office" },
+      { year: 1893, label: "Elected mayor of Ploiești", type: "office", note: "First of two mandates on the town council." },
       { year: 1907, label: "Estate spared in peasants' revolt", type: "note" },
       { year: 1921, label: "Land expropriated, agrarian reform", type: "property" },
     ],
     periods: [
-      { start: 1880, end: 1921, label: "Landowner at Săhăteni" },
-      { start: 1893, end: 1897, label: "Mayor of Ploiești" },
+      { start: 1880, end: 1921, label: "Landowner at Săhăteni", color: "#34635C" },
+      { start: 1893, end: 1897, label: "Mayor of Ploiești", color: "#445A75" },
     ],
-    groups: [{ start: 1880, end: 1921, label: "Săhăteni estate" }],
+    groups: [{ start: 1880, end: 1921, label: "Săhăteni estate", color: "#8A6A2F", note: "The family's principal holding until the agrarian reform." }],
   },
   {
     id: "i2", name: "Dumitru S. Hariton", sex: "M",
@@ -50,8 +50,8 @@ export const SAMPLE_PEOPLE = [
       { year: 1916, label: "Requisitions under occupation", type: "note" },
       { year: 1948, label: "Manor nationalized", type: "property" },
     ],
-    periods: [{ start: 1900, end: 1948, label: "Manages the Săhăteni manor" }],
-    groups: [{ start: 1900, end: 1948, label: "Săhăteni manor" }],
+    periods: [{ start: 1900, end: 1948, label: "Manages the Săhăteni manor", color: "#34635C" }],
+    groups: [{ start: 1900, end: 1948, label: "Săhăteni manor", color: "#8A6A2F" }],
   },
   {
     id: "i6", name: "Nicolae D. Hariton", sex: "M",
@@ -79,8 +79,14 @@ export const SAMPLE_PEOPLE = [
 ];
 
 export const SAMPLE_ANNOTATIONS = [
-  { id: "a1", laneKey: "p:i1", start: 1914, end: 1919, note: "War years — family whereabouts unverified. Check Ploiești parish registers." },
-  { id: "a2", laneKey: "p:i5", start: 1948, end: 1952, note: "After nationalization: fate unclear. Trace via property archives / CNSAS." },
+  { id: "a1", laneKey: "p:i1", start: 1914, end: 1919, title: "War-years gap", note: "War years — family whereabouts unverified. Check Ploiești parish registers.", color: "#8A3033" },
+  { id: "a2", laneKey: "p:i5", start: 1948, end: 1952, title: "Post-nationalization", note: "After nationalization: fate unclear. Trace via property archives / CNSAS.", color: "#8A3033" },
+];
+
+// Full-board era bands — big shared periods that span every lane.
+export const SAMPLE_ERAS = [
+  { id: "era1", start: 1881, end: 1947, label: "Kingdom of Romania", color: "#8A6A2F" },
+  { id: "era2", start: 1947, end: 1989, label: "Communist regime", color: "#54656C", note: "Nationalization, collectivization, and single-party rule." },
 ];
 
 export const CONTEXT_LANES = [
