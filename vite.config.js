@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
   plugins: [react()],
+  base: "/meridian/",
   server: { open: true, port: 5173 },
   test: {
     globals: true,
