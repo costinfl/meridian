@@ -1,17 +1,19 @@
 export const SAMPLE_PEOPLE = [
   {
     id: "i1", name: "Dumitru D. Hariton", sex: "M",
-    birth: { year: 1850, place: "Săhăteni" }, death: { year: 1927, place: "Ploiești" },
+    // A few facts are marked verified to show the sourced (solid) vs. unverified
+    // (dashed) marker treatment side by side on the default focus lane.
+    birth: { year: 1850, place: "Săhăteni", verified: true }, death: { year: 1927, place: "Ploiești", verified: true },
     fatherId: "i2", motherId: "i3", spouseIds: ["i4"],
     events: [
       { year: 1875, label: "Marries Elena Băltăceanu", type: "marriage" },
-      { year: 1893, label: "Elected mayor of Ploiești", type: "office", note: "First of two mandates on the town council." },
+      { year: 1893, label: "Elected mayor of Ploiești", type: "office", note: "First of two mandates on the town council.", verified: true },
       { year: 1907, label: "Estate spared in peasants' revolt", type: "note" },
       { year: 1921, label: "Land expropriated, agrarian reform", type: "property" },
     ],
     periods: [
       { start: 1880, end: 1921, label: "Landowner at Săhăteni", color: "#34635C" },
-      { start: 1893, end: 1897, label: "Mayor of Ploiești", color: "#445A75" },
+      { start: 1893, end: 1897, label: "Mayor of Ploiești", color: "#445A75", verified: true },
     ],
     groups: [{ start: 1880, end: 1921, label: "Săhăteni estate", color: "#8A6A2F", note: "The family's principal holding until the agrarian reform." }],
   },
@@ -48,7 +50,7 @@ export const SAMPLE_PEOPLE = [
     events: [
       { year: 1909, label: "Donation to the Săhăteni school", type: "note" },
       { year: 1916, label: "Requisitions under occupation", type: "note" },
-      { year: 1948, label: "Manor nationalized", type: "property" },
+      { year: 1948, label: "Manor nationalized", type: "property", verified: true },
     ],
     periods: [{ start: 1900, end: 1948, label: "Manages the Săhăteni manor", color: "#34635C" }],
     groups: [{ start: 1900, end: 1948, label: "Săhăteni manor", color: "#8A6A2F" }],

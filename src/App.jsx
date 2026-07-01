@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifiedBorderStyle, verifiedMarker } from "./theme.js";
+import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifiedBorderStyle, verifiedMarker, VERIFIED_MARK } from "./theme.js";
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin } from "./models/project.js";
 import { exportGedcom, parseGedcom } from "./gedcom.js";
@@ -819,8 +819,26 @@ export default function App() {
               </div>
             ))}
           </div>
+
+          <div style={{ height: 1, background: C.rule, margin: "12px 0" }} />
+          <div style={{ font: "700 8.5px Archivo, sans-serif", letterSpacing: ".08em", textTransform: "uppercase", color: C.inkSoft, marginBottom: 8 }}>
+            Border shows sourcing
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 18 }} />
+              <span style={{ width: 12, height: 12, transform: "rotate(45deg)", display: "inline-block", ...verifiedMarker(false, C.slate, { width: 1.8, fill: true, borderAlpha: 0.6 }) }} />
+              <span style={{ font: "500 12px Archivo, sans-serif", color: C.ink }}>Unverified — dashed, hollow</span>
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span style={{ width: 18 }} />
+              <span style={{ width: 12, height: 12, transform: "rotate(45deg)", display: "inline-block", ...verifiedMarker(true, C.slate, { width: 1.8, fill: true, borderAlpha: 0.6 }) }} />
+              <span style={{ font: "500 12px Archivo, sans-serif", color: C.ink }}>Verified {VERIFIED_MARK} — solid, filled</span>
+            </div>
+          </div>
+
           <div style={{ font: "italic 500 11px Fraunces, Georgia, serif", color: C.inkSoft, marginTop: 12 }}>
-            In research mode, drag across a lane to add roles, groups, brackets, or eras; click any item to edit.
+            Facts start unverified; mark an item Verified in its editor once you've sourced it. Only verified facts are written to standard GEDCOM export. In research mode, drag across a lane to add roles, groups, brackets, or eras; click any item to edit.
           </div>
         </Modal>
       )}
