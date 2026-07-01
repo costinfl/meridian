@@ -28,6 +28,25 @@ export const btnStyle = (active) => ({
   whiteSpace: "nowrap",
 });
 
+/* ── "Verified" affordance ──────────────────────────────────────────────
+   Verified facts read as solid, filled markers tagged with a ✓; unverified
+   ones are dashed and hollow. Centralized so every lane item stays in step. */
+export const VERIFIED_MARK = "✓";
+
+// "✓ " (prefix) or " ✓" (suffix) when verified, else "" — for labels/tooltips.
+export const verifiedTick = (verified, pos = "prefix") =>
+  verified ? (pos === "suffix" ? ` ${VERIFIED_MARK}` : `${VERIFIED_MARK} `) : "";
+
+export const verifiedBorderStyle = (verified) => (verified ? "solid" : "dashed");
+
+// Fill + border for a point marker (dot/diamond). `width` = border px; `fill`
+// paints the marker with `color` when verified (else paper); `borderAlpha`,
+// when given, fades the border via hexA(color, verified ? 1 : borderAlpha).
+export const verifiedMarker = (verified, color, { width = 1.5, fill = false, borderAlpha } = {}) => ({
+  background: fill && verified ? color : C.paperHi,
+  border: `${width}px ${verified ? "solid" : "dashed"} ${borderAlpha == null ? color : hexA(color, verified ? 1 : borderAlpha)}`,
+});
+
 /* Event marker types — icon + color per `event.type`. `note` is the neutral
    fallback for unknown/legacy types. */
 export const EVENT_TYPES = {

@@ -11,7 +11,12 @@ const KIND_META = {
   annotation: { label: "Bracket",           point: false, titleField: "title" },
   era:        { label: "Era band",          point: false, titleField: "label" },
   media:      { label: "Media pin",          point: true,  titleField: "label", needsSource: true },
+  birth:      { label: "Birth",             point: true,  titleField: "place", fact: true },
+  death:      { label: "Death",             point: true,  titleField: "place", fact: true },
 };
+
+// Kinds that carry a `verified` flag (i.e. can flow into standard GEDCOM export).
+const VERIFIABLE = new Set(["event", "period", "group", "birth", "death"]);
 
 const PERSON_KINDS = ["event", "period", "group", "annotation", "era", "media"];
 const CONTEXT_KINDS = ["era"];
@@ -37,6 +42,7 @@ function initForm(kind, item) {
     note: item?.note ?? "",
     color: item?.color ?? null,
     sourceId: item?.sourceId ?? "",
+    verified: !!item?.verified,
   };
 }
 
@@ -94,8 +100,15 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
   const doSave = () => {
     const meta2 = KIND_META[kind];
     const num = (v) => { const n = parseInt(v, 10); return isNaN(n) ? null : n; };
+    const emit = (values) => onSave({ kind, mode, id: descriptor.id, laneKey: descriptor.laneKey, laneId: descriptor.laneId, values });
+
+    if (meta2.fact) { // birth / death — year + place + verified only
+      emit({ year: num(form.year), place: form.title.trim(), verified: form.verified });
+      return;
+    }
     const values = { [meta2.titleField]: form.title.trim(), note: form.note.trim() || "", color: form.color, sourceId: form.sourceId || null };
     if (meta2.hasType) values.type = form.type;
+    if (VERIFIABLE.has(kind)) values.verified = form.verified;
     if (meta2.point) {
       values.year = num(form.year);
       if (values.year == null) return;
@@ -106,8 +119,15 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
       values.start = Math.min(a, b);
       values.end = Math.max(a, b);
     }
-    onSave({ kind, mode, id: descriptor.id, laneKey: descriptor.laneKey, laneId: descriptor.laneId, values });
+    emit(values);
   };
+
+  const verifiedBadge = (on) => (
+    <span style={{ font: "700 9px Archivo, sans-serif", letterSpacing: ".08em", textTransform: "uppercase", padding: "1px 6px", borderRadius: 2,
+      color: on ? C.paperHi : C.inkSoft, background: on ? "#34635C" : hexA(C.ink, 0.08), border: `1px solid ${on ? "#34635C" : C.rule}` }}>
+      {on ? "✓ Verified" : "Unverified"}
+    </span>
+  );
 
   const title = mode === "view" ? (form.title || meta.label) : mode === "edit" ? `Edit ${meta.label.toLowerCase()}` : "New timeline item";
 
@@ -122,6 +142,7 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
             {et ? `${et.icon} ${et.label}` : meta.label}
           </span>
           <span style={{ font: "500 12px 'IBM Plex Mono', monospace", color: C.inkSoft }}>{dateText}</span>
+          {VERIFIABLE.has(kind) && verifiedBadge(!!descriptor.item?.verified)}
         </div>
         {descriptor.item?.note && (
           <div style={{ ...valueStyle, whiteSpace: "pre-wrap", color: C.inkSoft, marginTop: 8 }}>{descriptor.item.note}</div>
@@ -157,8 +178,8 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
         </>
       )}
 
-      <label style={labelStyle}>{meta.titleField === "title" ? "Title" : "Label"}{kind === "media" ? " (optional)" : ""}</label>
-      <input autoFocus value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder={meta.label} style={fieldStyle} />
+      <label style={labelStyle}>{meta.fact ? "Place" : meta.titleField === "title" ? "Title" : "Label"}{kind === "media" ? " (optional)" : ""}</label>
+      <input autoFocus value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder={meta.fact ? "Place" : meta.label} style={fieldStyle} />
 
       {meta.point ? (
         <>
@@ -191,17 +212,21 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
         </>
       )}
 
-      <label style={labelStyle}>Color</label>
-      <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-        <button onClick={() => set({ color: null })} title="Default color"
-          style={{ width: 22, height: 22, borderRadius: 3, cursor: "pointer", background: C.paper, border: form.color == null ? `2px solid ${C.ink}` : `1px solid ${C.rule}`, font: "700 9px Archivo", color: C.inkSoft }}>A</button>
-        {ITEM_COLORS.map((c) => (
-          <button key={c} onClick={() => set({ color: c })} title={c}
-            style={{ width: 22, height: 22, borderRadius: 3, cursor: "pointer", background: c, border: form.color === c ? `2px solid ${C.ink}` : `1px solid ${hexA(C.ink, 0.2)}` }} />
-        ))}
-      </div>
+      {!meta.fact && (
+        <>
+          <label style={labelStyle}>Color</label>
+          <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+            <button onClick={() => set({ color: null })} title="Default color"
+              style={{ width: 22, height: 22, borderRadius: 3, cursor: "pointer", background: C.paper, border: form.color == null ? `2px solid ${C.ink}` : `1px solid ${C.rule}`, font: "700 9px Archivo", color: C.inkSoft }}>A</button>
+            {ITEM_COLORS.map((c) => (
+              <button key={c} onClick={() => set({ color: c })} title={c}
+                style={{ width: 22, height: 22, borderRadius: 3, cursor: "pointer", background: c, border: form.color === c ? `2px solid ${C.ink}` : `1px solid ${hexA(C.ink, 0.2)}` }} />
+            ))}
+          </div>
+        </>
+      )}
 
-      {sources.length > 0 && (
+      {!meta.fact && sources.length > 0 && (
         <>
           <label style={labelStyle}>Source{kind === "media" ? " *" : " (optional)"}</label>
           <select value={form.sourceId} onChange={(e) => set({ sourceId: e.target.value })} style={fieldStyle}>
@@ -215,7 +240,7 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
         <div style={{ font: "italic 500 11px Fraunces, Georgia, serif", color: C.focus, marginTop: 8 }}>Add an image or document in the Sources panel first, then pin it here.</div>
       )}
 
-      {kind !== "media" && (
+      {kind !== "media" && !meta.fact && (
         <>
           <label style={labelStyle}>Note</label>
           <textarea value={form.note} onChange={(e) => set({ note: e.target.value })} rows={3}
@@ -223,9 +248,20 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
         </>
       )}
 
+      {VERIFIABLE.has(kind) && (
+        <>
+          <label style={labelStyle}>Verification</label>
+          <button onClick={() => set({ verified: !form.verified })} title="Only verified facts are written to standard GEDCOM export"
+            style={{ display: "inline-flex", alignItems: "center", gap: 7, cursor: "pointer", background: "none", border: "none", padding: 0 }}>
+            <span style={{ width: 16, height: 16, borderRadius: 3, border: `1.5px solid ${form.verified ? "#34635C" : C.rule}`, background: form.verified ? "#34635C" : "#fff", color: C.paperHi, font: "700 11px Archivo", display: "flex", alignItems: "center", justifyContent: "center" }}>{form.verified ? "✓" : ""}</span>
+            <span style={{ font: "500 12px Archivo, sans-serif", color: C.ink }}>Verified — include in GEDCOM export</span>
+          </button>
+        </>
+      )}
+
       <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 14 }}>
         <div>
-          {mode === "edit" && (
+          {mode === "edit" && !meta.fact && (
             <button style={{ ...btnStyle(false), color: C.focus, borderColor: hexA(C.focus, 0.5) }} onClick={() => onDelete({ kind, id: descriptor.id, laneId: descriptor.laneId })}>Delete</button>
           )}
         </div>
