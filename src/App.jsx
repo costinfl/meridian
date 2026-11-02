@@ -11,6 +11,7 @@ import { ItemModal } from "./components/ItemModal.jsx";
 import { ProjectManager } from "./components/ProjectManager.jsx";
 import { SourcesPanel } from "./components/SourcesPanel.jsx";
 import { isEvidenceEnabled } from "./evidenceFlag.js";
+import { requestPersistence } from "./storage/persistence.js";
 
 // Evidence UI is code-split: nothing is downloaded unless the flag is on and the panel is opened.
 const EvidencePanel = lazy(() => import("./components/evidence/EvidencePanel.jsx"));
@@ -286,6 +287,7 @@ export default function App() {
   const [sourcesOpen, setSourcesOpen] = useState(false);
   const [evidenceOpen, setEvidenceOpen] = useState(false);
   const evidenceOn = isEvidenceEnabled(project);
+  useEffect(() => { if (evidenceOn) requestPersistence(); }, [evidenceOn]);
 
   const contentRef = useRef(null);
   const viewRef = useRef(view);
@@ -481,6 +483,7 @@ export default function App() {
     try {
       const blob = await exportProjectZip(project, storage);
       downloadBlob(blob, `${safeProjectName}.meridian.zip`);
+      storage.putSetting("lastBundleExportAt", new Date().toISOString()).catch(() => {});
       flash("Exported Meridian bundle (.zip) — full fidelity");
     } catch (err) {
       console.error("Meridian: bundle export failed", err);
@@ -901,7 +904,7 @@ export default function App() {
       {/* evidence layer (behind the evidenceUi flag, lazy-loaded) */}
       {evidenceOn && evidenceOpen && (
         <Suspense fallback={null}>
-          <EvidencePanel onClose={() => setEvidenceOpen(false)} />
+          <EvidencePanel storage={storage} onClose={() => setEvidenceOpen(false)} />
         </Suspense>
       )}
 

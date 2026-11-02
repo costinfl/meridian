@@ -1,9 +1,21 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { C } from "../../theme.js";
+import { getStorageStatus, describeStorage } from "../../storage/persistence.js";
 
 // Evidence layer entry point. Empty in Phase 1; later phases add the library, runs, review and search.
 // Loaded lazily from App.jsx so it adds nothing to the main bundle while the flag is off.
-export default function EvidencePanel({ onClose }) {
+export default function EvidencePanel({ onClose, storage }) {
+  const [line, setLine] = useState("Checking storage…");
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const status = await getStorageStatus();
+      let last;
+      try { last = await storage?.getSetting("lastBundleExportAt"); } catch { /* ignore */ }
+      if (alive) setLine(describeStorage(status, last));
+    })();
+    return () => { alive = false; };
+  }, [storage]);
   return (
     <div
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
@@ -19,6 +31,7 @@ export default function EvidencePanel({ onClose }) {
         <div style={{ font: "400 12px Archivo, sans-serif", color: C.inkSoft, lineHeight: 1.5 }}>
           The evidence layer is under construction. Nothing here changes your project yet.
         </div>
+        <div data-testid="storage-status" style={{ marginTop: 12, font: "400 11px 'IBM Plex Mono', monospace", color: C.inkSoft, lineHeight: 1.5 }}>{line}</div>
         <div style={{ marginTop: 14, textAlign: "right" }}>
           <button onClick={onClose} style={{ font: "600 12px Archivo, sans-serif", color: C.ink, background: C.paperHi, border: `1px solid ${C.ink}`, borderRadius: 3, padding: "5px 10px", cursor: "pointer" }}>Close</button>
         </div>
