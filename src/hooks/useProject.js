@@ -218,6 +218,10 @@ export function useProject(storage) {
     }));
   }, [mutate]);
 
+  const setEvidenceUi = useCallback((on) => {
+    mutate((prev) => ({ ...prev, settings: { ...prev.settings, evidenceUi: !!on } }));
+  }, [mutate]);
+
   return {
     projectList,
     project,
@@ -240,5 +244,6 @@ export function useProject(storage) {
     setRelativeIds,
     setView,
     setCtxOn,
+    setEvidenceUi,
   };
 }

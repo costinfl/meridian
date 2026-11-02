@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, Suspense, lazy } from "react";
 import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifiedBorderStyle, verifiedMarker, VERIFIED_MARK } from "./theme.js";
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin } from "./models/project.js";
@@ -10,6 +10,10 @@ import { Modal } from "./components/Modal.jsx";
 import { ItemModal } from "./components/ItemModal.jsx";
 import { ProjectManager } from "./components/ProjectManager.jsx";
 import { SourcesPanel } from "./components/SourcesPanel.jsx";
+import { isEvidenceEnabled } from "./evidenceFlag.js";
+
+// Evidence UI is code-split: nothing is downloaded unless the flag is on and the panel is opened.
+const EvidencePanel = lazy(() => import("./components/evidence/EvidencePanel.jsx"));
 
 /* Stop a click on an interactive timeline item from starting a board pan/drag. */
 const stopPD = (e) => e.stopPropagation();
@@ -280,6 +284,8 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [projectManagerOpen, setProjectManagerOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  const evidenceOn = isEvidenceEnabled(project);
 
   const contentRef = useRef(null);
   const viewRef = useRef(view);
@@ -636,6 +642,11 @@ export default function App() {
         >
           Sources{sources.length > 0 ? ` (${sources.length})` : ""}
         </button>
+        {evidenceOn && (
+          <button style={btnStyle(evidenceOpen)} onClick={() => setEvidenceOpen((o) => !o)} title="Evidence layer (preview)">
+            Evidence
+          </button>
+        )}
 
         <span style={{ width: 1, height: 22, background: C.rule }} />
         <button style={btnStyle(false)} onClick={() => zoomAt(trackW / 2, 1.45)}>+</button>
@@ -885,6 +896,13 @@ export default function App() {
           onUpdate={updateSource}
           onClose={() => setSourcesOpen(false)}
         />
+      )}
+
+      {/* evidence layer (behind the evidenceUi flag, lazy-loaded) */}
+      {evidenceOn && evidenceOpen && (
+        <Suspense fallback={null}>
+          <EvidencePanel onClose={() => setEvidenceOpen(false)} />
+        </Suspense>
       )}
 
       {/* toast */}

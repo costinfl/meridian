@@ -15,6 +15,7 @@ export function createProject(name, { people = [], annotations = [], eras = [], 
       relativeIds: [],
       view: { left: 1842, ppy: 8 },
       ctxOn: { local: true, national: true, global: true },
+      evidenceUi: false, // feature flag for the unfinished evidence layer UI
       ...settings,
     },
   };
