@@ -6,7 +6,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 0 — Discovery
 - **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 0. Reviewer must answer Open question 1 (stack mismatch) before Phase 1 can be planned.
+- **Next action:** Wait for reviewer decision on `tech-stack-assessment.md` (Open question 1). Then revise `IMPLEMENTATION_PLAN.md` per its section 6 and wait for review of Phase 0. Do not start Phase 1.
 - **Last updated:** 2026-11-02
 
 ## Phase overview
@@ -185,6 +185,7 @@ Filled in during P0.T2. Existing model is one JSON document per project (`src/mo
 
 | Date | Phase/Task | Decision or deviation | Reason | Alternatives considered |
 | --- | --- | --- | --- | --- |
+| 2026-11-02 | P0 | PROPOSED (not applied): replace Java/Postgres server with browser-local PGlite; drop Apache AGE and pgvector. | Reviewer rejected the Java/Postgres backend; spike confirmed needed Postgres features run in PGlite. See `tech-stack-assessment.md`. | Node + Postgres server; local Node helper. |
 | 2026-11-02 | P0 | Worked on the session-designated branch `ccr-adaa4345-wbnkkm` instead of `evidence/p0`. | The cloud session is restricted to pushing that branch. | Create `evidence/p0` (would need push permission). |
 
 ## Module layout proposal (P0.T4)
@@ -211,7 +212,7 @@ The plan's target (`meridian-evidence`, `-conclusions`, `-ingest`, `-graph`, `-a
 
 ## Open questions for the reviewer
 
-1. **Stack decision (blocks Phase 1).** The plan assumes Java + Postgres + Flyway + Testcontainers, but Meridian is a client-only React/Vite SPA on IndexedDB, deployed to GitHub Pages. Which option: (A) new Java backend + Postgres, (B) new Node/TypeScript backend + Postgres, or (C) client-only redesign? Recommendation: A or B (see C1). Also: where will the backend be hosted?
+1. **Stack decision (blocks Phase 1). Reviewer says the plan's Java + Postgres backend is wrong; assessment written in `tech-stack-assessment.md`, recommending local-first browser app with PGlite (Option C), dropping AGE and pgvector. Awaiting decision.** Original question: The plan assumes Java + Postgres + Flyway + Testcontainers, but Meridian is a client-only React/Vite SPA on IndexedDB, deployed to GitHub Pages. Which option: (A) new Java backend + Postgres, (B) new Node/TypeScript backend + Postgres, or (C) client-only redesign? Recommendation: A or B (see C1). Also: where will the backend be hosted?
 2. May the SPA be moved under `web/`, or should it stay at the repo root?
 3. May I add `npm test` to the CI workflow and regenerate `package-lock.json` (C7, C8)?
 4. Is `master` the integration branch, and may I use `evidence/pN` branches (the session currently restricts me to `ccr-adaa4345-wbnkkm`)?
@@ -256,3 +257,4 @@ Template for each phase:
 | Date | Tasks worked on | Commits | Notes |
 | --- | --- | --- | --- |
 | 2026-11-02 | P0.T1-P0.T5 | see git log | Discovery only; found stack mismatch; awaiting review. |
+| 2026-11-02 | Stack assessment | see git log | Spike of PGlite in scratch dir (not committed); wrote tech-stack-assessment.md. |
