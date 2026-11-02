@@ -5,15 +5,15 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 ## Current status
 
 - **Current phase:** 0 — Discovery
-- **Phase status:** not started  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Start P0.T1 (confirm environment facts below).
-- **Last updated:** 2026-11-02 (plan revised for the client-only stack, see Decisions log)
+- **Phase status:** approved  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** Phase 0 is approved. After the Phase 0 pull request is merged, start Phase 1 on `evidence/p1`, task P1.T1.
+- **Last updated:** 2026-11-02 (Phase 0 complete)
 
 ## Phase overview
 
 | Phase | Status | Branch | Approved |
 | --- | --- | --- | --- |
-| 0 Discovery | not started | evidence/p0 | |
+| 0 Discovery | approved | evidence/p0 (done on `ccr-adaa4345-wbnkkm`, see log) | 2026-11-02 |
 | 1 Foundation | not started | evidence/p1 | |
 | 2 Library sources and text | not started | evidence/p2 | |
 | 3 Evidence, places, names, dates | not started | evidence/p3 | |
@@ -31,13 +31,13 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 0
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P0.T1 | todo | | |
-| P0.T2 | todo | | |
-| P0.T3 | todo | | |
-| P0.T4 | todo | | |
-| P0.T5 | todo | | |
-| P0.T6 | todo | | |
-| P0.T7 | todo | | |
+| P0.T1 | done | docs/evidence-layer/PROGRESS.md | see sections below |
+| P0.T2 | done | docs/evidence-layer/PROGRESS.md | see sections below |
+| P0.T3 | done | docs/evidence-layer/PROGRESS.md | see sections below |
+| P0.T4 | done | docs/evidence-layer/PROGRESS.md | see sections below |
+| P0.T5 | done | docs/evidence-layer/PROGRESS.md | see sections below |
+| P0.T6 | done | docs/evidence-layer/PROGRESS.md | see sections below |
+| P0.T7 | done | docs/evidence-layer/PROGRESS.md | see sections below |
 
 ### Phase 1
 | ID | Status | Files touched | Notes |
@@ -128,7 +128,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 
 ## Environment facts
 
-Pre-filled from commit `243bf1c` by the planning session; P0.T1 confirms or corrects them.
+Pre-filled from commit `243bf1c` by the planning session; **confirmed in P0.T1 on 2026-11-02 (commit `8bd5f41`) with the corrections listed under the table.**
 
 | Item | Value |
 | --- | --- |
@@ -142,34 +142,157 @@ Pre-filled from commit `243bf1c` by the planning session; P0.T1 confirms or corr
 | Lint / format | No ESLint or Prettier config in the repo at this commit |
 | Docs | ADRs in `docs/adr/` (0001–0004); `README.md` is out of date (describes the single-file `App.jsx`) |
 
+**P0.T1 confirmation and corrections**
+- Confirmed as written: Vite 5.4.21, React 18.3.1, `jszip` 3.10.1, IndexedDB `meridian-v1` v1 with stores `projects` and `blobs`, Vitest 4.1.9 + jsdom 29 + fake-indexeddb 6.2.5 + Testing Library, Pages deploy with Node 20 and no test job, no ESLint/Prettier/editorconfig.
+- Correction: ADRs are now 0001-0005 (0005 is **Proposed**, not yet Accepted).
+- Correction: README is stale in more than one place (single-component claim at README.md:162; the swimlane, research mode and share features have since moved into `components/`, `hooks/`, `share.js`, `gedcom.js`).
+- Addition: attached blobs are keyed `blob_<timestamp>_<fileName>` (`SourcesPanel.jsx:58`), not by content hash, so duplicates are possible today.
+- Addition: the adapter caches one open connection (`IndexedDBAdapter._open`) and has **no** `onversionchange` / `onblocked` handling; with two tabs open, a version upgrade in one tab would be blocked until the other closes (see Risks, R1).
+- Addition: the seed project (`useProject.js:26`) is built from `SAMPLE_PEOPLE`, `SAMPLE_ANNOTATIONS`, `SAMPLE_ERAS` and has an empty `sources` list.
+- Addition: in the dev container `npm ci` fails with npm 10.9.9 (`EUSAGE`, lockfile lacks `esbuild@0.28.2` entries); `npx -y npm@latest ci` works, which matches what CI does (`npm install -g npm@latest`). The plan's "run `npm ci`" step therefore needs that workaround locally (see Open question 6).
+
 ## Existing model → design mapping
-<!-- Filled in during P0.T2. Starting point from the planning session: -->
+Confirmed and extended in P0.T2. Sample-data counts come from `SAMPLE_PEOPLE` (the seed project), measured with a script run outside the repo.
 
 | Existing | Design | Notes |
 | --- | --- | --- |
-| `project.people[]` | Person | Kept in place |
-| `birth`, `death`, `events`, `periods`, `groups` (each with `sourceId`, `verified`) | Person facts → assertions | `verified` ⇔ preferred assertion confirmed |
-| `fatherId`, `motherId`, `spouseIds` | Family | Family becomes source of truth; fields derived (to confirm at Phase 0 review) |
-| `project.sources[]` (+ blob) | Project source list → LibrarySource + DigitalCopy | Linked via `librarySourceId` |
-| `project.annotations` (braces), `eras`, `media` | No change | Braces may later cite assertions / ProofNotes |
+| `project.people[]` (8 in sample) | Person | Kept in place; shape unchanged. |
+| `birth`, `death` (`{year, place, verified}`) | Person facts → assertions | Year only and free-text place; FuzzyDate precision `year`. 8 births, 8 deaths in sample; 1 verified of each. |
+| `events[]` (14), `periods[]` (7), `groups[]` (2) with `sourceId`, `verified` | Person facts → assertions (`assertionIds`, `preferredAssertionId`) | 2 events and 1 period verified; groups none. Free-text `label` and small `type` vocabulary: the legacy property is the kind plus label. |
+| Totals in sample | | **39 facts, 5 verified, 0 with a `sourceId`**, no media pins, 0 project sources. So the sample proves the "verified without source" case: those legacy assertions must cite the "Legacy Meridian data" source (I2 exception). |
+| `fatherId`, `motherId`, `spouseIds` (5 with father, 4 with mother, 4 with spouses) | Family | Families are not stored today; `gedcom.js:43-56` already derives them by key (parents pair, plus spouse pairs). P4.T2 can reuse that derivation so the results are identical (I8). Nothing in the UI writes these fields (see impact list). |
+| `project.sources[]` (+ blob) | Project source list → LibrarySource + DigitalCopy | Link through `librarySourceId` (P2.T7). `repository` and `citation` are free text; `verified` is a source-level flag (used by GEDCOM `SOUR` records, `gedcom.js:39`). |
+| Blob store key `blob_<ts>_<name>` | DigitalCopy `storage: blob` | Hash is computed when first linked; existing keys stay valid. |
+| `project.annotations` (braces), `project.eras`, `person.media` (pins) | No change | Braces may later cite assertions/ProofNotes (P6.T5 / Backlog). |
+| `project.settings` | Feature flag `evidenceUi` | Added in P1.T5; `normalizeProject` does not currently touch `settings`. |
+| Native bundle `project.json` + `media/` | Bundle v2 adds `evidence.json` | `share.js` imports via `normalizeProject`, so older bundles keep loading. |
+| GEDCOM export/import | Unchanged | Export reads the derived `fatherId/motherId/spouseIds` and `verified`; import ignores FAMC/FAMS (`gedcom.js:184`) and creates people with `spouseIds: []` (`gedcom.js:154`). |
+
+### Impact list for Phase 4 (P0.T3): code touching `fatherId`, `motherId`, `spouseIds`, `verified`, `sourceId`
+Non-test code (line numbers at commit `8bd5f41`):
+
+| Area | Where | Reads / writes |
+| --- | --- | --- |
+| Relationship inference | `src/App.jsx:63-71` | **reads** `fatherId`, `motherId`, `spouseIds` (labels father/mother/spouse/child/sibling/grandparent/grandchild) |
+| Verified count for export toast | `src/App.jsx:463-467` | reads `verified` on birth, death, events, periods, groups |
+| Timeline markers and tooltips | `src/App.jsx:81-97, 167, 185-190` | reads `verified` (via `verifiedTick/verifiedBorderStyle/verifiedMarker` in `theme.js`) |
+| Media pin source lookup | `src/App.jsx:202` | reads `m.sourceId` |
+| Item editor | `src/components/ItemModal.jsx:18, 44-45, 98, 105-111, 115, 125-145, 232, 254-256` | **reads and writes** `sourceId`, `verified`; `VERIFIABLE` = event, period, group, birth, death |
+| Source panel | `src/components/SourcesPanel.jsx:36, 76, 175, 284-287` | reads and writes source-level `verified` |
+| Model factories | `src/models/project.js:41, 51-77` | define `sourceId` / `verified` defaults |
+| GEDCOM export | `src/gedcom.js:39, 43-56, 59-62, 71-95` | reads all of the above; family derivation is here |
+| GEDCOM import | `src/gedcom.js:154, 184, 218` | writes `spouseIds: []`, ignores FAMC/FAMS, sets `sourceId` from `SOUR` records |
+| Seed data | `src/sampleData.js` | defines all fields |
+| Tests | `src/tests/gedcom.test.js` (37 matches), `models.test.js` (13), `share.test.js` (1) | assert on the fields above |
+
+Not touched anywhere else: `useProject.js`, `share.js` and `StorageService`/adapter never mention these fields. **No component writes `fatherId`, `motherId` or `spouseIds`** (they come only from sample data); this makes "Family becomes the source of truth" a low-risk change: the derivation in `normalizeProject` can recreate the same values, and the only editing UI to add is new.
+
+## Library proposals (P0.T4)
+Sizes are raw (not gzipped) file sizes from the installed packages. "Spike" means I built and ran it with the repo's Vite 5.4.21 and the pre-installed Chromium 153 (scratch project outside the repo, not committed). All of these are lazy-loaded only when evidence features are used.
+
+| Need | Proposal | Version / licence | Size | Evidence and reason |
+| --- | --- | --- | --- | --- |
+| PDF text, word boxes, rendering | **pdfjs-dist** | 6.5.438, Apache-2.0 | `pdf.min.mjs` 474 kB + `pdf.worker.min.mjs` 1,272 kB | Spike: in a module Worker built by Vite 5, `getTextContent` returned the Romanian text with diacritics and positions; rendering to `OffscreenCanvas` worked. pdf.js logs "Setting up fake worker" when run inside our own worker; harmless. Actively maintained (published 2026-11-01). |
+| DOCX → text | **mammoth** | 1.13.0, BSD-2-Clause | ~2 MB unpacked (browser bundle size not measured) | Not exercised in the spike. Maintained (2026-09). Phase 5 task P5.T3 must measure the bundle. |
+| OCR | **tesseract.js** + Romanian `ron` data | 7.0.0, Apache-2.0; `@tesseract.js-data/ron` 1.0.0, MIT | `worker.min.js` 111 kB; WASM core 2.9-4.7 MB per variant (browser picks one); `ron` best_int 1.69 MB gz | Spike (self-hosted worker, core and language data, `gzip: true`): 3-line Romanian image with ş/ă/î/ț recognised exactly, confidence 93, 0.73 s in headless Chromium. This is a clean synthetic image, **not** evidence about scanned registers; Phase 5 review decides. Works without cross-origin isolation (GitHub Pages cannot send COOP/COEP). |
+| Full-text search | **MiniSearch** | 7.2.0, MIT | ~640 kB package dir (min file far smaller; not measured) | Spike: prefix + fuzzy search runs in a worker; the index can be serialised to JSON, which suits `evSearchIndex` and I7. FlexSearch is larger and has a more complex API for no needed gain. |
+| Daitch-Mokotoff | **Vendor `talisman/phonetics/daitch-mokotoff.js`** (single file, MIT) with its licence header, plus our own tests | talisman 1.1.4, MIT | one small file | Reproduces published vectors in the spike: Peters → 739400/734000, Moskowitz → 645740, Jackson → 154600/454600/145460/445460, Auerbach → 097500/097400 (same set as Wikipedia). **The package itself was last published in Jan 2021**, so depend on a copy, not the package. **Finding:** it folds cedilla ş (Ştefan = Stefan = 276000) but **not** comma-below ș (Ștefan → 376000), so the Romanian folding in P3.T4 must run before the code is computed, exactly as the plan says. |
+| Jaro-Winkler | **Own implementation** (~30 lines) with unit tests | n/a | negligible | Needed only in Phase 9; avoids a dependency. |
+| JSON Schema validation | **Ajv** | 8.20.0, MIT | ~1 MB package dir (bundle size not measured) | Mature; note Ajv compiles validators with `new Function`, fine on Pages (no CSP header). If bundle size matters, Ajv's standalone code generation at build time is the alternative. |
+| Graph | **Plain `Map`s**, own BFS and union-find | n/a | negligible | Needed algorithms are bounded BFS and connected components. graphology 0.26.0 (MIT, ~2.7 MB package dir) is not justified at this scale. |
+
+## Browser and platform findings (P0.T5)
+Tested in headless Chromium 153 (Playwright) against a Vite 5 production build served over http://localhost.
+
+| Check | Result | Consequence |
+| --- | --- | --- |
+| `window.showDirectoryPicker` | present (`function`) | Folder linking is feasible in Chromium. **Not tested:** the actual picker, storing a handle in IndexedDB, and permission re-prompt across sessions (needs a headed browser and a user gesture). Phase 5 task P5.T1 keeps the file-picker / drag-and-drop fallback. |
+| `navigator.storage.persist()` | resolved `false` | Expected in headless; real browsers decide by heuristics. The UI must show the actual state (P1.T6) and never assume persistence. |
+| `navigator.storage.estimate()` | quota ≈ 3.2 GB here | Varies by device; show it in the status line. |
+| `crossOriginIsolated` | `false` | GitHub Pages cannot set COOP/COEP, so no `SharedArrayBuffer`. tesseract.js and pdf.js worked regardless. |
+| Module Web Workers in a Vite 5 build | works (`new Worker(new URL("./w.js", import.meta.url), { type: "module" })`) with pdfjs, MiniSearch and the DM code bundled inside | Use this pattern for all workers. Note: **Vite 5's default build target rejects top-level `await`** in app code (my spike failed until I wrapped it in an async function); don't use it in new modules. |
+| LLM providers allow direct browser calls (CORS preflight from `https://costinfl.github.io`) | Anthropic API: preflight 200, `access-control-allow-origin: *`, allows the `anthropic-dangerous-direct-browser-access` header (calls must send it). OpenAI API: preflight 200, origin echoed. Google Generative Language API: preflight returned 403 from this sandbox, undetermined. | A preflight is not proof a real call succeeds; no key was used. Provider choice is Open question 2 and does not block Phases 1-5. |
+
+## Folder layout proposal (P0.T6)
+```
+src/
+  models/ storage/ hooks/ components/ share.js gedcom.js theme.js App.jsx   (existing, stay where they are)
+  storage/upgrades/        one file per IndexedDB version step (v2 settings, v3 library stores, v4 evidence stores ...)
+  evidence/                Layers 1-3 + places/names/dates; imports nothing outside src/evidence and src/storage
+    domain/                fuzzyDate.js, normalize.js (folding, DM), box.js (normalizedBox), ids
+    repositories/          one module per store group; the only code allowed to call generic store methods
+    index.js
+  conclusions/             families, persona links, relationships, assertion<->fact glue; may import evidence and models
+  ingest/                  scanner, router, processors (pdf-text, docx-text, tesseract, llm), orchestration
+  search/                  index builder/query (pure, runs in a worker)
+  graph/                   projection, FAN, kinship (the only module used for graph queries)
+  workers/                 thin worker entry files that import the pure modules above
+  components/evidence/     evidence UI, loaded with React.lazy / dynamic import so the main bundle (319 kB today) stays unchanged until the flag is on
+  tests/                   existing; new tests may sit next to modules or in src/tests/
+```
+Dependency rules (extend P1.T2 to check them): `evidence` → only `evidence`/`storage`; `search`, `graph`, `ingest` → `evidence` (graph may also read `conclusions` data passed in); `conclusions` → `evidence` and `models`; `components/**` and `App.jsx` may import anything; nothing under `evidence`, `search`, `graph`, `ingest`, `workers` imports UI.
+
+Needed storage change (for P1.T4/P2.T1): `StorageService` and the adapter get generic store methods (`put`, `get`, `getAll`, `getAllByIndex`, a small `transaction`). Because a generic `put` could update evidence rows, **I1 is enforced by the repositories and by the architecture test that only `src/evidence/repositories/**` (and `src/storage/**`) may call those methods.** Components still never call IndexedDB.
+
+Existing code stays where it is. The only moves are new files; `normalizeProject` gains evidence-aware steps in Phase 4 but remains in `src/models/project.js`.
+
+## Baseline (P0.T7)
+Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 22.23.4, npm 10.9.9:
+
+| Command | Result |
+| --- | --- |
+| `npm ci` | **fails** with npm 10.9.9 (`EUSAGE`, lockfile out of sync). Works with `npx -y npm@latest ci`. |
+| `npx vitest run` (same as `npm test -- --run`) | 6 files, **76 tests passed**, 0 failed, ~2.4 s |
+| `npm run build` | succeeds; `dist/assets/index-*.js` 319.19 kB (98.57 kB gzip); only Vite deprecation warnings (esbuild/oxc options) |
+
+## Risks found (for the reviewer)
+- **R1 Multi-tab upgrades.** The adapter has no `onversionchange`/`onblocked` handling. When Phase 1 bumps the DB version, a user with an old tab open could hang the upgrade in the new tab. P1.T4 should add a handler that closes the old connection and tells the user to reload. (Plan-compatible, small.)
+- **R2 I6 versus legacy migration.** P4.T4 turns every `verified` legacy fact into a **confirmed** assertion (`decidedBy: legacy-verified`) without a new click. I6 says nothing becomes confirmed without an explicit user action. I read the user's earlier "verified" tick as that action, but this is a judgment call (Open question 4).
+- **R3 Blob identity.** Existing blobs are keyed by timestamp+name, so two copies of one file can exist; linking in P2.T7 must dedupe by hash and keep old keys valid.
+- **R4 Storage durability.** `persist()` may be refused; the plan already covers a status line and bundle-export reminders. Evidence is more expensive to recreate than timeline data, so I suggest the Phase 1 status line also shows "last bundle export" time (not in the plan; Open question 5).
+- **R5 Bundle size.** The main bundle is 319 kB. The evidence UI and libraries must be dynamic imports; the plan requires this and the layout above supports it.
 
 ## Decisions & deviations log
 
 | Date | Phase/Task | Decision or deviation | Reason | Alternatives considered |
 | --- | --- | --- | --- | --- |
+| 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
+| 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
+| 2026-11-02 | P0 review | Reviewer decisions: ADR-0005 accepted; self-host OCR/PDF assets; legacy verified facts confirmed by one-time user step; last-export indicator in P1.T6; install latest npm instead of regenerating the lockfile; LLM provider deferred; PR from the session branch | Phase 0 review answers 1-7 | n/a |
 | 2026-11-02 | Plan | Evidence layer runs client-side in the same repo (ADR-0005, Proposed); Postgres, AGE, Flyway, Testcontainers and Java modules removed from the plan | Meridian is a static app on GitHub Pages with IndexedDB storage and no backend | Java + Postgres backend (separate repo); local ingest companion (kept in Backlog) |
 
 ## Open questions for the reviewer
 
 <!-- Numbered; mark answered ones with the answer and date. -->
-1. Approve ADR-0005 (client-side evidence layer)?
-2. Which LLM provider and model for extraction (Phase 6)? It must allow direct browser calls.
+1. **Answered 2026-11-02: approved; ADR-0005 is now Accepted.** Approve ADR-0005 (client-side evidence layer)? It is still `Proposed`; I did not change its status.
+2. **Answered 2026-11-02: deferred.** Phase 6 task P6.T3 cannot start until decided; Phases 1-5 are not affected. Which LLM provider and model for extraction (Phase 6)? It must allow direct browser calls. Preflight results are in "Browser and platform findings"; Anthropic and OpenAI allow it, Google undetermined.
+3. **Answered 2026-11-02: self-host** (copied from `node_modules` at build time, not committed). Plan P5.T3 updated. OCR and PDF assets (WASM core ≈ 3-5 MB, `ron` data 1.7 MB, pdf.js worker 1.3 MB): **self-host** with the Pages build (offline, no third party, larger deploy) or load from a CDN by default (smaller deploy, third-party dependency)? I recommend self-hosting, copied from `node_modules` at build time rather than committed.
+4. **Answered 2026-11-02: one-time user step** (legacy `verified` facts start proposed; the user confirms them in one click). Plan P4.T4 updated; risk R2 resolved. Legacy `verified` facts become `confirmed` automatically in P4.T4 (risk R2). Accept, or require a one-time "confirm legacy verified facts" step by the user?
+5. **Answered 2026-11-02: yes.** Plan P1.T6 updated. Add a "last bundle export" indicator to the Phase 1 status line (risk R4)?
+6. **Answered 2026-11-02: install the latest npm** (like CI); do not regenerate the lockfile. Plan operating rule 4 updated. Local setup: `npm ci` fails under npm 10.9.9 because the lockfile only syncs with the newer npm that CI installs. May Phase 1 regenerate `package-lock.json` (touches a deployment-relevant file), or should the plan just say "use `npx -y npm@latest ci`"?
+7. **Answered 2026-11-02: open the PR from `ccr-adaa4345-wbnkkm`.** Branch and PR: this session may push only to `ccr-adaa4345-wbnkkm`, so Phase 0 is there rather than on `evidence/p0`. The plan says to open a pull request at phase end; I have not, because no PR was explicitly requested. Should I open one (and from which branch)?
 
 ## Backlog ideas
 
 <!-- Ideas noticed while working that belong to later phases or are out of scope. -->
+- GEDCOM import ignores FAMC/FAMS, so imported people have no parents or spouses; after Phase 4 Family exists, importing families would be a natural improvement (changes ADR-0003 scope, needs approval).
+- Refresh `README.md` (still describes the single-file app) when the evidence layer lands (already in Backlog of the plan).
 
 ## Phase reports
+
+### Phase 0 report
+- **Built:** nothing in `src/`. Confirmed environment facts, mapped the model (with sample-data counts), listed every read/write of `fatherId`/`motherId`/`spouseIds`/`verified`/`sourceId`, evaluated libraries with a working spike, checked browser support and LLM CORS, proposed the folder layout, recorded the baseline, and listed risks.
+- **IndexedDB version / stores added:** none.
+- **New dependencies:** none added to the repo. Proposed: pdfjs-dist 6.5.438, mammoth 1.13.0, tesseract.js 7.0.0 (+ `ron` data), minisearch 7.2.0, ajv 8.20.0; vendored DM file (see Library proposals).
+- **Deviations:** see Decisions & deviations log (branch/PR handling; discarded earlier draft).
+- **How to verify:** `npx -y npm@latest ci && npx vitest run && npm run build` (expect 76 tests passing and a successful build). Read the sections "Environment facts", "Existing model → design mapping" (with impact list), "Library proposals", "Browser and platform findings", "Folder layout proposal", "Risks found". The spike code lived in a scratch directory and is not in the repo; I can add it under `docs/` if you want to rerun it.
+- **Backup reminder:** not applicable (no storage change).
+- **Known limitations:** the spike used clean synthetic inputs, not real scans; folder-handle persistence, mammoth and real-key LLM calls were not tested; bundle sizes for mammoth, Ajv and MiniSearch were not measured; sample data has no sources or media pins, so the sourced-fact path is only covered by tests.
+- **Questions for the reviewer:** Open questions 1-7. Also confirm "Family is the source of truth, legacy fields derived" (plan's reviewer check): the impact list shows no UI writes those fields, so the change is low-risk.
+
+**Review**
+- Approved: yes (2026-11-02)
+- Reviewer notes: ADR-0005 accepted. Family is the source of truth (confirmed). Answers recorded under Open questions.
 
 <!--
 Template for each phase:
@@ -193,3 +316,5 @@ Template for each phase:
 
 | Date | Tasks worked on | Commits | Notes |
 | --- | --- | --- | --- |
+| 2026-11-02 | P0.T1-P0.T7 | see git log | Started over on the reviewed plan; Phase 0 complete. |
+| 2026-11-02 | Phase 0 review | see git log | Approved; ADR-0005 accepted; plan updated for answers; PR opened. |
