@@ -6,7 +6,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 1 — Foundation
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P1.T2 (architecture test).
+- **Next action:** P1.T4 (IndexedDB upgrade framework).
 - **Last updated:** 2026-11-02 (Phase 0 complete)
 
 ## Phase overview
@@ -43,8 +43,8 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
 | P1.T1 | done | src/{evidence,conclusions,ingest,search,graph,workers}/index.js, src/components/evidence/index.js, src/storage/upgrades/ | Empty modules only; nothing imports them yet; bundle size unchanged (319.19 kB). |
-| P1.T2 | todo | | |
-| P1.T3 | todo | | |
+| P1.T2 | done | src/tests/archRules.js, src/tests/architecture.test.js | Rules per the Phase 0 layout (evidence -> storage only; conclusions -> evidence/models/storage; ingest -> evidence/storage; search, graph -> evidence; workers -> non-UI; storage -> nothing). Scans static, side-effect, dynamic imports and `new URL(.., import.meta.url)`. Deliberate violation (`evidence/index.js` importing `models/project.js`) failed the test with `must not import models/project.js`, then removed. The rule "only repositories may call generic store methods" is added in P2.T1 when those methods exist. |
+| P1.T3 | done | .github/workflows/deploy.yml | New `test` job (Node 20, latest npm, `npm ci`, `npm test -- --run`); `build` has `needs: test`, so a failing test blocks the Pages build and deploy. Also added a `pull_request` trigger (deviation, logged): tests and build run on PRs to master; `deploy` is skipped for PRs. Verified locally by YAML parse and dependency graph; the workflow itself first runs on the PR. |
 | P1.T4 | todo | | |
 | P1.T5 | todo | | |
 | P1.T6 | todo | | |
@@ -258,6 +258,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | --- | --- | --- | --- | --- |
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
+| 2026-11-02 | P1.T3 | Added `pull_request` trigger (branches: master) to the deploy workflow; deploy job skipped on PRs | The plan's phase PRs would otherwise merge to a live site before any test ran | Test-only separate workflow file |
 | 2026-11-02 | P0 review | Reviewer decisions: ADR-0005 accepted; self-host OCR/PDF assets; legacy verified facts confirmed by one-time user step; last-export indicator in P1.T6; install latest npm instead of regenerating the lockfile; LLM provider deferred; PR from the session branch | Phase 0 review answers 1-7 | n/a |
 | 2026-11-02 | Plan | Evidence layer runs client-side in the same repo (ADR-0005, Proposed); Postgres, AGE, Flyway, Testcontainers and Java modules removed from the plan | Meridian is a static app on GitHub Pages with IndexedDB storage and no backend | Java + Postgres backend (separate repo); local ingest companion (kept in Backlog) |
 
