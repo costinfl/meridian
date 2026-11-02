@@ -4,9 +4,9 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 0 — Discovery
-- **Phase status:** approved  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Phase 0 is approved. After the Phase 0 pull request is merged, start Phase 1 on `evidence/p1`, task P1.T1.
+- **Current phase:** 1 — Foundation
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** P1.T2 (architecture test).
 - **Last updated:** 2026-11-02 (Phase 0 complete)
 
 ## Phase overview
@@ -14,7 +14,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | Phase | Status | Branch | Approved |
 | --- | --- | --- | --- |
 | 0 Discovery | approved | evidence/p0 (done on `ccr-adaa4345-wbnkkm`, see log) | 2026-11-02 |
-| 1 Foundation | not started | evidence/p1 | |
+| 1 Foundation | in progress | evidence/p1 | |
 | 2 Library sources and text | not started | evidence/p2 | |
 | 3 Evidence, places, names, dates | not started | evidence/p3 | |
 | 4 Conclusions, legacy facts, bundle v2 | not started | evidence/p4 | |
@@ -42,7 +42,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 1
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P1.T1 | todo | | |
+| P1.T1 | done | src/{evidence,conclusions,ingest,search,graph,workers}/index.js, src/components/evidence/index.js, src/storage/upgrades/ | Empty modules only; nothing imports them yet; bundle size unchanged (319.19 kB). |
 | P1.T2 | todo | | |
 | P1.T3 | todo | | |
 | P1.T4 | todo | | |
