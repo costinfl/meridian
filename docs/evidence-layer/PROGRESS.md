@@ -5,15 +5,15 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 ## Current status
 
 - **Current phase:** 0 — Discovery
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 0 (see Phase 0 report and Open questions 1-6). Do not start Phase 1.
+- **Phase status:** approved  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** Phase 0 is approved. After the Phase 0 pull request is merged, start Phase 1 on `evidence/p1`, task P1.T1.
 - **Last updated:** 2026-11-02 (Phase 0 complete)
 
 ## Phase overview
 
 | Phase | Status | Branch | Approved |
 | --- | --- | --- | --- |
-| 0 Discovery | awaiting review | evidence/p0 (done on `ccr-adaa4345-wbnkkm`, see log) | |
+| 0 Discovery | approved | evidence/p0 (done on `ccr-adaa4345-wbnkkm`, see log) | 2026-11-02 |
 | 1 Foundation | not started | evidence/p1 | |
 | 2 Library sources and text | not started | evidence/p2 | |
 | 3 Evidence, places, names, dates | not started | evidence/p3 | |
@@ -258,18 +258,19 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | --- | --- | --- | --- | --- |
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
+| 2026-11-02 | P0 review | Reviewer decisions: ADR-0005 accepted; self-host OCR/PDF assets; legacy verified facts confirmed by one-time user step; last-export indicator in P1.T6; install latest npm instead of regenerating the lockfile; LLM provider deferred; PR from the session branch | Phase 0 review answers 1-7 | n/a |
 | 2026-11-02 | Plan | Evidence layer runs client-side in the same repo (ADR-0005, Proposed); Postgres, AGE, Flyway, Testcontainers and Java modules removed from the plan | Meridian is a static app on GitHub Pages with IndexedDB storage and no backend | Java + Postgres backend (separate repo); local ingest companion (kept in Backlog) |
 
 ## Open questions for the reviewer
 
 <!-- Numbered; mark answered ones with the answer and date. -->
-1. Approve ADR-0005 (client-side evidence layer)? It is still `Proposed`; I did not change its status.
-2. Which LLM provider and model for extraction (Phase 6)? It must allow direct browser calls. Preflight results are in "Browser and platform findings"; Anthropic and OpenAI allow it, Google undetermined.
-3. OCR and PDF assets (WASM core ≈ 3-5 MB, `ron` data 1.7 MB, pdf.js worker 1.3 MB): **self-host** with the Pages build (offline, no third party, larger deploy) or load from a CDN by default (smaller deploy, third-party dependency)? I recommend self-hosting, copied from `node_modules` at build time rather than committed.
-4. Legacy `verified` facts become `confirmed` automatically in P4.T4 (risk R2). Accept, or require a one-time "confirm legacy verified facts" step by the user?
-5. Add a "last bundle export" indicator to the Phase 1 status line (risk R4)?
-6. Local setup: `npm ci` fails under npm 10.9.9 because the lockfile only syncs with the newer npm that CI installs. May Phase 1 regenerate `package-lock.json` (touches a deployment-relevant file), or should the plan just say "use `npx -y npm@latest ci`"?
-7. Branch and PR: this session may push only to `ccr-adaa4345-wbnkkm`, so Phase 0 is there rather than on `evidence/p0`. The plan says to open a pull request at phase end; I have not, because no PR was explicitly requested. Should I open one (and from which branch)?
+1. **Answered 2026-11-02: approved; ADR-0005 is now Accepted.** Approve ADR-0005 (client-side evidence layer)? It is still `Proposed`; I did not change its status.
+2. **Answered 2026-11-02: deferred.** Phase 6 task P6.T3 cannot start until decided; Phases 1-5 are not affected. Which LLM provider and model for extraction (Phase 6)? It must allow direct browser calls. Preflight results are in "Browser and platform findings"; Anthropic and OpenAI allow it, Google undetermined.
+3. **Answered 2026-11-02: self-host** (copied from `node_modules` at build time, not committed). Plan P5.T3 updated. OCR and PDF assets (WASM core ≈ 3-5 MB, `ron` data 1.7 MB, pdf.js worker 1.3 MB): **self-host** with the Pages build (offline, no third party, larger deploy) or load from a CDN by default (smaller deploy, third-party dependency)? I recommend self-hosting, copied from `node_modules` at build time rather than committed.
+4. **Answered 2026-11-02: one-time user step** (legacy `verified` facts start proposed; the user confirms them in one click). Plan P4.T4 updated; risk R2 resolved. Legacy `verified` facts become `confirmed` automatically in P4.T4 (risk R2). Accept, or require a one-time "confirm legacy verified facts" step by the user?
+5. **Answered 2026-11-02: yes.** Plan P1.T6 updated. Add a "last bundle export" indicator to the Phase 1 status line (risk R4)?
+6. **Answered 2026-11-02: install the latest npm** (like CI); do not regenerate the lockfile. Plan operating rule 4 updated. Local setup: `npm ci` fails under npm 10.9.9 because the lockfile only syncs with the newer npm that CI installs. May Phase 1 regenerate `package-lock.json` (touches a deployment-relevant file), or should the plan just say "use `npx -y npm@latest ci`"?
+7. **Answered 2026-11-02: open the PR from `ccr-adaa4345-wbnkkm`.** Branch and PR: this session may push only to `ccr-adaa4345-wbnkkm`, so Phase 0 is there rather than on `evidence/p0`. The plan says to open a pull request at phase end; I have not, because no PR was explicitly requested. Should I open one (and from which branch)?
 
 ## Backlog ideas
 
@@ -290,8 +291,8 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - **Questions for the reviewer:** Open questions 1-7. Also confirm "Family is the source of truth, legacy fields derived" (plan's reviewer check): the impact list shows no UI writes those fields, so the change is low-risk.
 
 **Review**
-- Approved: no
-- Reviewer notes:
+- Approved: yes (2026-11-02)
+- Reviewer notes: ADR-0005 accepted. Family is the source of truth (confirmed). Answers recorded under Open questions.
 
 <!--
 Template for each phase:
@@ -315,4 +316,5 @@ Template for each phase:
 
 | Date | Tasks worked on | Commits | Notes |
 | --- | --- | --- | --- |
-| 2026-11-02 | P0.T1-P0.T7 | see git log | Started over on the reviewed plan; Phase 0 complete, awaiting review. |
+| 2026-11-02 | P0.T1-P0.T7 | see git log | Started over on the reviewed plan; Phase 0 complete. |
+| 2026-11-02 | Phase 0 review | see git log | Approved; ADR-0005 accepted; plan updated for answers; PR opened. |

@@ -14,7 +14,7 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 1. Read `PROGRESS.md` first, then this plan, then `evidence-model.md` and the ADRs in `docs/adr/`.
 2. Find **Current status** and **Next action** in `PROGRESS.md`. Continue exactly from there.
 3. If the current phase is `awaiting review`, do **not** start new work. Check the phase's review section for `Approved: yes`. If it is not there, report that you are waiting for review and stop.
-4. Run `npm ci`, `npm test -- --run` and `npm run build` before changing anything. If anything fails, record it in `PROGRESS.md` and fix it before new work (or stop and ask, if the cause is outside the plan).
+4. Install the latest npm first, as CI does (`npm install -g npm@latest`, or `npx -y npm@latest ci` if a global install is not possible), then run `npm ci`, `npm test -- --run` and `npm run build` before changing anything. Do not regenerate `package-lock.json`. If anything fails, record it in `PROGRESS.md` and fix it before new work (or stop and ask, if the cause is outside the plan).
 
 ### Working on tasks
 - Work on **one task at a time**, in the order listed, using its ID (e.g. `P2.T3`).
@@ -101,7 +101,7 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 | P1.T3 | CI: add a test job (`npm ci`, `npm test -- --run`) that must pass before the Pages build job runs. | Workflow updated; a failing test blocks deployment. |
 | P1.T4 | IndexedDB upgrade framework in the adapter: versioned, forward-only upgrade steps (version 1 → 2 creates an empty `settings` store only). Migration test per **I8**: version-1 database with projects and blobs upgrades losslessly. | Test passes; `listProjects`, `loadProject`, `loadBlob` unchanged. |
 | P1.T5 | Feature flag `evidenceUi` (project setting + `?evidence=1`) and an empty "Evidence" entry point visible only when enabled. | Hidden by default; visible with the flag. |
-| P1.T6 | `navigator.storage.persist()` request when evidence features are enabled, plus a status line showing persistence state and storage estimate. | Works in Chromium; degrades silently elsewhere. |
+| P1.T6 | `navigator.storage.persist()` request when evidence features are enabled, plus a status line showing persistence state, storage estimate and the time of the last native bundle export. | Works in Chromium; degrades silently elsewhere. |
 
 **Reviewer checks:** deployed app unchanged; export a bundle backup, then merge.
 
@@ -146,7 +146,7 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 | P4.T1 | Project model: `families`, `personaLinks`, `relationships`, `conclusionEvidence`, `proofNotes`, and `assertionIds` / `preferredAssertionId` on facts, added through `normalizeProject` (older projects upgrade transparently). | Model tests; old projects load unchanged. |
 | P4.T2 | Families as source of truth: on upgrade, build families from `fatherId`/`motherId`/`spouseIds`; afterwards `normalizeProject` derives those fields from families. Edits in the UI go through family functions. | Round-trip test on sample data: derived fields equal the originals; relationship inference and GEDCOM FAM output unchanged (**I8**). |
 | P4.T3 | Legacy facts as evidence, **dry run first**: report (counts per fact type, with/without `sourceId`, verified/unverified) without writing. | Report in the phase report. |
-| P4.T4 | Legacy facts as evidence: create a "Legacy Meridian data" LibrarySource; for each fact create an import-agent assertion citing its source (via P2.T7) or the legacy source; `verified` facts → confirmed (decidedBy `legacy-verified`), others → proposed; set `preferredAssertionId`. Idempotent. | Counts match the dry run; running twice changes nothing. |
+| P4.T4 | Legacy facts as evidence: create a "Legacy Meridian data" LibrarySource; for each fact create an import-agent assertion citing its source (via P2.T7) or the legacy source; all facts start `proposed` (including `verified` ones); a one-time user step ("Confirm legacy verified facts", showing the count and requiring a click) then confirms the `verified` ones with decidedBy `legacy-verified`; set `preferredAssertionId`. Idempotent. | Counts match the dry run; running twice changes nothing. |
 | P4.T5 | Keep `verified` consistent: a fact is verified ⇔ its preferred assertion is confirmed; toggling verified in `ItemModal` confirms or re-proposes through the assertion functions (a user action). | Tests; GEDCOM export of the sample project byte-identical before and after (**I8**). |
 | P4.T6 | Native bundle v2: `evidence.json` with the library entities the project references; import merges by id and copy hash, never overwriting; bundles without `evidence.json` still import. Update ADR-0002 via a new ADR if the reviewer wants it recorded. | Round-trip test; old-bundle import test; **I9** test (no keys or handles in output). |
 
@@ -160,7 +160,7 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 | --- | --- | --- |
 | P5.T1 | Link a documents folder with `showDirectoryPicker()`; store the handle in IndexedDB; re-request permission on new sessions. Fallback: multi-file picker and drag-and-drop (stored as blobs). | Manual test steps documented; fallback tested. |
 | P5.T2 | Scanner: walk the folder, hash files (PDF, DOCX, JPG/PNG/TIFF), register copies; unknown files go to an "Inbox" until linked to a LibrarySource. Optional sidecar `<file>.meta.json` (source title, repository, date, page label, access URL) — format documented. | Re-scan creates no duplicates; moved/renamed files recognised by hash. |
-| P5.T3 | pdf.js in a worker: page count, size, rotation → Page rows; render pages to the disposable cache on demand. DOCX via mammoth → one text page. Legacy `.doc` → clear "convert to DOCX/PDF" message. | Cache can be cleared and regenerated. |
+| P5.T3 | pdf.js in a worker: page count, size, rotation → Page rows; render pages to the disposable cache on demand. DOCX via mammoth → one text page. Legacy `.doc` → clear "convert to DOCX/PDF" message. pdf.js, OCR WASM core and `ron` data are **self-hosted**, copied from `node_modules` into the build at build time (not committed) and loaded lazily. | Cache can be cleared and regenerated; build output contains the assets. |
 | P5.T4 | Router run: use pdf.js embedded text (with word boxes) if it passes a quality check (share of plausible words, configurable); otherwise queue OCR; sources flagged handwritten → "awaiting HTR". | Classification stored per run item. |
 | P5.T5 | OCR with tesseract.js in a worker (`ron` default, languages configurable, language data loaded lazily); word boxes converted to normalised coordinates; raw output stored; versions on the run. | Fixture tests: text PDF, scanned PDF page, DOCX. |
 | P5.T6 | Evidence panel (behind the flag): runs and items with status, failed-item re-run as a one-page batch, progress and cancel. | Manual test steps in the phase report. |
