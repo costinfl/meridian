@@ -16,6 +16,9 @@ class StorageService {
   saveBlob(key, blob) { return this._adapter.saveBlob(key, blob); }
   loadBlob(key) { return this._adapter.loadBlob(key); }
   deleteBlob(key) { return this._adapter.deleteBlob(key); }
+  getSetting(key) { return this._adapter.getSetting(key); }
+  putSetting(key, value) { return this._adapter.putSetting(key, value); }
+  deleteSetting(key) { return this._adapter.deleteSetting(key); }
 }
 
 export const storage = new StorageService();

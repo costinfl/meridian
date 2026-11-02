@@ -6,7 +6,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 1 — Foundation
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P1.T4 (IndexedDB upgrade framework).
+- **Next action:** P1.T5 (feature flag and empty Evidence entry point).
 - **Last updated:** 2026-11-02 (Phase 0 complete)
 
 ## Phase overview
@@ -45,7 +45,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P1.T1 | done | src/{evidence,conclusions,ingest,search,graph,workers}/index.js, src/components/evidence/index.js, src/storage/upgrades/ | Empty modules only; nothing imports them yet; bundle size unchanged (319.19 kB). |
 | P1.T2 | done | src/tests/archRules.js, src/tests/architecture.test.js | Rules per the Phase 0 layout (evidence -> storage only; conclusions -> evidence/models/storage; ingest -> evidence/storage; search, graph -> evidence; workers -> non-UI; storage -> nothing). Scans static, side-effect, dynamic imports and `new URL(.., import.meta.url)`. Deliberate violation (`evidence/index.js` importing `models/project.js`) failed the test with `must not import models/project.js`, then removed. The rule "only repositories may call generic store methods" is added in P2.T1 when those methods exist. |
 | P1.T3 | done | .github/workflows/deploy.yml | New `test` job (Node 20, latest npm, `npm ci`, `npm test -- --run`); `build` has `needs: test`, so a failing test blocks the Pages build and deploy. Also added a `pull_request` trigger (deviation, logged): tests and build run on PRs to master; `deploy` is skipped for PRs. Verified locally by YAML parse and dependency graph; the workflow itself first runs on the PR. |
-| P1.T4 | todo | | |
+| P1.T4 | done | src/storage/upgrades/{index,v1,v2}.js, src/storage/adapters/IndexedDBAdapter.js, src/storage/StorageService.js, src/tests/upgrade.test.js | DB version 1 -> 2 (adds `settings` store only). Forward-only step list; `openDB()` runs steps; `getSetting/putSetting/deleteSetting` added. R1 handled: on `versionchange` the connection closes, the adapter drops it and calls `onVersionChange`; `onBlocked` hook too. Tests build a hand-made v1 DB with projects + blob and prove it survives (I8); fresh DB; no-op reopen; a simulated v3 step on top; versionchange closes the connection. Note: fake-indexeddb drops the Blob prototype, so blob presence + record metadata are asserted. Main bundle 319.19 -> 320.43 kB. |
 | P1.T5 | todo | | |
 | P1.T6 | todo | | |
 
