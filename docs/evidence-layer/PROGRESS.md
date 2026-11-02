@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 0 — Discovery
 - **Phase status:** not started  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Start P0.T1 (inventory the stack).
-- **Last updated:** —
+- **Next action:** Start P0.T1 (confirm environment facts below).
+- **Last updated:** 2026-11-02 (plan revised for the client-only stack, see Decisions log)
 
 ## Phase overview
 
@@ -15,9 +15,9 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | --- | --- | --- | --- |
 | 0 Discovery | not started | evidence/p0 | |
 | 1 Foundation | not started | evidence/p1 | |
-| 2 Sources and text | not started | evidence/p2 | |
+| 2 Library sources and text | not started | evidence/p2 | |
 | 3 Evidence, places, names, dates | not started | evidence/p3 | |
-| 4 Conclusions and legacy migration | not started | evidence/p4 | |
+| 4 Conclusions, legacy facts, bundle v2 | not started | evidence/p4 | |
 | 5 Ingestion v1 | not started | evidence/p5 | |
 | 6 Extraction and review | not started | evidence/p6 | |
 | 7 Search | not started | evidence/p7 | |
@@ -36,6 +36,8 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P0.T3 | todo | | |
 | P0.T4 | todo | | |
 | P0.T5 | todo | | |
+| P0.T6 | todo | | |
+| P0.T7 | todo | | |
 
 ### Phase 1
 | ID | Status | Files touched | Notes |
@@ -56,6 +58,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P2.T4 | todo | | |
 | P2.T5 | todo | | |
 | P2.T6 | todo | | |
+| P2.T7 | todo | | |
 
 ### Phase 3
 | ID | Status | Files touched | Notes |
@@ -76,6 +79,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P4.T3 | todo | | |
 | P4.T4 | todo | | |
 | P4.T5 | todo | | |
+| P4.T6 | todo | | |
 
 ### Phase 5
 | ID | Status | Files touched | Notes |
@@ -103,7 +107,6 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P7.T2 | todo | | |
 | P7.T3 | todo | | |
 | P7.T4 | todo | | |
-| P7.T5 | todo | | |
 
 ### Phase 8
 | ID | Status | Files touched | Notes |
@@ -124,22 +127,43 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P9.T5 | todo | | |
 
 ## Environment facts
-<!-- Filled in during Phase 0: Java version, build tool, framework, persistence, database, migration tool, test setup, frontend, run commands. -->
 
-## Existing entities → design mapping
-<!-- Filled in during P0.T2. -->
+Pre-filled from commit `243bf1c` by the planning session; P0.T1 confirms or corrects them.
 
-| Existing entity / table | Design entity | Notes |
+| Item | Value |
+| --- | --- |
+| App | Client-only SPA, Vite 5, React 18, plain JavaScript (ES modules), inline styles + `src/theme.js` tokens |
+| Dependencies | `react`, `react-dom`, `jszip` |
+| Storage | IndexedDB `meridian-v1`, version 1, stores `projects` (keyPath `id`) and `blobs` (keyPath `key`); access via `src/storage/StorageService.js` → `adapters/IndexedDBAdapter.js` |
+| Project model | `src/models/project.js` (`createProject`, `createSource`, event/period/group/annotation/era/media factories, `normalizeProject`); autosave in `src/hooks/useProject.js` |
+| Interop | Native bundle `src/share.js` (ADR-0001/0002), GEDCOM 5.5.1 `src/gedcom.js` (verified-only, ADR-0003) |
+| Tests | Vitest 4 + jsdom + `fake-indexeddb` + Testing Library; `src/tests/*.test.js`; script `npm test` (use `npm test -- --run` for a single pass) |
+| Build / deploy | `npm run build` → `dist/`, Vite `base: "/meridian/"`; GitHub Actions deploys to Pages on push to `master` (Node 20); no test job in CI yet |
+| Lint / format | No ESLint or Prettier config in the repo at this commit |
+| Docs | ADRs in `docs/adr/` (0001–0004); `README.md` is out of date (describes the single-file `App.jsx`) |
+
+## Existing model → design mapping
+<!-- Filled in during P0.T2. Starting point from the planning session: -->
+
+| Existing | Design | Notes |
 | --- | --- | --- |
+| `project.people[]` | Person | Kept in place |
+| `birth`, `death`, `events`, `periods`, `groups` (each with `sourceId`, `verified`) | Person facts → assertions | `verified` ⇔ preferred assertion confirmed |
+| `fatherId`, `motherId`, `spouseIds` | Family | Family becomes source of truth; fields derived (to confirm at Phase 0 review) |
+| `project.sources[]` (+ blob) | Project source list → LibrarySource + DigitalCopy | Linked via `librarySourceId` |
+| `project.annotations` (braces), `eras`, `media` | No change | Braces may later cite assertions / ProofNotes |
 
 ## Decisions & deviations log
 
 | Date | Phase/Task | Decision or deviation | Reason | Alternatives considered |
 | --- | --- | --- | --- | --- |
+| 2026-11-02 | Plan | Evidence layer runs client-side in the same repo (ADR-0005, Proposed); Postgres, AGE, Flyway, Testcontainers and Java modules removed from the plan | Meridian is a static app on GitHub Pages with IndexedDB storage and no backend | Java + Postgres backend (separate repo); local ingest companion (kept in Backlog) |
 
 ## Open questions for the reviewer
 
 <!-- Numbered; mark answered ones with the answer and date. -->
+1. Approve ADR-0005 (client-side evidence layer)?
+2. Which LLM provider and model for extraction (Phase 6)? It must allow direct browser calls.
 
 ## Backlog ideas
 
@@ -152,9 +176,11 @@ Template for each phase:
 
 ### Phase N report
 - **Built:**
-- **Migrations added:**
+- **IndexedDB version / stores added:**
+- **New dependencies:** name, version, size
 - **Deviations:** (link to log entries)
 - **How to verify:** exact commands and manual steps
+- **Backup reminder:** export a native bundle before merging (if storage changed)
 - **Known limitations:**
 - **Questions for the reviewer:**
 
