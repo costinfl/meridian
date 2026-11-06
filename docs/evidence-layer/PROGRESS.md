@@ -6,7 +6,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 2 — Library sources and text
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P2.T2 (Repository and LibrarySource repositories).
+- **Next action:** P2.T3 (DigitalCopy by SHA-256).
 - **Last updated:** 2026-11-02 (Phase 1 complete)
 
 ## Phase overview
@@ -53,7 +53,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
 | P2.T1 | done | src/storage/upgrades/v3.js, src/storage/adapters/IndexedDBAdapter.js, src/storage/StorageService.js, src/tests/{upgrade,dbMethods,architecture}.test.js, src/tests/archRules.js | DB version 2 -> 3: stores evRepositories, evSources, evCopies, evPages, evRegions, evRuns, evRunItems, evRawOutputs, evTextLayers, evPageCache with indexes (copies by unique sha256 and source; pages by copy and unique [copyId,pageIndex]; regions by page/parent; text layers by region/run/supersedes; run items by run/page; sources by parent/repository). Generic `db*` methods (`dbAdd` insert-only, `dbPut`, `dbTransact` atomic multi-store). Architecture test now also enforces that only src/storage and src/evidence/repositories call `db*` (completes the rule deferred from P1.T2). v2 -> v3 upgrade test (lossless, indexes present). |
-| P2.T2 | todo | | |
+| P2.T2 | done | src/evidence/{ids.js,domain/errors.js,repositories/repositoryStore.js,repositories/sourceStore.js}, src/tests/{evidenceHelpers.js,sourceStores.test.js} | Store factories take the storage service (dependency injection). Repository kinds archive/library/online/private; LibrarySource kinds parish-register ... other; call number {fond, inventory, file}; parent hierarchy with existence and cycle checks done in one transaction; update is whitelisted (id/createdAt immutable). Place stays free text (`placeText`) until Phase 3. 8 tests incl. hierarchy and cycle rejection. |
 | P2.T3 | todo | | |
 | P2.T4 | todo | | |
 | P2.T5 | todo | | |
