@@ -6,7 +6,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 2 — Library sources and text
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P2.T3 (DigitalCopy by SHA-256).
+- **Next action:** P2.T4 (Page and Region, normalizedBox).
 - **Last updated:** 2026-11-02 (Phase 1 complete)
 
 ## Phase overview
@@ -54,7 +54,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | --- | --- | --- | --- |
 | P2.T1 | done | src/storage/upgrades/v3.js, src/storage/adapters/IndexedDBAdapter.js, src/storage/StorageService.js, src/tests/{upgrade,dbMethods,architecture}.test.js, src/tests/archRules.js | DB version 2 -> 3: stores evRepositories, evSources, evCopies, evPages, evRegions, evRuns, evRunItems, evRawOutputs, evTextLayers, evPageCache with indexes (copies by unique sha256 and source; pages by copy and unique [copyId,pageIndex]; regions by page/parent; text layers by region/run/supersedes; run items by run/page; sources by parent/repository). Generic `db*` methods (`dbAdd` insert-only, `dbPut`, `dbTransact` atomic multi-store). Architecture test now also enforces that only src/storage and src/evidence/repositories call `db*` (completes the rule deferred from P1.T2). v2 -> v3 upgrade test (lossless, indexes present). |
 | P2.T2 | done | src/evidence/{ids.js,domain/errors.js,repositories/repositoryStore.js,repositories/sourceStore.js}, src/tests/{evidenceHelpers.js,sourceStores.test.js} | Store factories take the storage service (dependency injection). Repository kinds archive/library/online/private; LibrarySource kinds parish-register ... other; call number {fond, inventory, file}; parent hierarchy with existence and cycle checks done in one transaction; update is whitelisted (id/createdAt immutable). Place stays free text (`placeText`) until Phase 3. 8 tests incl. hierarchy and cycle rejection. |
-| P2.T3 | todo | | |
+| P2.T3 | done | src/evidence/domain/hash.js, src/evidence/repositories/copyStore.js, src/tests/copyStore.test.js | SHA-256 via crypto.subtle (realm-safe input detection: jsdom and Node ArrayBuffers differ); verified against known vectors. `register` / `registerFile` return `{copy, created}`: same hash returns the existing copy (even from another name/location; concurrent duplicates yield one row, enforced by the unique `bySha256` index). Storage modes `blob {blobKey}` and `folder {path}` (relative, no `..`). Unassigned inbox = `sourceId: null`; `relocate` for moved files; `update` is whitelisted (hash/id immutable). |
 | P2.T4 | todo | | |
 | P2.T5 | todo | | |
 | P2.T6 | todo | | |
