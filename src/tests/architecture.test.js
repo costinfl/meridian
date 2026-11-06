@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { checkImports, importsOf } from "./archRules.js";
+import { checkImports, importsOf, checkDbMethodUse } from "./archRules.js";
 
 const SRC = path.resolve(__dirname, "..");
 
@@ -65,5 +65,15 @@ describe("architecture: import boundaries (I5)", () => {
   it("importsOf finds static, side-effect, dynamic and worker-URL imports", () => {
     const src = 'import a from "./a.js"; import "./b.js"; export { c } from "./c.js"; import("./d.js"); new URL("./e.js", import.meta.url);';
     expect(importsOf(src).sort()).toEqual(["./a.js", "./b.js", "./c.js", "./d.js", "./e.js"]);
+  });
+
+  it("only storage and evidence repositories call generic db* store methods (I1)", () => {
+    expect(checkDbMethodUse(readSources())).toEqual([]);
+    expect(checkDbMethodUse({
+      "evidence/repositories/a.js": "await storage.dbAdd('evSources', x);",
+      "storage/adapters/IndexedDBAdapter.js": "this.dbPut(s, v)",
+      "conclusions/b.js": "await storage.dbPut('evSources', x);",
+      "components/evidence/P.jsx": "storage.dbTransact(['a'], 'readwrite', fn)",
+    })).toHaveLength(2);
   });
 });

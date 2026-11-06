@@ -259,7 +259,7 @@ export default function App() {
     projectList, project, isDirty, isLoading,
     openProject, createProject, importProject, deleteProject, renameProject,
     addSource, deleteSource, updateSource,
-    setPeople, updatePerson, setAnnotations, setEras, setFocusId, setRelativeIds, setView, setCtxOn,
+    setPeople, updatePerson, setAnnotations, setEras, setFocusId, setRelativeIds, setView, setCtxOn, setEvidenceUi,
   } = useProject(storage);
 
   // Derive working state from project (fallbacks keep UI stable during load)
@@ -881,6 +881,8 @@ export default function App() {
           projectList={projectList}
           currentProjectId={project?.id}
           onClose={() => setProjectManagerOpen(false)}
+          evidenceUi={project?.settings?.evidenceUi === true}
+          onToggleEvidenceUi={setEvidenceUi}
           onCreate={async (name) => { await createProject(name); setProjectManagerOpen(false); initRef.current = false; }}
           onOpen={(id) => { openProject(id); initRef.current = false; }}
           onDelete={deleteProject}
