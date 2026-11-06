@@ -1,3 +1,27 @@
-// Evidence layer (Layers 1-3, places, names, dates). Implemented from Phase 2.
+// Evidence layer (Layers 1-3, places, names, dates). Layers 1-2 implemented in Phase 2.
 // Rule I5: nothing under src/evidence may import conclusions, UI, hooks or models.
-export {};
+import { createRepositoryStore } from "./repositories/repositoryStore.js";
+import { createSourceStore } from "./repositories/sourceStore.js";
+import { createCopyStore } from "./repositories/copyStore.js";
+import { createPageStore } from "./repositories/pageStore.js";
+import { createRunStore } from "./repositories/runStore.js";
+import { createTextLayerStore } from "./repositories/textLayerStore.js";
+
+export { EvidenceError } from "./domain/errors.js";
+export { normalizedBox, boxFromPixels, WHOLE_PAGE_BOX } from "./domain/box.js";
+export { sha256Hex } from "./domain/hash.js";
+export { SOURCE_KINDS } from "./repositories/sourceStore.js";
+export { REPOSITORY_KINDS } from "./repositories/repositoryStore.js";
+export { PROCESSORS } from "./repositories/runStore.js";
+
+/** The evidence library bound to a storage service (StorageService or an IndexedDBAdapter). */
+export function createEvidenceLibrary(storage) {
+  return {
+    repositories: createRepositoryStore(storage),
+    sources: createSourceStore(storage),
+    copies: createCopyStore(storage),
+    pages: createPageStore(storage),
+    runs: createRunStore(storage),
+    textLayers: createTextLayerStore(storage),
+  };
+}

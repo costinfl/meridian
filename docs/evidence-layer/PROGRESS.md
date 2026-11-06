@@ -6,7 +6,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 2 — Library sources and text
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P2.T6 (TextLayer, append-only, current-layer query).
+- **Next action:** P2.T7 (link existing project sources to the library).
 - **Last updated:** 2026-11-02 (Phase 1 complete)
 
 ## Phase overview
@@ -57,7 +57,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P2.T3 | done | src/evidence/domain/hash.js, src/evidence/repositories/copyStore.js, src/tests/copyStore.test.js | SHA-256 via crypto.subtle (realm-safe input detection: jsdom and Node ArrayBuffers differ); verified against known vectors. `register` / `registerFile` return `{copy, created}`: same hash returns the existing copy (even from another name/location; concurrent duplicates yield one row, enforced by the unique `bySha256` index). Storage modes `blob {blobKey}` and `folder {path}` (relative, no `..`). Unassigned inbox = `sourceId: null`; `relocate` for moved files; `update` is whitelisted (hash/id immutable). |
 | P2.T4 | done | src/evidence/domain/box.js, src/evidence/repositories/pageStore.js, src/tests/pageStore.test.js | I4: `normalizedBox` requires finite numbers in 0-1 with x0<x1, y0<y1 (rejects NaN, strings, out of range, inverted, zero-size); optional polygon (>=3 points in 0-1); `boxFromPixels` for import-time conversion on the unrotated image. `addPage` is idempotent per (copyId, pageIndex) and creates the whole-page region in the same transaction. Regions nest (same page only), are insert-only (no update/delete: they are citation targets). Page label and rotation are editable; size/position are not. Containment of child inside parent is **not** enforced (OCR boxes can overhang); `boxContains` is available. |
 | P2.T5 | done | src/evidence/repositories/runStore.js, src/tests/runStore.test.js | Processors router, pdf-text, docx-text, tesseract, llm-extraction, entity-resolution, manual, import. Run configuration fixed at `startRun`; only status/finishedAt change, via `finishRun` (once; later calls are conflicts). Items: queued/running/succeeded/failed/skipped/awaiting-htr, with error, unitsBilled, rawOutputId and a small structured `result` (router classification, P5.T4). Raw outputs (`evRawOutputs`) are insert-only; bytes stored as an ArrayBuffer copy with sha256 and size; round trip verified for all 256 byte values and UTF-8 text with diacritics. |
-| P2.T6 | todo | | |
+| P2.T6 | done | src/evidence/repositories/textLayerStore.js, src/evidence/index.js, src/tests/textLayerStore.test.js | I1: the store has no update/delete/put/set operations; `dbAdd` rejects re-inserting an id (tested), and the architecture test confines db* calls to repositories. I3: `runId` required and must exist; region must exist. Corrections use `supersedesId` (same region, target must exist, a layer can be superseded only once). `current(regionId)` = newest non-superseded layer; `currentForPage(pageId)` maps regionId -> current layer. Word boxes validated with the I4 helper. Open point: `normalizedText` defaults to the original text until the Phase 3 normaliser exists. `createEvidenceLibrary(storage)` wires all stores. |
 | P2.T7 | todo | | |
 
 ### Phase 3
