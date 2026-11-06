@@ -5,9 +5,9 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 ## Current status
 
 - **Current phase:** 2 — Library sources and text
-- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P2.T7 (link existing project sources to the library).
-- **Last updated:** 2026-11-02 (Phase 1 complete)
+- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** Wait for review of Phase 2.
+- **Last updated:** 2026-11-06 (Phase 2 complete)
 
 ## Phase overview
 
@@ -15,7 +15,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | --- | --- | --- | --- |
 | 0 Discovery | approved | evidence/p0 (done on `ccr-adaa4345-wbnkkm`, see log) | 2026-11-02 |
 | 1 Foundation | approved | evidence/p1 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-06 |
-| 2 Library sources and text | in progress | evidence/p2 | |
+| 2 Library sources and text | awaiting review | evidence/p2 | |
 | 3 Evidence, places, names, dates | not started | evidence/p3 | |
 | 4 Conclusions, legacy facts, bundle v2 | not started | evidence/p4 | |
 | 5 Ingestion v1 | not started | evidence/p5 | |
@@ -58,7 +58,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P2.T4 | done | src/evidence/domain/box.js, src/evidence/repositories/pageStore.js, src/tests/pageStore.test.js | I4: `normalizedBox` requires finite numbers in 0-1 with x0<x1, y0<y1 (rejects NaN, strings, out of range, inverted, zero-size); optional polygon (>=3 points in 0-1); `boxFromPixels` for import-time conversion on the unrotated image. `addPage` is idempotent per (copyId, pageIndex) and creates the whole-page region in the same transaction. Regions nest (same page only), are insert-only (no update/delete: they are citation targets). Page label and rotation are editable; size/position are not. Containment of child inside parent is **not** enforced (OCR boxes can overhang); `boxContains` is available. |
 | P2.T5 | done | src/evidence/repositories/runStore.js, src/tests/runStore.test.js | Processors router, pdf-text, docx-text, tesseract, llm-extraction, entity-resolution, manual, import. Run configuration fixed at `startRun`; only status/finishedAt change, via `finishRun` (once; later calls are conflicts). Items: queued/running/succeeded/failed/skipped/awaiting-htr, with error, unitsBilled, rawOutputId and a small structured `result` (router classification, P5.T4). Raw outputs (`evRawOutputs`) are insert-only; bytes stored as an ArrayBuffer copy with sha256 and size; round trip verified for all 256 byte values and UTF-8 text with diacritics. |
 | P2.T6 | done | src/evidence/repositories/textLayerStore.js, src/evidence/index.js, src/tests/textLayerStore.test.js | I1: the store has no update/delete/put/set operations; `dbAdd` rejects re-inserting an id (tested), and the architecture test confines db* calls to repositories. I3: `runId` required and must exist; region must exist. Corrections use `supersedesId` (same region, target must exist, a layer can be superseded only once). `current(regionId)` = newest non-superseded layer; `currentForPage(pageId)` maps regionId -> current layer. Word boxes validated with the I4 helper. Open point: `normalizedText` defaults to the original text until the Phase 3 normaliser exists. `createEvidenceLibrary(storage)` wires all stores. |
-| P2.T7 | todo | | |
+| P2.T7 | done | src/conclusions/linkLegacySource.js, src/models/project.js (`librarySourceId: null` default), src/evidence/repositories/sourceStore.js (+`dateText`, `url`), src/tests/linkLegacySource.test.js | `linkProjectSourceToLibrary({library, loadBlob, project, sourceId})` returns a new project plus `{librarySourceId, repositoryId, copyId, copyCreated, warnings}`; the caller persists. Not called by the app yet. Free-text repository -> Repository (reused by case-insensitive name; url sources -> `online`, others `private`); type -> kind (document/image/url, else other); parseable ISO dates -> dateRange, other dates kept as `dateText`; blob -> DigitalCopy (same file on two sources is not duplicated, with a warning); text-only sources register no copy. Idempotent; input project not mutated. |
 
 ### Phase 3
 | ID | Status | Files touched | Notes |
@@ -283,6 +283,23 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 
 ## Phase reports
 
+### Phase 2 report
+- **Built:** the library layers 1-2 as plain-JavaScript stores on IndexedDB, with no UI: Repository, LibrarySource (parent hierarchy, call numbers), DigitalCopy (content SHA-256 identity, blob or linked-folder location, unassigned inbox), Page + Region (normalised boxes, nesting, automatic whole-page region), ProcessingRun / RunItem / RawOutput, append-only TextLayer with superseding corrections and a current-layer query, plus `linkProjectSourceToLibrary` (not run automatically). Entry point: `createEvidenceLibrary(storage)` in `src/evidence/index.js`.
+- **IndexedDB version / stores added:** 2 -> **3**; added `evRepositories`, `evSources`, `evCopies`, `evPages`, `evRegions`, `evRuns`, `evRunItems`, `evRawOutputs`, `evTextLayers`, `evPageCache` (the last is created but unused until Phase 5).
+- **New dependencies:** none. The main bundle is unchanged by this phase (the library is not imported by the app yet).
+- **Deviations:** none from the design. Additions: `dateText` and `url` on LibrarySource (needed for P2.T7); `librarySourceId: null` default on project sources; the architecture test also enforces the repository-only rule for `db*` store methods (planned in P1.T2's note).
+- **Invariants and where they are tested:** **I1** `textLayerStore` exposes no update/delete (test), `dbAdd` refuses an existing id (test, and in real Chromium), regions/raw outputs are insert-only, and the architecture test fails if code outside `src/storage` and `src/evidence/repositories` calls `db*` methods. **I3** a text layer requires an existing run (tests). **I4** `normalizedBox` rejects NaN, strings, out-of-range, inverted and zero-size boxes, polygon points and word boxes use the same checks (tests incl. 10 invalid shapes). **I8** `upgrade.test.js` proves v1 -> v3 and v2 -> v3 keep projects, blobs and settings; `createSource` only gained a null field and all GEDCOM/bundle tests are unchanged and green. **I5** unchanged and passing.
+- **Tests:** 105 -> 172 (all earlier tests unchanged). `npm test -- --run` and `npm run build` pass.
+- **Real-browser check (Chromium, dev server, not committed):** a hand-made v2 database upgraded to v3 (13 stores) with project and setting intact; a real binary Blob hashed once and the same bytes from another location returned the existing copy; 6 raw bytes incl. 253-255 round-tripped; a superseding text layer became current while history kept both; re-inserting an existing text layer id was rejected; linking a project source with a real stored blob created a copy; no page errors.
+- **How to verify:** `npm install -g npm@latest` (or `npx -y npm@latest ci`), `npm ci`, `npm test -- --run`, `npm run build`. Read `src/evidence/` (about 700 lines) in this order: `domain/box.js`, `repositories/pageStore.js`, `repositories/textLayerStore.js`, `repositories/copyStore.js`. There is no visible change in the app (`npm run dev`: behaviour as before; browser devtools > Application > IndexedDB > `meridian-v1` shows version 3 with the new stores, empty).
+- **Backup reminder:** **export a native bundle backup before merging**: the IndexedDB version goes 2 -> 3 (adds empty stores only).
+- **Known limitations:** (1) I1 is enforced by repository code and the architecture test, not by the database itself; IndexedDB has no triggers, so code that bypasses the repositories at runtime (for example from devtools) can still overwrite rows. (2) `normalizedText` defaults to the original text until the Phase 3 normaliser exists. (3) A child region is not required to lie inside its parent (OCR boxes can overhang); `boxContains` exists if you want it enforced. (4) Page width/height are stored as given (pixels or points, caller's choice) and only their ratio matters for boxes. (5) `evPageCache` has no code yet. (6) Page size and position cannot be corrected, only label and display rotation.
+- **Questions for the reviewer:** (a) Keep regions insert-only (so citations can never move), or allow correcting a box through a superseding region? (b) Should a child region be forced inside its parent box? (c) Is "first registration wins" for duplicate files (later metadata ignored, `relocate`/`update` explicit) the right behaviour? (d) Page indexes are 0-based; the printed folio is a separate label. OK? (e) May `linkProjectSourceToLibrary` be wired into the Sources panel in Phase 4/5, or do you want an earlier visible "Use as evidence" action?
+
+**Review**
+- Approved: no
+- Reviewer notes:
+
 ### Phase 1 report
 - **Built:** folder skeleton for the evidence layer (P1.T1); import-boundary architecture test enforcing I5 (P1.T2); CI test job that gates the Pages build, and tests/build on pull requests (P1.T3); versioned forward-only IndexedDB upgrade framework with a `settings` store and multi-tab `versionchange` handling (P1.T4); `evidenceUi` feature flag with an empty, lazy-loaded Evidence panel (P1.T5); persistence request plus a storage/last-export status line (P1.T6).
 - **IndexedDB version / stores added:** version 1 -> **2**; added `settings` (keyPath `key`). `projects` and `blobs` untouched.
@@ -346,3 +363,4 @@ Template for each phase:
 | 2026-11-02 | P1.T1-P1.T6 | see git log | Phase 1 complete, awaiting review; PR opened. |
 | 2026-11-06 | CI fix | see git log | Phase 1 merge deploy failed (npm 12 vs Node 20); workflow moved to Node 22. |
 | 2026-11-06 | P1 review follow-up | see git log | Phase 1 approved; evidenceUi checkbox in Projects dialog (105 tests); Phase 2 started. |
+| 2026-11-06 | P2.T1-P2.T7 | see git log | Phase 2 complete (172 tests), awaiting review; PR opened. |

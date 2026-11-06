@@ -7,7 +7,7 @@ export const SOURCE_KINDS = [
 ];
 const STORE = "evSources";
 const EDITABLE = [
-  "kind", "title", "issuingAuthority", "placeText", "dateRange", "languages", "script",
+  "kind", "title", "issuingAuthority", "placeText", "dateText", "dateRange", "url", "languages", "script",
   "repositoryId", "callNumber", "parentSourceId", "citation",
 ];
 
@@ -47,7 +47,9 @@ export function createSourceStore(storage) {
         title: input.title,
         issuingAuthority: input.issuingAuthority ?? "",
         placeText: input.placeText ?? "", // free text until places exist (Phase 3)
+        dateText: input.dateText ?? "", // the date as written ("12 Martie 1843")
         dateRange: input.dateRange ?? null,
+        url: input.url ?? "", // where an online source lives
         languages: input.languages ?? [],
         script: input.script ?? "",
         repositoryId: input.repositoryId ?? null,
