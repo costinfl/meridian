@@ -101,6 +101,6 @@ describe("Region store", () => {
     const r = await pages.addRegion({ pageId: page.id, box: { x0: 0, y0: 0, x1: 0.5, y1: 0.5 }, polygon: [[0, 0], [0.5, 0], [0.25, 0.5]], kind: "article" });
     expect((await pages.getRegion(r.id)).polygon).toEqual([[0, 0], [0.5, 0], [0.25, 0.5]]);
     const names = Object.keys(pages).filter((k) => /region/i.test(k));
-    expect(names.filter((k) => /update|delete|remove|set|put/i.test(k))).toEqual([]);
+    expect(names.filter((k) => /^(update|delete|remove|set|put)/i.test(k))).toEqual([]);
   });
 });

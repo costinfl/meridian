@@ -6,7 +6,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 2 — Library sources and text
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P2.T5 (ProcessingRun, ProcessingRunItem, RawOutput).
+- **Next action:** P2.T6 (TextLayer, append-only, current-layer query).
 - **Last updated:** 2026-11-02 (Phase 1 complete)
 
 ## Phase overview
@@ -56,7 +56,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P2.T2 | done | src/evidence/{ids.js,domain/errors.js,repositories/repositoryStore.js,repositories/sourceStore.js}, src/tests/{evidenceHelpers.js,sourceStores.test.js} | Store factories take the storage service (dependency injection). Repository kinds archive/library/online/private; LibrarySource kinds parish-register ... other; call number {fond, inventory, file}; parent hierarchy with existence and cycle checks done in one transaction; update is whitelisted (id/createdAt immutable). Place stays free text (`placeText`) until Phase 3. 8 tests incl. hierarchy and cycle rejection. |
 | P2.T3 | done | src/evidence/domain/hash.js, src/evidence/repositories/copyStore.js, src/tests/copyStore.test.js | SHA-256 via crypto.subtle (realm-safe input detection: jsdom and Node ArrayBuffers differ); verified against known vectors. `register` / `registerFile` return `{copy, created}`: same hash returns the existing copy (even from another name/location; concurrent duplicates yield one row, enforced by the unique `bySha256` index). Storage modes `blob {blobKey}` and `folder {path}` (relative, no `..`). Unassigned inbox = `sourceId: null`; `relocate` for moved files; `update` is whitelisted (hash/id immutable). |
 | P2.T4 | done | src/evidence/domain/box.js, src/evidence/repositories/pageStore.js, src/tests/pageStore.test.js | I4: `normalizedBox` requires finite numbers in 0-1 with x0<x1, y0<y1 (rejects NaN, strings, out of range, inverted, zero-size); optional polygon (>=3 points in 0-1); `boxFromPixels` for import-time conversion on the unrotated image. `addPage` is idempotent per (copyId, pageIndex) and creates the whole-page region in the same transaction. Regions nest (same page only), are insert-only (no update/delete: they are citation targets). Page label and rotation are editable; size/position are not. Containment of child inside parent is **not** enforced (OCR boxes can overhang); `boxContains` is available. |
-| P2.T5 | todo | | |
+| P2.T5 | done | src/evidence/repositories/runStore.js, src/tests/runStore.test.js | Processors router, pdf-text, docx-text, tesseract, llm-extraction, entity-resolution, manual, import. Run configuration fixed at `startRun`; only status/finishedAt change, via `finishRun` (once; later calls are conflicts). Items: queued/running/succeeded/failed/skipped/awaiting-htr, with error, unitsBilled, rawOutputId and a small structured `result` (router classification, P5.T4). Raw outputs (`evRawOutputs`) are insert-only; bytes stored as an ArrayBuffer copy with sha256 and size; round trip verified for all 256 byte values and UTF-8 text with diacritics. |
 | P2.T6 | todo | | |
 | P2.T7 | todo | | |
 
