@@ -4,17 +4,17 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 0 — Discovery
-- **Phase status:** approved  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Phase 0 is approved. After the Phase 0 pull request is merged, start Phase 1 on `evidence/p1`, task P1.T1.
-- **Last updated:** 2026-11-02 (Phase 0 complete)
+- **Current phase:** 1 — Foundation
+- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** Wait for review of Phase 1.
+- **Last updated:** 2026-11-02 (Phase 1 complete)
 
 ## Phase overview
 
 | Phase | Status | Branch | Approved |
 | --- | --- | --- | --- |
 | 0 Discovery | approved | evidence/p0 (done on `ccr-adaa4345-wbnkkm`, see log) | 2026-11-02 |
-| 1 Foundation | not started | evidence/p1 | |
+| 1 Foundation | awaiting review | evidence/p1 | |
 | 2 Library sources and text | not started | evidence/p2 | |
 | 3 Evidence, places, names, dates | not started | evidence/p3 | |
 | 4 Conclusions, legacy facts, bundle v2 | not started | evidence/p4 | |
@@ -42,12 +42,12 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 1
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P1.T1 | todo | | |
-| P1.T2 | todo | | |
-| P1.T3 | todo | | |
-| P1.T4 | todo | | |
-| P1.T5 | todo | | |
-| P1.T6 | todo | | |
+| P1.T1 | done | src/{evidence,conclusions,ingest,search,graph,workers}/index.js, src/components/evidence/index.js, src/storage/upgrades/ | Empty modules only; nothing imports them yet; bundle size unchanged (319.19 kB). |
+| P1.T2 | done | src/tests/archRules.js, src/tests/architecture.test.js | Rules per the Phase 0 layout (evidence -> storage only; conclusions -> evidence/models/storage; ingest -> evidence/storage; search, graph -> evidence; workers -> non-UI; storage -> nothing). Scans static, side-effect, dynamic imports and `new URL(.., import.meta.url)`. Deliberate violation (`evidence/index.js` importing `models/project.js`) failed the test with `must not import models/project.js`, then removed. The rule "only repositories may call generic store methods" is added in P2.T1 when those methods exist. |
+| P1.T3 | done | .github/workflows/deploy.yml | New `test` job (Node 20, latest npm, `npm ci`, `npm test -- --run`); `build` has `needs: test`, so a failing test blocks the Pages build and deploy. Also added a `pull_request` trigger (deviation, logged): tests and build run on PRs to master; `deploy` is skipped for PRs. Verified locally by YAML parse and dependency graph; the workflow itself first runs on the PR. |
+| P1.T4 | done | src/storage/upgrades/{index,v1,v2}.js, src/storage/adapters/IndexedDBAdapter.js, src/storage/StorageService.js, src/tests/upgrade.test.js | DB version 1 -> 2 (adds `settings` store only). Forward-only step list; `openDB()` runs steps; `getSetting/putSetting/deleteSetting` added. R1 handled: on `versionchange` the connection closes, the adapter drops it and calls `onVersionChange`; `onBlocked` hook too. Tests build a hand-made v1 DB with projects + blob and prove it survives (I8); fresh DB; no-op reopen; a simulated v3 step on top; versionchange closes the connection. Note: fake-indexeddb drops the Blob prototype, so blob presence + record metadata are asserted. Main bundle 319.19 -> 320.43 kB. |
+| P1.T5 | done | src/evidenceFlag.js, src/components/evidence/EvidencePanel.jsx, src/App.jsx, src/hooks/useProject.js (`setEvidenceUi`), src/models/project.js (`evidenceUi: false` default), src/tests/evidenceFlag.test.jsx, src/tests/useProject.test.js | Flag = `project.settings.evidenceUi === true` or `?evidence=1`. Hidden by default (App test), shown with the URL flag (App test opens and closes the lazy panel). Panel is a separate lazy chunk (1.15 kB); main bundle 320.43 -> 322.10 kB. There is deliberately no UI toggle for the project setting yet (only the hook setter); the reviewer enables via `?evidence=1` or an imported project with the setting. |
+| P1.T6 | done | src/storage/persistence.js, src/components/evidence/EvidencePanel.jsx, src/App.jsx, src/tests/persistence.test.jsx | `requestPersistence()` runs when the flag is on; panel shows persistence state, usage/quota and last bundle export time (Open question 5). `doExportZip` now also stores `lastBundleExportAt` in the `settings` store (device-local, not in bundles). All helpers degrade to `null`/"not supported". Verified in real Chromium (see Phase 1 report). The export-time write itself is covered by the browser run, not a unit test (jsdom lacks `URL.createObjectURL`). Main bundle 323.49 kB; panel chunk 1.55 kB. |
 
 ### Phase 2
 | ID | Status | Files touched | Notes |
@@ -258,6 +258,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | --- | --- | --- | --- | --- |
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
+| 2026-11-02 | P1.T3 | Added `pull_request` trigger (branches: master) to the deploy workflow; deploy job skipped on PRs | The plan's phase PRs would otherwise merge to a live site before any test ran | Test-only separate workflow file |
 | 2026-11-02 | P0 review | Reviewer decisions: ADR-0005 accepted; self-host OCR/PDF assets; legacy verified facts confirmed by one-time user step; last-export indicator in P1.T6; install latest npm instead of regenerating the lockfile; LLM provider deferred; PR from the session branch | Phase 0 review answers 1-7 | n/a |
 | 2026-11-02 | Plan | Evidence layer runs client-side in the same repo (ADR-0005, Proposed); Postgres, AGE, Flyway, Testcontainers and Java modules removed from the plan | Meridian is a static app on GitHub Pages with IndexedDB storage and no backend | Java + Postgres backend (separate repo); local ingest companion (kept in Backlog) |
 
@@ -279,6 +280,28 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - Refresh `README.md` (still describes the single-file app) when the evidence layer lands (already in Backlog of the plan).
 
 ## Phase reports
+
+### Phase 1 report
+- **Built:** folder skeleton for the evidence layer (P1.T1); import-boundary architecture test enforcing I5 (P1.T2); CI test job that gates the Pages build, and tests/build on pull requests (P1.T3); versioned forward-only IndexedDB upgrade framework with a `settings` store and multi-tab `versionchange` handling (P1.T4); `evidenceUi` feature flag with an empty, lazy-loaded Evidence panel (P1.T5); persistence request plus a storage/last-export status line (P1.T6).
+- **IndexedDB version / stores added:** version 1 -> **2**; added `settings` (keyPath `key`). `projects` and `blobs` untouched.
+- **New dependencies:** none. Main bundle 319.19 -> 323.49 kB (+4.3 kB: upgrade runner, flag, persistence helpers); the Evidence panel is a separate 1.55 kB lazy chunk.
+- **Deviations:** pull_request trigger added to the deploy workflow (log, P1.T3). Phase work is on `ccr-adaa4345-wbnkkm`, restarted from master after PR #4 merged (log, P0).
+- **Tests:** 76 -> 104 (architecture 6, upgrade 6, flag/App 6, persistence 10, useProject 1; all existing tests unchanged and passing). `npm test -- --run` and `npm run build` pass.
+- **I5 demonstration:** adding `import { createProject } from "../models/project.js"` to `src/evidence/index.js` made the architecture test fail with `evidence/index.js (evidence) must not import models/project.js (models)`; the line was removed.
+- **I8:** the upgrade test builds a v1 database by hand with projects and a blob and proves they survive; GEDCOM and bundle tests are unchanged and green. Also verified in real Chromium against the production build (vite preview): a hand-made v1 database became version 2 with stores `blobs, projects, settings`, the legacy project and blob intact, no page errors.
+- **How to verify:**
+  1. `npm install -g npm@latest` (or `npx -y npm@latest ci`), `npm ci`, `npm test -- --run`, `npm run build`.
+  2. `npm run dev`: the app looks and behaves as before; there is no Evidence button.
+  3. Open `/?evidence=1` (dev URL, or `/meridian/?evidence=1` on Pages): an **Evidence** button appears after **Sources**; it opens a small preview panel whose last line reads e.g. `Persistent storage: not granted — export a bundle regularly · Using 74 kB of 3.2 GB · Last bundle export: never`.
+  4. Export > Meridian project (.zip), reopen the panel: the last-export time is now shown.
+  5. Open the app in two tabs at once: nothing should hang (the old tab closes its connection on a future upgrade).
+- **Backup reminder:** **export a native bundle backup before merging.** This is the first phase that upgrades the IndexedDB version (1 -> 2); the upgrade only adds an empty store, but real data deserves a backup.
+- **Known limitations:** there is no UI to switch the `evidenceUi` project setting on (only `?evidence=1`, or a project that already has it); the workflow changes can only be fully exercised by the pull request run on GitHub; Chromium's persistence grant is a browser heuristic, so the panel shows "not granted" in many cases; the rule that only repositories may call generic store methods arrives in P2.T1 when those methods exist.
+- **Questions for the reviewer:** (a) Should the `pull_request` trigger on the deploy workflow stay? (b) Do you want a visible toggle for `evidenceUi` (for example inside the Evidence panel or project manager) or is `?evidence=1` enough until Phase 5? (c) Is the status-line wording acceptable?
+
+**Review**
+- Approved: no
+- Reviewer notes:
 
 ### Phase 0 report
 - **Built:** nothing in `src/`. Confirmed environment facts, mapped the model (with sample-data counts), listed every read/write of `fatherId`/`motherId`/`spouseIds`/`verified`/`sourceId`, evaluated libraries with a working spike, checked browser support and LLM CORS, proposed the folder layout, recorded the baseline, and listed risks.
@@ -318,3 +341,4 @@ Template for each phase:
 | --- | --- | --- | --- |
 | 2026-11-02 | P0.T1-P0.T7 | see git log | Started over on the reviewed plan; Phase 0 complete. |
 | 2026-11-02 | Phase 0 review | see git log | Approved; ADR-0005 accepted; plan updated for answers; PR opened. |
+| 2026-11-02 | P1.T1-P1.T6 | see git log | Phase 1 complete, awaiting review; PR opened. |

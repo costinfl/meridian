@@ -1,20 +1,22 @@
-const DB_NAME = "meridian-v1";
-const DB_VERSION = 1;
+import { DB_VERSION, UPGRADES, runUpgrades } from "../upgrades/index.js";
 
-function openDB() {
+const DB_NAME = "meridian-v1"; // name kept for compatibility; the schema version is separate
+
+/** Open the database, applying forward-only upgrade steps. `onVersionChange` fires when another
+    tab/session needs to upgrade; the connection is closed first so the upgrade is not blocked. */
+export function openDB({ name = DB_NAME, version = DB_VERSION, steps = UPGRADES, onVersionChange, onBlocked } = {}) {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains("projects")) {
-        db.createObjectStore("projects", { keyPath: "id" });
-      }
-      if (!db.objectStoreNames.contains("blobs")) {
-        db.createObjectStore("blobs", { keyPath: "key" });
-      }
+    const request = indexedDB.open(name, version);
+    request.onupgradeneeded = (e) => {
+      runUpgrades(e.target.result, e.target.transaction, e.oldVersion, e.newVersion, steps);
     };
-    req.onsuccess = (e) => resolve(e.target.result);
-    req.onerror = (e) => reject(e.target.error);
+    request.onblocked = () => onBlocked?.();
+    request.onsuccess = (e) => {
+      const db = e.target.result;
+      db.onversionchange = () => { db.close(); onVersionChange?.(); };
+      resolve(db);
+    };
+    request.onerror = (e) => reject(e.target.error);
   });
 }
 
@@ -26,13 +28,37 @@ function req(idbRequest) {
 }
 
 export class IndexedDBAdapter {
-  constructor() {
+  /** @param {{ onVersionChange?: () => void, onBlocked?: () => void }} [hooks] */
+  constructor(hooks = {}) {
     this._db = null;
+    this._hooks = hooks;
   }
 
   async _open() {
-    if (!this._db) this._db = await openDB();
+    if (!this._db) {
+      this._db = await openDB({
+        onVersionChange: () => { this._db = null; this._hooks.onVersionChange?.(); },
+        onBlocked: () => this._hooks.onBlocked?.(),
+      });
+    }
     return this._db;
+  }
+
+  // Device-local key/value settings (never exported). `value` must be structured-cloneable.
+  async getSetting(key) {
+    const db = await this._open();
+    const row = await req(db.transaction("settings", "readonly").objectStore("settings").get(key));
+    return row ? row.value : undefined;
+  }
+
+  async putSetting(key, value) {
+    const db = await this._open();
+    await req(db.transaction("settings", "readwrite").objectStore("settings").put({ key, value }));
+  }
+
+  async deleteSetting(key) {
+    const db = await this._open();
+    await req(db.transaction("settings", "readwrite").objectStore("settings").delete(key));
   }
 
   async listProjects() {
