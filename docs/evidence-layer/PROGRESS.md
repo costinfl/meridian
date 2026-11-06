@@ -4,9 +4,9 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 1 — Foundation
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 1.
+- **Current phase:** 2 — Library sources and text
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** P2.T1 (IndexedDB version 3 library stores).
 - **Last updated:** 2026-11-02 (Phase 1 complete)
 
 ## Phase overview
@@ -14,8 +14,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | Phase | Status | Branch | Approved |
 | --- | --- | --- | --- |
 | 0 Discovery | approved | evidence/p0 (done on `ccr-adaa4345-wbnkkm`, see log) | 2026-11-02 |
-| 1 Foundation | awaiting review | evidence/p1 | |
-| 2 Library sources and text | not started | evidence/p2 | |
+| 1 Foundation | approved | evidence/p1 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-06 |
+| 2 Library sources and text | in progress | evidence/p2 | |
 | 3 Evidence, places, names, dates | not started | evidence/p3 | |
 | 4 Conclusions, legacy facts, bundle v2 | not started | evidence/p4 | |
 | 5 Ingestion v1 | not started | evidence/p5 | |
@@ -258,6 +258,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | --- | --- | --- | --- | --- |
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
+| 2026-11-06 | P1 review | Phase 1 approved. Visible `evidenceUi` toggle added as a checkbox in the Projects dialog (per project); `?evidence=1` still works as an override. `pull_request` trigger kept. | Reviewer answers; `?evidence=1` is too easy to forget | Toggle inside the Evidence panel (unreachable while the flag is off) |
 | 2026-11-06 | P1 (CI fix) | CI workflow moved from Node 20 to Node 22 (both `test` and `build` jobs) | `npm install -g npm@latest` now installs npm 12, which requires Node ^22.22.2 / ^24.15 / >=26; on Node 20 the step fails with EBADENGINE. Every deploy failed from 2026-11-02 (run 9, docs-only) through the Phase 1 merge (run 13). My P1.T3 job reused the step and I did not check CI results before reporting Phase 1 done. | Pin `npm@11` on Node 20 (still fails once Node 20 reaches end of life; the earlier answer to Open question 6 was to install the latest npm) |
 | 2026-11-02 | P1.T3 | Added `pull_request` trigger (branches: master) to the deploy workflow; deploy job skipped on PRs | The plan's phase PRs would otherwise merge to a live site before any test ran | Test-only separate workflow file |
 | 2026-11-02 | P0 review | Reviewer decisions: ADR-0005 accepted; self-host OCR/PDF assets; legacy verified facts confirmed by one-time user step; last-export indicator in P1.T6; install latest npm instead of regenerating the lockfile; LLM provider deferred; PR from the session branch | Phase 0 review answers 1-7 | n/a |
@@ -301,8 +302,8 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - **Questions for the reviewer:** (a) Should the `pull_request` trigger on the deploy workflow stay? (b) Do you want a visible toggle for `evidenceUi` (for example inside the Evidence panel or project manager) or is `?evidence=1` enough until Phase 5? (c) Is the status-line wording acceptable?
 
 **Review**
-- Approved: no
-- Reviewer notes:
+- Approved: yes (2026-11-06)
+- Reviewer notes: `pull_request` trigger stays; status-line wording accepted; wants a visible toggle for `evidenceUi` (added, see log). Merge of PR #5 deployed only after the CI Node 22 fix (PR #6).
 
 ### Phase 0 report
 - **Built:** nothing in `src/`. Confirmed environment facts, mapped the model (with sample-data counts), listed every read/write of `fatherId`/`motherId`/`spouseIds`/`verified`/`sourceId`, evaluated libraries with a working spike, checked browser support and LLM CORS, proposed the folder layout, recorded the baseline, and listed risks.
@@ -344,3 +345,4 @@ Template for each phase:
 | 2026-11-02 | Phase 0 review | see git log | Approved; ADR-0005 accepted; plan updated for answers; PR opened. |
 | 2026-11-02 | P1.T1-P1.T6 | see git log | Phase 1 complete, awaiting review; PR opened. |
 | 2026-11-06 | CI fix | see git log | Phase 1 merge deploy failed (npm 12 vs Node 20); workflow moved to Node 22. |
+| 2026-11-06 | P1 review follow-up | see git log | Phase 1 approved; evidenceUi checkbox in Projects dialog (105 tests); Phase 2 started. |

@@ -51,3 +51,28 @@ describe("App entry point", () => {
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull());
   });
 });
+
+describe("evidenceUi toggle in the Projects dialog", () => {
+  beforeEach(() => {
+    global.indexedDB = new IDBFactory();
+    global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+  });
+  afterEach(() => { cleanup(); window.history.pushState({}, "", "/"); });
+
+  it("turns the Evidence button on and off for the open project, without a URL flag", async () => {
+    const { default: App } = await import("../App.jsx");
+    render(<App />);
+    await screen.findByText(/Sources/);
+    expect(screen.queryByRole("button", { name: /^Evidence$/ })).toBeNull();
+
+    fireEvent.click(screen.getByTitle(/projects/i));
+    const box = await screen.findByRole("checkbox", { name: /Evidence layer \(preview\)/ });
+    expect(box).not.toBeChecked();
+    fireEvent.click(box);
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Evidence$/ })).toBeInTheDocument());
+    expect(screen.getByRole("checkbox", { name: /Evidence layer \(preview\)/ })).toBeChecked();
+
+    fireEvent.click(screen.getByRole("checkbox", { name: /Evidence layer \(preview\)/ }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: /^Evidence$/ })).toBeNull());
+  });
+});

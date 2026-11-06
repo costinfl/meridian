@@ -11,7 +11,7 @@ function formatDate(iso) {
   }
 }
 
-export function ProjectManager({ projectList, currentProjectId, onClose, onCreate, onOpen, onDelete, onRename }) {
+export function ProjectManager({ projectList, currentProjectId, onClose, onCreate, onOpen, onDelete, onRename, evidenceUi = false, onToggleEvidenceUi }) {
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
   const [renamingId, setRenamingId] = useState(null);
@@ -132,6 +132,18 @@ export function ProjectManager({ projectList, currentProjectId, onClose, onCreat
           </button>
         )}
       </div>
+
+      {onToggleEvidenceUi && (
+        <label style={{ display: "flex", alignItems: "flex-start", gap: 8, marginTop: 14, paddingTop: 10, borderTop: `1px solid ${C.rule}`, cursor: "pointer" }}>
+          <input type="checkbox" checked={!!evidenceUi} onChange={(e) => onToggleEvidenceUi(e.target.checked)} style={{ marginTop: 2 }} />
+          <span>
+            <span style={{ display: "block", font: "600 12px Archivo, sans-serif", color: C.ink }}>Evidence layer (preview)</span>
+            <span style={{ display: "block", font: "400 10.5px Archivo, sans-serif", color: C.inkSoft, lineHeight: 1.4 }}>
+              Shows the Evidence button for the open project. Unfinished; does not change your timeline.
+            </span>
+          </span>
+        </label>
+      )}
     </Modal>
   );
 }
