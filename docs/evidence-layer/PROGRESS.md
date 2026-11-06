@@ -138,7 +138,7 @@ Pre-filled from commit `243bf1c` by the planning session; **confirmed in P0.T1 o
 | Project model | `src/models/project.js` (`createProject`, `createSource`, event/period/group/annotation/era/media factories, `normalizeProject`); autosave in `src/hooks/useProject.js` |
 | Interop | Native bundle `src/share.js` (ADR-0001/0002), GEDCOM 5.5.1 `src/gedcom.js` (verified-only, ADR-0003) |
 | Tests | Vitest 4 + jsdom + `fake-indexeddb` + Testing Library; `src/tests/*.test.js`; script `npm test` (use `npm test -- --run` for a single pass) |
-| Build / deploy | `npm run build` → `dist/`, Vite `base: "/meridian/"`; GitHub Actions deploys to Pages on push to `master` (Node 20); no test job in CI yet |
+| Build / deploy | `npm run build` → `dist/`, Vite `base: "/meridian/"`; GitHub Actions deploys to Pages on push to `master` (Node **22** since the CI fix on 2026-11-06; was 20); test job added in P1.T3 |
 | Lint / format | No ESLint or Prettier config in the repo at this commit |
 | Docs | ADRs in `docs/adr/` (0001–0004); `README.md` is out of date (describes the single-file `App.jsx`) |
 
@@ -258,6 +258,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | --- | --- | --- | --- | --- |
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
+| 2026-11-06 | P1 (CI fix) | CI workflow moved from Node 20 to Node 22 (both `test` and `build` jobs) | `npm install -g npm@latest` now installs npm 12, which requires Node ^22.22.2 / ^24.15 / >=26; on Node 20 the step fails with EBADENGINE. Every deploy failed from 2026-11-02 (run 9, docs-only) through the Phase 1 merge (run 13). My P1.T3 job reused the step and I did not check CI results before reporting Phase 1 done. | Pin `npm@11` on Node 20 (still fails once Node 20 reaches end of life; the earlier answer to Open question 6 was to install the latest npm) |
 | 2026-11-02 | P1.T3 | Added `pull_request` trigger (branches: master) to the deploy workflow; deploy job skipped on PRs | The plan's phase PRs would otherwise merge to a live site before any test ran | Test-only separate workflow file |
 | 2026-11-02 | P0 review | Reviewer decisions: ADR-0005 accepted; self-host OCR/PDF assets; legacy verified facts confirmed by one-time user step; last-export indicator in P1.T6; install latest npm instead of regenerating the lockfile; LLM provider deferred; PR from the session branch | Phase 0 review answers 1-7 | n/a |
 | 2026-11-02 | Plan | Evidence layer runs client-side in the same repo (ADR-0005, Proposed); Postgres, AGE, Flyway, Testcontainers and Java modules removed from the plan | Meridian is a static app on GitHub Pages with IndexedDB storage and no backend | Java + Postgres backend (separate repo); local ingest companion (kept in Backlog) |
@@ -342,3 +343,4 @@ Template for each phase:
 | 2026-11-02 | P0.T1-P0.T7 | see git log | Started over on the reviewed plan; Phase 0 complete. |
 | 2026-11-02 | Phase 0 review | see git log | Approved; ADR-0005 accepted; plan updated for answers; PR opened. |
 | 2026-11-02 | P1.T1-P1.T6 | see git log | Phase 1 complete, awaiting review; PR opened. |
+| 2026-11-06 | CI fix | see git log | Phase 1 merge deploy failed (npm 12 vs Node 20); workflow moved to Node 22. |
