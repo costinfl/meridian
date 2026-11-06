@@ -57,3 +57,14 @@ export function checkImports(files) {
   }
   return violations;
 }
+
+// Generic store methods may only be called by the storage layer and evidence repositories (I1).
+const DB_CALL = /\.db(Transact|Get|Put|Add|GetAll|GetAllByIndex|GetByIndex|Count)\s*\(/;
+export function checkDbMethodUse(files) {
+  const violations = [];
+  for (const [file, source] of Object.entries(files)) {
+    if (file.startsWith("storage/") || file.startsWith("evidence/repositories/")) continue;
+    if (DB_CALL.test(source)) violations.push(`${file} calls a generic db* store method; only src/storage and src/evidence/repositories may`);
+  }
+  return violations;
+}

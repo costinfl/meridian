@@ -4,6 +4,7 @@ import { IndexedDBAdapter, openDB } from "../storage/adapters/IndexedDBAdapter.j
 import { DB_VERSION, UPGRADES } from "../storage/upgrades/index.js";
 import { createProject, createSource } from "../models/project.js";
 
+const EXPECTED_STORES = ["blobs", "projects", "settings", "evRepositories", "evSources", "evCopies", "evPages", "evRegions", "evRuns", "evRunItems", "evRawOutputs", "evTextLayers", "evPageCache"];
 const idbReq = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 
 /** Build a genuine version-1 database by hand (independent of the upgrade code). */
@@ -58,10 +59,40 @@ describe("IndexedDB upgrade framework (I8)", () => {
     expect(await adapter.getSetting("lastBundleExportAt")).toBeUndefined();
   });
 
+  it("upgrades a version-2 database (with settings) to version 3 losslessly and adds the library stores with their indexes", async () => {
+    // hand-made v2 database: v1 stores + settings
+    const db2 = await new Promise((res, rej) => {
+      const r = indexedDB.open("meridian-v1", 2);
+      r.onupgradeneeded = () => {
+        r.result.createObjectStore("projects", { keyPath: "id" });
+        r.result.createObjectStore("blobs", { keyPath: "key" });
+        r.result.createObjectStore("settings", { keyPath: "key" });
+      };
+      r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+    });
+    const proj = createProject("Two");
+    const tx = db2.transaction(["projects", "settings"], "readwrite");
+    tx.objectStore("projects").put(proj);
+    tx.objectStore("settings").put({ key: "lastBundleExportAt", value: "2026-11-02T10:00:00.000Z" });
+    await new Promise((res) => { tx.oncomplete = res; });
+    db2.close();
+
+    const adapter = new IndexedDBAdapter();
+    expect((await adapter.loadProject(proj.id)).name).toBe("Two");
+    expect(await adapter.getSetting("lastBundleExportAt")).toBe("2026-11-02T10:00:00.000Z");
+    const db = await adapter._open();
+    expect(db.version).toBe(3);
+    const idx = (s) => [...db.transaction(s).objectStore(s).indexNames].sort();
+    expect(idx("evCopies")).toEqual(["bySha256", "bySource"]);
+    expect(idx("evPages")).toEqual(["byCopy", "byCopyIndex"]);
+    expect(idx("evTextLayers")).toEqual(["byRegion", "byRun", "bySupersedes"]);
+    expect(db.transaction("evCopies").objectStore("evCopies").index("bySha256").unique).toBe(true);
+  });
+
   it("a fresh database gets every store at the current version", async () => {
     const db = await openDB();
     expect(db.version).toBe(DB_VERSION);
-    expect([...db.objectStoreNames].sort()).toEqual(["blobs", "projects", "settings"]);
+    expect([...db.objectStoreNames].sort()).toEqual([...EXPECTED_STORES].sort());
     db.close();
   });
 
@@ -77,16 +108,16 @@ describe("IndexedDB upgrade framework (I8)", () => {
     expect((await new IndexedDBAdapter().loadProject(p.id)).name).toBe("Gamma");
   });
 
-  it("a future step (v3) applies on top of v2 and keeps existing data", async () => {
+  it("a future step (v4) applies on top of the current schema and keeps existing data", async () => {
     const adapter = new IndexedDBAdapter();
     const p = createProject("Delta");
     await adapter.saveProject(p);
     await adapter.putSetting("k", { a: 1 });
     adapter._db.close();
 
-    const v3 = { version: 3, up(db) { db.createObjectStore("evTest", { keyPath: "id" }); } };
-    const db = await openDB({ version: 3, steps: [...UPGRADES, v3] });
-    expect([...db.objectStoreNames].sort()).toEqual(["blobs", "evTest", "projects", "settings"]);
+    const v4 = { version: 4, up(db) { db.createObjectStore("evTest", { keyPath: "id" }); } };
+    const db = await openDB({ version: 4, steps: [...UPGRADES, v4] });
+    expect([...db.objectStoreNames].sort()).toEqual([...EXPECTED_STORES, "evTest"].sort());
     const kept = await idbReq(db.transaction("projects").objectStore("projects").get(p.id));
     expect(kept.name).toBe("Delta");
     const setting = await idbReq(db.transaction("settings").objectStore("settings").get("k"));
@@ -99,9 +130,9 @@ describe("IndexedDB upgrade framework (I8)", () => {
     const adapter = new IndexedDBAdapter({ onVersionChange: () => notified++ });
     await adapter.saveProject(createProject("Epsilon"));
 
-    const v3 = { version: 3, up(db) { db.createObjectStore("evTest", { keyPath: "id" }); } };
-    const db = await openDB({ version: 3, steps: [...UPGRADES, v3] }); // would hang forever if not closed
-    expect(db.version).toBe(3);
+    const v4 = { version: 4, up(db) { db.createObjectStore("evTest", { keyPath: "id" }); } };
+    const db = await openDB({ version: 4, steps: [...UPGRADES, v4] }); // would hang forever if not closed
+    expect(db.version).toBe(4);
     expect(notified).toBe(1);
     expect(adapter._db).toBeNull();
     db.close();
