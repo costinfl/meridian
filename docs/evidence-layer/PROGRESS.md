@@ -6,7 +6,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 3 — Evidence, places, names, dates
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P3.T2 (IndexedDB v4: places, names, records, personas, assertions).
+- **Next action:** P3.T3 (places: names at a date, ancestors at a date).
 - **Last updated:** 2026-11-08 (Phase 2 approved, Phase 3 started)
 
 ## Phase overview
@@ -64,7 +64,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
 | P3.T1 | done | src/evidence/domain/fuzzyDate.js, src/tests/fuzzyDate.test.js | FuzzyDate plain object {asWritten, earliest, latest, earliestDay, latestDay, calendar, precision, derivedFrom}. `earliestDay/latestDay` are Julian Day Numbers, so ranges compare correctly across Julian and Gregorian records (this also gives Julian->Gregorian conversion for free: 1843-03-12 Julian = 1843-03-24 Gregorian; verified against JDN reference values and a full round trip over four years in both calendars). Constructors: stated parts (day/month/year), about (+-2 years), before/after (open ends use sentinel days), ISO text. `fromStatedAge({value, unit: years|months|days, slack})` at an event date: 45 ani at 1885-03-01 -> 1839-03-02..1840-03-01, verified by brute force against the completed-years definition; leap-day cases only widen. `overlaps`, `containsDay`, `validateFuzzyDate`. The persisted index and the Romanian text parser ("12 Martie 1843") come later (P3.T2 stores, Phase 6 extraction). |
-| P3.T2 | todo | | |
+| P3.T2 | done | src/storage/upgrades/v4.js, src/storage/upgrades/index.js, src/tests/upgrade.test.js | DB version 3 -> 4: stores evPlaces, evPlaceNames, evPlaceParents, evNameVariants, evRecords, evPersonas, evAssertions. Indexes: assertions by subject / object persona / citation region / status / run / supersedes plus compound [subject,property] and [citationRegion,property] (for 'rejected proposals are not re-proposed'); personas by record, name key and a multiEntry Daitch-Mokotoff surname key; records by kind, place, run, a multiEntry region index and denormalised event earliest/latest day (for date-range queries); place names by place/name/folded key; place parents by child/parent; name variants by canonical key and variant key. Upgrade test v3 -> v4 uses the frozen earlier steps to build a v3 database with library data, then checks it is intact. The v2 -> v3 test now stops at v3 so it keeps pinning that step. |
 | P3.T3 | todo | | |
 | P3.T4 | todo | | |
 | P3.T5 | todo | | |
