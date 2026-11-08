@@ -36,6 +36,7 @@ export function createSource({ title = "Untitled source", type = "text", ...rest
     fileName: null,
     mimeType: null,
     fileMissing: false, // true when the media file was removed from a shared bundle
+    librarySourceId: null, // id of the evidence-library source this one is linked to (set when first used as evidence)
     linkedPersonIds: [],
     linkedYearRange: null,
     tags: [],

@@ -44,6 +44,40 @@ export class IndexedDBAdapter {
     return this._db;
   }
 
+  /* ---- generic object-store access (evidence library) ----
+     Named db* so the architecture test can restrict callers to src/evidence/repositories
+     and src/storage (this is what keeps append-only evidence append-only, I1).
+     `dbAdd` rejects an existing key; `dbPut` overwrites. Inside dbTransact only await the
+     ops handed to the callback (anything else lets the transaction auto-commit). */
+  dbTransact(storeNames, mode, fn) {
+    return this._open().then((db) => new Promise((resolve, reject) => {
+      const tx = db.transaction(storeNames, mode);
+      const ops = {
+        get: (s, k) => req(tx.objectStore(s).get(k)),
+        put: (s, v) => req(tx.objectStore(s).put(v)),
+        add: (s, v) => req(tx.objectStore(s).add(v)),
+        getAll: (s) => req(tx.objectStore(s).getAll()),
+        getAllByIndex: (s, i, q) => req(tx.objectStore(s).index(i).getAll(q)),
+        getByIndex: (s, i, q) => req(tx.objectStore(s).index(i).get(q)),
+        count: (s) => req(tx.objectStore(s).count()),
+      };
+      let result;
+      tx.oncomplete = () => resolve(result);
+      tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+      Promise.resolve().then(() => fn(ops)).then(
+        (r) => { result = r; },
+        (err) => { reject(err); try { tx.abort(); } catch { /* already finished */ } },
+      );
+    }));
+  }
+  dbGet(store, key) { return this.dbTransact([store], "readonly", (o) => o.get(store, key)); }
+  dbPut(store, value) { return this.dbTransact([store], "readwrite", (o) => o.put(store, value)); }
+  dbAdd(store, value) { return this.dbTransact([store], "readwrite", (o) => o.add(store, value)); }
+  dbGetAll(store) { return this.dbTransact([store], "readonly", (o) => o.getAll(store)); }
+  dbGetAllByIndex(store, index, query) { return this.dbTransact([store], "readonly", (o) => o.getAllByIndex(store, index, query)); }
+  dbGetByIndex(store, index, query) { return this.dbTransact([store], "readonly", (o) => o.getByIndex(store, index, query)); }
+  dbCount(store) { return this.dbTransact([store], "readonly", (o) => o.count(store)); }
+
   // Device-local key/value settings (never exported). `value` must be structured-cloneable.
   async getSetting(key) {
     const db = await this._open();
