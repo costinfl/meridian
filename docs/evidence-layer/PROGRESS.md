@@ -4,10 +4,10 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 2 — Library sources and text
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 2.
-- **Last updated:** 2026-11-06 (Phase 2 complete)
+- **Current phase:** 3 — Evidence, places, names, dates
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** P3.T2 (IndexedDB v4: places, names, records, personas, assertions).
+- **Last updated:** 2026-11-08 (Phase 2 approved, Phase 3 started)
 
 ## Phase overview
 
@@ -15,7 +15,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | --- | --- | --- | --- |
 | 0 Discovery | approved | evidence/p0 (done on `ccr-adaa4345-wbnkkm`, see log) | 2026-11-02 |
 | 1 Foundation | approved | evidence/p1 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-06 |
-| 2 Library sources and text | awaiting review | evidence/p2 | |
+| 2 Library sources and text | approved | evidence/p2 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-08 |
 | 3 Evidence, places, names, dates | not started | evidence/p3 | |
 | 4 Conclusions, legacy facts, bundle v2 | not started | evidence/p4 | |
 | 5 Ingestion v1 | not started | evidence/p5 | |
@@ -63,7 +63,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 3
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P3.T1 | todo | | |
+| P3.T1 | done | src/evidence/domain/fuzzyDate.js, src/tests/fuzzyDate.test.js | FuzzyDate plain object {asWritten, earliest, latest, earliestDay, latestDay, calendar, precision, derivedFrom}. `earliestDay/latestDay` are Julian Day Numbers, so ranges compare correctly across Julian and Gregorian records (this also gives Julian->Gregorian conversion for free: 1843-03-12 Julian = 1843-03-24 Gregorian; verified against JDN reference values and a full round trip over four years in both calendars). Constructors: stated parts (day/month/year), about (+-2 years), before/after (open ends use sentinel days), ISO text. `fromStatedAge({value, unit: years|months|days, slack})` at an event date: 45 ani at 1885-03-01 -> 1839-03-02..1840-03-01, verified by brute force against the completed-years definition; leap-day cases only widen. `overlaps`, `containsDay`, `validateFuzzyDate`. The persisted index and the Romanian text parser ("12 Martie 1843") come later (P3.T2 stores, Phase 6 extraction). |
 | P3.T2 | todo | | |
 | P3.T3 | todo | | |
 | P3.T4 | todo | | |
@@ -258,6 +258,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | --- | --- | --- | --- | --- |
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
+| 2026-11-08 | P3.T1 | FuzzyDate day numbers are Julian Day Numbers (not epoch days); "about" = +-2 years (`ABOUT_SPAN_YEARS`, overridable per call); open ends use sentinel days 0 and 5373484 | The design asks for comparable indexed ranges and a calendar flag but fixes neither the day-number base nor the width of "about"; JDN makes Julian/Gregorian comparison exact and needs no extra conversion step | Epoch days in the stated calendar (not comparable across calendars); +-1 or +-5 years for "about" (adjustable by the reviewer) |
 | 2026-11-06 | P1 review | Phase 1 approved. Visible `evidenceUi` toggle added as a checkbox in the Projects dialog (per project); `?evidence=1` still works as an override. `pull_request` trigger kept. | Reviewer answers; `?evidence=1` is too easy to forget | Toggle inside the Evidence panel (unreachable while the flag is off) |
 | 2026-11-06 | P1 (CI fix) | CI workflow moved from Node 20 to Node 22 (both `test` and `build` jobs) | `npm install -g npm@latest` now installs npm 12, which requires Node ^22.22.2 / ^24.15 / >=26; on Node 20 the step fails with EBADENGINE. Every deploy failed from 2026-11-02 (run 9, docs-only) through the Phase 1 merge (run 13). My P1.T3 job reused the step and I did not check CI results before reporting Phase 1 done. | Pin `npm@11` on Node 20 (still fails once Node 20 reaches end of life; the earlier answer to Open question 6 was to install the latest npm) |
 | 2026-11-02 | P1.T3 | Added `pull_request` trigger (branches: master) to the deploy workflow; deploy job skipped on PRs | The plan's phase PRs would otherwise merge to a live site before any test ran | Test-only separate workflow file |
@@ -297,7 +298,8 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - **Questions for the reviewer:** (a) Keep regions insert-only (so citations can never move), or allow correcting a box through a superseding region? (b) Should a child region be forced inside its parent box? (c) Is "first registration wins" for duplicate files (later metadata ignored, `relocate`/`update` explicit) the right behaviour? (d) Page indexes are 0-based; the printed folio is a separate label. OK? (e) May `linkProjectSourceToLibrary` be wired into the Sources panel in Phase 4/5, or do you want an earlier visible "Use as evidence" action?
 
 **Review**
-- Approved: no
+- Approved: yes (2026-11-08, by merging PR #7 and asking to continue)
+- Reviewer notes: no answers were given to questions (a)-(e); the current behaviour is kept as the default: regions insert-only, no forced child-in-parent containment, first registration wins, 0-based page indexes, linking not yet wired to the UI. Master deploy of the merge succeeded (run 17).
 - Reviewer notes:
 
 ### Phase 1 report
@@ -364,3 +366,4 @@ Template for each phase:
 | 2026-11-06 | CI fix | see git log | Phase 1 merge deploy failed (npm 12 vs Node 20); workflow moved to Node 22. |
 | 2026-11-06 | P1 review follow-up | see git log | Phase 1 approved; evidenceUi checkbox in Projects dialog (105 tests); Phase 2 started. |
 | 2026-11-06 | P2.T1-P2.T7 | see git log | Phase 2 complete (172 tests), awaiting review; PR opened. |
+| 2026-11-08 | Phase 2 review | see git log | Phase 2 approved by merge; Phase 3 started. |
