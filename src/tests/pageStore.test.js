@@ -104,3 +104,73 @@ describe("Region store", () => {
     expect(names.filter((k) => /^(update|delete|remove|set|put)/i.test(k))).toEqual([]);
   });
 });
+
+describe("Region: nesting inside the parent box and corrections by superseding region", () => {
+  let page, whole;
+  beforeEach(async () => { ({ page, wholePageRegion: whole } = await pages.addPage({ copyId: copy.id, pageIndex: 0, width: 100, height: 100 })); });
+  const box = (x0, y0, x1, y1) => ({ x0, y0, x1, y1 });
+
+  it("a child region must lie inside its parent's box (touching edges is fine)", async () => {
+    const article = await pages.addRegion({ pageId: page.id, box: box(0.1, 0.1, 0.9, 0.6), kind: "article" });
+    await expect(pages.addRegion({ pageId: page.id, box: box(0.05, 0.2, 0.5, 0.3), parentRegionId: article.id })).rejects.toThrow(/inside its parent/);
+    await expect(pages.addRegion({ pageId: page.id, box: box(0.2, 0.2, 0.95, 0.3), parentRegionId: article.id })).rejects.toThrow(/inside its parent/);
+    await expect(pages.addRegion({ pageId: page.id, box: box(0.2, 0.2, 0.5, 0.7), parentRegionId: article.id })).rejects.toThrow(/inside its parent/);
+    const edge = await pages.addRegion({ pageId: page.id, box: box(0.1, 0.1, 0.9, 0.6), parentRegionId: article.id }); // same box
+    expect(edge.parentRegionId).toBe(article.id);
+    const inside = await pages.addRegion({ pageId: page.id, box: box(0.2, 0.2, 0.5, 0.3), parentRegionId: whole.id });
+    expect(inside.parentRegionId).toBe(whole.id);
+    expect(await storage.dbCount("evRegions")).toBe(4);
+  });
+
+  it("correctRegion adds a superseding region; the old one stays and old citations remain valid", async () => {
+    const wrong = await pages.addRegion({ pageId: page.id, box: box(0.1, 0.1, 0.4, 0.2), kind: "row", label: "Row 1" });
+    const fixed = await pages.correctRegion(wrong.id, { box: box(0.1, 0.1, 0.9, 0.2) });
+    expect(fixed).toMatchObject({ supersedesId: wrong.id, pageId: page.id, kind: "row", label: "Row 1", parentRegionId: null });
+    expect(fixed.box).toEqual(box(0.1, 0.1, 0.9, 0.2));
+    expect((await pages.getRegion(wrong.id)).box).toEqual(box(0.1, 0.1, 0.4, 0.2)); // untouched: citations keep what was read
+    expect((await pages.currentRegion(wrong.id)).id).toBe(fixed.id);
+    expect((await pages.currentRegion(fixed.id)).id).toBe(fixed.id);
+    expect((await pages.regionHistory(fixed.id)).map((r) => r.id)).toEqual([wrong.id, fixed.id]);
+    expect((await pages.listRegions(page.id)).map((r) => r.id)).toContain(wrong.id);
+    expect((await pages.listCurrentRegions(page.id)).map((r) => r.id).sort()).toEqual([whole.id, fixed.id].sort());
+    const again = await pages.correctRegion(fixed.id, { label: "Row 1 (full width)" }); // chains of corrections
+    expect((await pages.currentRegion(wrong.id)).id).toBe(again.id);
+    expect((await pages.regionHistory(again.id)).map((r) => r.id)).toEqual([wrong.id, fixed.id, again.id]);
+    expect(again.box).toEqual(fixed.box); // unchanged fields carry over
+  });
+
+  it("a region can be superseded once; whole-page regions and unknown ids cannot be corrected; corrections are validated", async () => {
+    const r = await pages.addRegion({ pageId: page.id, box: box(0.1, 0.1, 0.4, 0.2) });
+    await pages.correctRegion(r.id, { label: "v2" });
+    await expect(pages.correctRegion(r.id, { label: "v3" })).rejects.toMatchObject({ code: "conflict" });
+    await expect(pages.correctRegion(whole.id, { label: "x" })).rejects.toMatchObject({ code: "invalid" });
+    await expect(pages.correctRegion("missing", {})).rejects.toMatchObject({ code: "not-found" });
+    const latest = await pages.currentRegion(r.id);
+    await expect(pages.correctRegion(latest.id, { box: box(0.5, 0, 0.2, 1) })).rejects.toThrow(/box/);
+    await expect(pages.correctRegion(latest.id, { kind: "page" })).rejects.toMatchObject({ code: "invalid" });
+  });
+
+  it("a corrected child must still fit its parent; children of earlier versions are found from the newest version", async () => {
+    const article = await pages.addRegion({ pageId: page.id, box: box(0.1, 0.1, 0.9, 0.6), kind: "article" });
+    const body = await pages.addRegion({ pageId: page.id, box: box(0.2, 0.2, 0.5, 0.5), parentRegionId: article.id });
+    await expect(pages.correctRegion(body.id, { box: box(0.0, 0.2, 0.5, 0.5) })).rejects.toThrow(/inside its parent/);
+    const fixedBody = await pages.correctRegion(body.id, { box: box(0.15, 0.2, 0.6, 0.5) });
+    expect(fixedBody.parentRegionId).toBe(article.id);
+    expect((await pages.childRegions(article.id)).map((r) => r.id).sort()).toEqual([body.id, fixedBody.id].sort());
+    // an article corrected later: its old children are still reachable from the new version
+    const fixedArticle = await pages.correctRegion(article.id, { box: box(0.1, 0.1, 0.95, 0.65) });
+    expect((await pages.childRegions(fixedArticle.id)).map((r) => r.id).sort()).toEqual([body.id, fixedBody.id].sort());
+  });
+
+  it("text and citations on the old region stay attached to it (nothing is moved to the new version)", async () => {
+    const { createRunStore } = await import("../evidence/repositories/runStore.js");
+    const { createTextLayerStore } = await import("../evidence/repositories/textLayerStore.js");
+    const run = await createRunStore(storage).startRun({ processor: "tesseract" });
+    const texts = createTextLayerStore(storage);
+    const wrong = await pages.addRegion({ pageId: page.id, box: box(0.1, 0.1, 0.4, 0.2) });
+    const layer = await texts.add({ regionId: wrong.id, runId: run.id, originalText: "cut-off te" });
+    const fixed = await pages.correctRegion(wrong.id, { box: box(0.1, 0.1, 0.9, 0.2) });
+    expect((await texts.current(wrong.id)).id).toBe(layer.id);
+    expect(await texts.current(fixed.id)).toBeNull(); // the new box has not been read yet; it must be re-read, not assumed
+  });
+});
