@@ -141,7 +141,7 @@ Pre-filled from commit `243bf1c` by the planning session; **confirmed in P0.T1 o
 | Tests | Vitest 4 + jsdom + `fake-indexeddb` + Testing Library; `src/tests/*.test.js`; script `npm test` (use `npm test -- --run` for a single pass) |
 | Build / deploy | `npm run build` → `dist/`, Vite `base: "/meridian/"`; GitHub Actions deploys to Pages on push to `master` (Node **22** since the CI fix on 2026-11-06; was 20); test job added in P1.T3 |
 | Lint / format | No ESLint or Prettier config in the repo at this commit |
-| Docs | ADRs in `docs/adr/` (0001–0004); `README.md` is out of date (describes the single-file `App.jsx`) |
+| Docs | ADRs in `docs/adr/` (0001–0005); `README.md` rewritten and `docs/user-guide.md`, `docs/development.md`, `docs/architecture.md` added on 2026-11-09 |
 
 **P0.T1 confirmation and corrections**
 - Confirmed as written: Vite 5.4.21, React 18.3.1, `jszip` 3.10.1, IndexedDB `meridian-v1` v1 with stores `projects` and `blobs`, Vitest 4.1.9 + jsdom 29 + fake-indexeddb 6.2.5 + Testing Library, Pages deploy with Node 20 and no test job, no ESLint/Prettier/editorconfig.
@@ -441,5 +441,6 @@ Template for each phase:
 | 2026-11-06 | P2.T1-P2.T7 | see git log | Phase 2 complete (172 tests), awaiting review; PR opened. |
 | 2026-11-08 | Phase 2 review | see git log | Phase 2 approved by merge; Phase 3 started. |
 | 2026-11-08 | P3.T1-P3.T7 | see git log | Phase 3 complete (246 tests), awaiting review; PR opened. |
+| 2026-11-09 | Documentation | see git log | At the reviewer's request: README rewritten; user guide, development guide, architecture and docs index added (describe the app as of Phase 4). No code changes. |
 | 2026-11-09 | P4.T1-P4.T7 | see git log | Phase 4 complete (321 tests), awaiting review; PR opened. |
 | 2026-11-09 | Review follow-up | see git log | P2/P3 reviewer answers applied: region corrections + containment, duplicate flagging, decision events, one-hop name variants (266 tests, IndexedDB v5); replace reading and place-hierarchy rule confirmed. |

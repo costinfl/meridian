@@ -2,170 +2,102 @@
 
 > *Meridian: the cartographic line you read positions from — echoing the vertical crosshair that anchors every life to shared historical terrain.*
 
-A single-page genealogical timeline that replaces the conventional family tree with a **swimlane layout**: lives rendered as horizontal tracks against a shared, zoomable year axis. Named after the surveyor's reference line, Meridian lets you read a family not as a branching diagram but as a set of parallel biographies unfolding across the same historical backdrop.
+Meridian is a genealogical timeline. Instead of a family tree, it lays lives out as horizontal lanes on one shared, zoomable year axis, with local, national and world history above them. You read a family as parallel biographies: who was alive at the same time, how old each person was in a given year, which wars and reforms they lived through.
 
----
+![The Meridian timeline: context lanes on top, the focus person in the middle, relatives below](docs/images/timeline.png)
 
-## Concept
+It runs entirely in your browser. There is no server and no account, and your data stays on your computer.
 
-Most genealogy tools show *structure* (who descended from whom). Meridian shows *time* — the actual overlap of lives, the wars a great-grandfather lived through, the decade a grandmother held office, the years two siblings shared the same roof. The vertical crosshair is the eponymous meridian: drag it across the canvas and every lane shows the person's age at that exact moment.
+**Use it now:** <https://costinfl.github.io/meridian/> (the app is published from this repository with GitHub Pages).
 
----
+## Contents
 
-## Layout
+- [What you can do](#what-you-can-do)
+- [Five-minute tour](#five-minute-tour)
+- [Your data and backups](#your-data-and-backups)
+- [Run it locally](#run-it-locally)
+- [Documentation](#documentation)
+- [Project status](#project-status)
+- [Browser support](#browser-support)
 
-The viewport is divided into three stacked areas that share one horizontal time scale and zoom/pan together:
+## What you can do
 
-| Area | Purpose |
-|---|---|
-| **Context** (top) | Historical backdrop — Local, National, and Global lanes with point events and period bands. A soft tint marks which years the focus person was alive, dimming events outside their lifespan. |
-| **Focus** (middle) | The primary subject. Taller lane, oxblood accent, year axis directly above. |
-| **Compare** (bottom) | Any number of relatives added for side-by-side comparison. |
+- **Compare lives in time.** One *focus* person, any number of relatives below, history above. Hover anywhere and a crosshair shows the year and everyone's age.
+- **Record a life.** Birth and death, point events (marriage, office, property, military…), roles and occupations as bars, named groups of years, research brackets with notes, and full-height era bands.
+- **Keep your sources.** Attach scans, documents, audio, video, links or transcriptions; cite them from any item; pin an image to a year.
+- **Separate what you know from what you suspect.** Every fact is *unverified* (dashed, hollow) until you mark it *verified* (solid, ✓).
+- **Organise several projects**, each saved automatically in the browser.
+- **Share and back up** with a single `.zip` bundle, and exchange data with other genealogy software through GEDCOM 5.5.1.
 
-A fixed **216 px left header column** labels every lane; the scrollable track fills the remainder. The transform is `x(year) = (year − view.left) × ppy` where `ppy` is pixels-per-year, shared by every lane.
+## Five-minute tour
 
----
+1. Open the app. The first time, it loads a sample project: the Hariton family of Ploiești and Săhăteni, Romania.
+2. **Scroll** to zoom, **drag** to pan. Move the mouse over the board to see the year and each person's age.
+3. Choose another person in the **Focus** list, or click **+ relative** to add a comparison lane.
+4. Click any marker or bar to read its details.
+5. Turn on **research mode** to edit: click an item to change it, click empty space in a person's lane to add an event, or drag across a lane to add a period, group or bracket.
+6. Open **Sources** to add a document or link, then cite it from an item.
+7. Use **Export ▾ → Meridian project (.zip)** to save a backup.
 
-## Per-lane contents
+The full walkthrough is in the [user guide](docs/user-guide.md).
 
-Each person's lane renders:
+## Your data and backups
 
-- **Life bar** — birth to death, with a circular birth marker and a square death marker. Open-ended lives fade to a gradient.
-- **Point events** — rotated-square (diamond) markers with year + label. Labels are hidden when zoomed out below ~4.5 ppy.
-- **Period bars** — labelled spans (e.g. *Mayor 1893–1897*) that auto-pack into stacked rows using greedy row-packing so overlapping periods never collide.
-- **Grouping rectangles** — dashed-border boxes spanning a year range with an uppercase tab on the top edge, used to cluster related events for analysis (inspired by time.graphics groupings).
+- Everything is stored in your browser's IndexedDB, on your device, for the site you opened (the public site and a local copy keep separate data).
+- Changes are saved automatically about 1.5 seconds after you stop editing. A red dot next to the project name means a save is pending.
+- **Browsers can delete site data** (when you clear browsing data, in private windows, or when the disk is nearly full). The `.zip` bundle is your backup: export one regularly and keep it somewhere safe.
+- A bundle contains the whole project and its attached files. Import it on any computer with **Import**.
 
----
+## Run it locally
 
-## Research mode
-
-Toggle **research mode** from the toolbar. While active:
-
-- Dragging across any lane draws a year range rather than panning.
-- A modal prompts for a note.
-- Saving renders a **curly-brace accolade** (an SVG `{` rotated 90°, dipping at both ends and peaking in the middle) above the lane's range, with the note in italic serif and a small ✕ to delete it.
-
-Two sample braces are pre-loaded — e.g. *"War years — whereabouts unverified, check parish registers"* over 1914–1919 — to illustrate the feature immediately.
-
----
-
-## Interaction
-
-| Gesture | Action |
-|---|---|
-| Scroll wheel | Zoom toward the cursor |
-| Horizontal scroll / trackpad | Pan |
-| Drag (normal mode) | Pan |
-| Drag (research mode) | Draw annotation range |
-| Hover | Vertical crosshair across all areas; age shown per person |
-
-Toolbar controls: **Zoom +/−**, **Fit life** (frame the focus person's lifespan), **All** (frame everyone).
-
-The **Focus** person is chosen from a dropdown. Each Compare lane has a **⌖ Focus** button (promotes that person to focus, demoting the current focus to Compare) and a **×** to remove it. **+ Relative** opens a picker that lists people not yet visible, with their computed relationship to the focus person (father / mother / spouse / child / sibling / grandparent / grandchild / relative).
-
----
-
-## GEDCOM
-
-### Export
-
-Generates a valid **GEDCOM 5.5.1** file:
-
-- `HEAD` block with `SOUR`, `GEDC`, `CHAR UTF-8`
-- `INDI` records: `NAME Given /Surname/`, `SEX`, `BIRT`/`DEAT` with `DATE` year and `PLAC`
-- `FAM` records reconstructed from parent/spouse links with `HUSB`/`WIFE`/`CHIL` and `FAMC`/`FAMS` pointers
-- `TRLR`
-
-Downloaded as a `.ged` file.
-
-### Import
-
-Parses a `.ged` file (level / xref / tag / value line regex), extracts birth/death year and place from `INDI` records, and surfaces any person with at least a birth year through the **+ Relative** picker.
-
-A **Context source** dropdown offers *Built-in sample* (selected) plus disabled future options (*Wikidata — coming soon*, *time.graphics — coming soon*) to signal planned external-provider integration.
-
----
-
-## Data model
-
-```js
-// Person
-{
-  id, name, sex: 'M' | 'F',
-  birth: { year, place },
-  death: { year, place } | null,
-  fatherId, motherId,
-  spouseIds: [],
-  events:  [{ year, label, type }],
-  periods: [{ start, end, label }],
-  groups:  [{ start, end, label }]
-}
-
-// Context lane
-{ id, label, sub, events: [{ year, label }], periods: [{ start, end, label }] }
-
-// Research annotation (brace)
-{ id, laneKey, start, end, note }   // laneKey e.g. "p:i1" or "ctx:local"
-```
-
----
-
-## Sample data
-
-The built-in dataset follows the **Hariton family of Ploiești / Săhăteni, Romania**, spanning roughly **1792–1989**. It includes:
-
-- Multiple generations with believable life events, offices held, and property periods
-- Packed period rows and grouping rectangles on the focus person
-- Context lanes whose events align with the family history — land reforms, wars, regime changes, local industrial milestones
-
----
-
-## Visual design
-
-The aesthetic is **archival map / survey ledger** — not a generic web dashboard.
-
-| Token | Value |
-|---|---|
-| Background | `#E8EAE1` (pale map paper) |
-| Panel | `#F3F4ED` (lighter) |
-| Dark ink | `#23312B` |
-| Soft ink | `#4A5850` |
-| Rules | `#C7CDBD` / `#D8DCCE` |
-| Context slate | `#54656C` |
-| Focus accent | `#8A3033` (deep oxblood) |
-| Relative colors | Plum / ochre / teal / umber / steel-blue |
-
-Typefaces loaded from Google Fonts:
-
-| Role | Face |
-|---|---|
-| Names / titles | **Fraunces** (serif display) |
-| UI / labels | **Archivo** (sans) |
-| Years / dates | **IBM Plex Mono** |
-
-Survey gridlines sit behind all content; century lines are heavier. The header column is separated by a heavy ink rule; the year axis sits on a dark ink band. Border radii are zero to hairline. The crosshair and research braces are the intended memorable elements.
-
----
-
-## Getting started
+You need [Node.js](https://nodejs.org/) 22.22.2 or newer and a current npm.
 
 ```bash
-npm install
-npm run dev        # http://localhost:5173
+git clone https://github.com/costinfl/meridian.git
+cd meridian
+npm install -g npm@latest   # the lockfile needs a recent npm (see note below)
+npm ci
+npm run dev
 ```
 
-```bash
-npm run build      # production output → dist/
-npm run preview    # serve the production build
-```
+The app opens at <http://localhost:5173/meridian/> (note the `/meridian/` path).
 
-The entire application is a single component: `src/App.jsx`. Helper functions — hex-with-alpha, clamp, greedy row-packing, brace SVG path, tick-step selection, relationship inference, GEDCOM read/write — all live in the same file. A `ResizeObserver` measures the track width and fits the initial view on first layout.
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Development server with hot reload |
+| `npm test -- --run` | Run the test suite once (`npm test` watches for changes) |
+| `npm run build` | Production build into `dist/` |
+| `npm run preview` | Serve the production build locally |
 
----
+**If `npm ci` fails** with "package.json and package-lock.json are not in sync", your npm is too old. Either update it as shown above or run `npx -y npm@latest ci` without installing anything globally.
 
-## Browser notes
+More detail, including the test setup, deployment and troubleshooting, is in the [development guide](docs/development.md).
 
-- Uses a **non-passive wheel listener** so `preventDefault()` works for zoom — browsers may log a warning; this is intentional.
-- Uses **pointer events with pointer capture** for drag/pan.
-- Respects `prefers-reduced-motion`.
-- No external UI libraries, no Tailwind, no localStorage.
+## Documentation
+
+| Document | For |
+| --- | --- |
+| [User guide](docs/user-guide.md) | Using the app: every screen, button and file format |
+| [Development guide](docs/development.md) | Running, testing, building, deploying, contributing |
+| [Architecture](docs/architecture.md) | How the code and data are organised |
+| [Architecture decisions](docs/adr/README.md) | Why key choices were made (ADR-0001 to 0005) |
+| [Evidence layer design](docs/evidence-layer/evidence-model.md) | Target design of the evidence features |
+| [Evidence layer plan](docs/evidence-layer/IMPLEMENTATION_PLAN.md) and [progress](docs/evidence-layer/PROGRESS.md) | What is being built, phase by phase |
+
+## Project status
+
+The timeline, sources, projects, bundles and GEDCOM exchange work today.
+
+An **evidence layer** is being added in phases: document ingestion, OCR, extraction of people and facts with a citation to the exact region of a scan, search, and matching of the same person across records. Of the ten phases (0 to 9), phases 0 to 4 are built: the data model, storage, and conversion of existing facts into evidence. Phases 5 to 9 are not started. It is switched off by default; you can preview it per project from **Projects → Evidence layer (preview)**. What it does today is described in the [user guide](docs/user-guide.md#evidence-layer-preview).
+
+Known gaps in the current app:
+
+- People cannot yet be created or deleted in the interface; they come from the sample, a GEDCOM import or a bundle import.
+- Parents and spouses cannot yet be edited in the interface, and GEDCOM import does not read family links.
+- The context lanes (local, national, world history) are the built-in sample only.
+
+## Browser support
+
+Any current desktop browser works for the timeline. Chrome or Edge is recommended, because the evidence layer will read documents from a folder on your computer through an API that only Chromium browsers provide. The app is designed for a mouse or trackpad and a wide screen.
+
+Fonts (Fraunces, Archivo, IBM Plex Mono) are loaded from Google Fonts; without a connection the app falls back to system fonts.

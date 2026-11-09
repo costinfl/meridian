@@ -234,4 +234,4 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 - Cyrillic and transitional-alphabet transliteration.
 - In-browser embeddings and semantic search.
 - Place gazetteer import (GeoNames/Wikidata) and historical administrative units.
-- README update describing the evidence layer.
+- Keep `README.md` and `docs/user-guide.md` up to date as evidence features become visible (documentation was rewritten after Phase 4).
