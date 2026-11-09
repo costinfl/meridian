@@ -5,7 +5,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 ## Current status
 
 - **Current phase:** 4 — Conclusions, legacy facts, bundle v2
-- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
 - **Next action:** Wait for review of Phase 4.
 - **Last updated:** 2026-11-08 (Phase 3 complete)
 
@@ -17,7 +17,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 1 Foundation | approved | evidence/p1 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-06 |
 | 2 Library sources and text | approved | evidence/p2 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-08 |
 | 3 Evidence, places, names, dates | approved | evidence/p3 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
-| 4 Conclusions, legacy facts, bundle v2 | in progress | evidence/p4 | |
+| 4 Conclusions, legacy facts, bundle v2 | awaiting review | evidence/p4 | |
 | 5 Ingestion v1 | not started | evidence/p5 | |
 | 6 Extraction and review | not started | evidence/p6 | |
 | 7 Search | not started | evidence/p7 | |
@@ -291,6 +291,47 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 
 ## Phase reports
 
+### Phase 4 report
+- **Built:**
+  - *P4.T1/T2 Conclusions in the project document:* `families`, `personaLinks`, `relationships`, `conclusionEvidence`, `proofNotes`, `legacyEvidence`; every fact gains `assertionIds` / `preferredAssertionId`; **families are the source of truth** for parents and spouses (`fatherId`/`motherId`/`spouseIds` are derived on load, built from the legacy fields on first upgrade). `setParents`, `addPartners`, `removePartners` are the way to edit relations.
+  - *P4.T3 Dry run, P4.T4 conversion:* every timeline fact becomes one proposed import assertion cited to its source or to "Legacy Meridian data" (a real snapshot copy of the legacy data), on an import persona linked to its person; a second deliberate step confirms the verified ones. Both steps are buttons in the Evidence panel (behind the flag).
+  - *P4.T5:* toggling **Verified** in the item editor for a converted fact goes through assertion decisions.
+  - *P4.T6 Bundle v2:* `evidence.json` (closure of what the project references), merged on import in one transaction by id and by content hash, never overwriting.
+  - *P4.T7 Display name:* first identified name by default, user choice stored per person, shown everywhere a name appears; `person.name` and GEDCOM untouched.
+- **IndexedDB version / stores added:** none (still **5**). Phase 4 changes the project document, not the database schema.
+- **New dependencies:** none. Main bundle 328.39 -> **333.83 kB** (+5.4 kB: family model, normalisation, display-name helper, small App changes). The evidence library and conversion code load only when needed (separate chunks: panel 4.5 kB, library 51 kB, legacy-facts 13 kB).
+- **Dry-run report for the seeded sample project (P4.T3):**
+```
+Legacy facts: 8 people
+  birth: 8 (to convert 8, already 0; with source 0, without 8; verified 1, unverified 7)
+  death: 8 (to convert 8, already 0; with source 0, without 8; verified 1, unverified 7)
+  event: 14 (to convert 14, already 0; with source 0, without 14; verified 2, unverified 12)
+  period: 7 (to convert 7, already 0; with source 0, without 7; verified 1, unverified 6)
+  group: 2 (to convert 2, already 0; with source 0, without 2; verified 0, unverified 2)
+Would create: 8 records, 8 personas, 8 links, 55 assertions (8 names, 8 sex, 39 facts), link 0 sources, the 'Legacy Meridian data' source
+Verified facts to confirm in the second step: 5
+Anomalies: 5
+```
+  Counts match the real conversion (tested) and the real UI run: 55 assertions, 8 personas, 5 verified facts confirmed in the second step.
+- **Deviations / decisions to flag:** (1) one assertion per fact with extension properties `x-legacy.birth|death|event|period|group` and a structured value, rather than splitting into date/place assertions; (2) the legacy PersonaLinks are created **accepted** with method and decider `legacy-import`, by the click on "Convert": I read that click as the user action (the persona is created from the person, so the link is true by construction); (3) the "Legacy Meridian data" source holds a snapshot of the legacy data as a real DigitalCopy so legacy assertions cite actual bytes; (4) no ADR was written for bundle v2 (plan: only if you want it).
+- **Invariants and where tested:** **I8** GEDCOM export of the sample is byte-identical before and after normalisation and after conversion (unit tests), derived parent/spouse fields equal the originals, bundle round trip compares every library row, old bundles import. **I6** nothing is confirmed by conversion (tested); `decideLink`, `convertLegacyFacts`, `confirmLegacyVerified` and `setFactVerified` are blocked for automated modules by the architecture test; `addLink` can only create candidates. **I9** a planted API key, folder handle, cached image and raw output do not appear in any bundle file. **I2/I3** unchanged (legacy assertions are import-agent: cite a source, reference an import run). **I1/I5** unchanged and passing.
+- **Tests:** 266 -> **321** (earlier tests unchanged except one reworded: "preserves existing ids" now asserts idempotence because facts legitimately gain evidence fields). `npm test -- --run` and `npm run build` pass.
+- **Real-browser checks (Chromium, dev server, not committed):** convert in the Evidence panel -> confirm 5 -> un-verify the focus person's birth in the editor: flag false, preferred assertion proposed, previous confirmed kept, GEDCOM loses only that birth; export the bundle from the UI, wipe the database, import: 55 assertions, 8 personas, 5 decisions, legacy copy and file restored, families intact; a chosen display name replaces the old one in the lane header and the person list; no page errors.
+- **How to verify:** `npm install -g npm@latest` (or `npx -y npm@latest ci`), `npm ci`, `npm test -- --run`, `npm run build`, then `npm run dev`:
+  1. Export **GEDCOM** (Export > GEDCOM) and save it as `before.ged`.
+  2. Open the app with `?evidence=1` (or tick "Evidence layer (preview)" in Projects), click **Evidence**: read the report, click **Convert ... items to evidence**, then **Confirm 5 verified facts**.
+  3. Export GEDCOM again as `after.ged` and run `diff before.ged after.ged`: the only differences should be the export header date line, if any; nothing about people, families or facts.
+  4. Open a verified item in research mode, un-tick Verified, Save: GEDCOM export no longer contains it; re-tick it: it comes back.
+  5. Export **Meridian project (.zip)**, delete the site data in the browser, reload, **Import** the zip: the toast reports the evidence entries added, and the Evidence panel (after re-running nothing) shows "Nothing left to convert".
+  6. Spot-check people and families: compare the lanes and the "Add a relative" list with before; the `relationship` labels (father, spouse, grandparent...) must be unchanged.
+- **Backup reminder:** **export a native bundle backup before merging.** Projects are upgraded in memory on load (new fields, families built) and saved in the new shape at the next edit; an older build opening such a project ignores the new fields, but edits made there to `fatherId`/`motherId`/`spouseIds` would be overwritten by the families on the next load in the new build.
+- **Known limitations:** (1) editing the content of a converted fact (year, label, place) does not create a new assertion; only `verified` is kept in sync (Open question 9). (2) Between "Convert" and "Confirm verified facts" the timeline still shows the facts as verified while their assertions are proposed. (3) A conversion that fails midway leaves unlinked legacy records in the shared library; the project is unchanged and a retry starts clean. (4) The display-name picker has no UI yet: every person has one linked persona until Phase 6/9, so there is nothing to choose; the functions and the display are done and tested. (5) The bundle closure reads the whole library into memory (fine at personal scale). (6) Family edits have no UI (there was none for relations before). (7) Direct edits of `fatherId`/`motherId`/`spouseIds` in a project that already has families are reverted on load. (8) `relationships`, `conclusionEvidence` and `proofNotes` have constructors and tests but no UI yet.
+- **Questions for the reviewer:** (a) Is it right that legacy PersonaLinks are `accepted` by the Convert click (deviation 2), or should they stay candidates until each is confirmed? (b) Should editing a converted fact's content create a superseding assertion (Open question 9)? (c) Do you want an ADR for bundle v2 (extending ADR-0002)? (d) Is one assertion per fact (deviation 1) acceptable, or should births/deaths be split into date and place assertions already now? (e) Is the two-click flow (Convert, then Confirm verified) clear enough in the panel wording?
+
+**Review**
+- Approved: no
+- Reviewer notes:
+
 ### Phase 3 report
 - **Built (no UI):** `FuzzyDate` (Julian-day-number ranges, calendar flag, stated-age ranges, overlap); Romanian normalisation and Daitch-Mokotoff codes; places with names and civil/church parents valid over time; Records and Personas; NameVariants; append-only Assertions with user-action-only decisions; the persona convenience view. All reachable through `createEvidenceLibrary(storage)`.
 - **IndexedDB version / stores added:** 3 -> **5** (4 in the original Phase 3 work, 5 added by the review follow-up). v4 added `evPlaces`, `evPlaceNames`, `evPlaceParents`, `evNameVariants`, `evRecords`, `evPersonas`, `evAssertions` with the indexes listed under P3.T2. v5 adds `evAssertionDecisions` (unique per assertion) and the `bySupersedes` index on `evRegions`, and moves any decision an earlier build wrote onto an assertion row into an event (tested).
@@ -400,4 +441,5 @@ Template for each phase:
 | 2026-11-06 | P2.T1-P2.T7 | see git log | Phase 2 complete (172 tests), awaiting review; PR opened. |
 | 2026-11-08 | Phase 2 review | see git log | Phase 2 approved by merge; Phase 3 started. |
 | 2026-11-08 | P3.T1-P3.T7 | see git log | Phase 3 complete (246 tests), awaiting review; PR opened. |
+| 2026-11-09 | P4.T1-P4.T7 | see git log | Phase 4 complete (321 tests), awaiting review; PR opened. |
 | 2026-11-09 | Review follow-up | see git log | P2/P3 reviewer answers applied: region corrections + containment, duplicate flagging, decision events, one-hop name variants (266 tests, IndexedDB v5); replace reading and place-hierarchy rule confirmed. |
