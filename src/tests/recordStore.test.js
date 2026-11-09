@@ -106,16 +106,24 @@ describe("Record and Persona", () => {
 });
 
 describe("NameVariant", () => {
-  it("adds variants idempotently and expands names transitively in both directions", async () => {
+  it("adds variants idempotently and expands one hop in both directions, never transitively", async () => {
     await variants.add({ canonical: "Ioan", variant: "Iohannes", language: "la" });
     await variants.add({ canonical: "Ioan", variant: "Ion", language: "ro" });
     await variants.add({ canonical: "Ioan", variant: "Jan", language: "pl", origin: "learned" });
     const again = await variants.add({ canonical: "ioan", variant: "ION" });
     expect(again.variant).toBe("Ion");
     expect(await variants.list()).toHaveLength(3);
-    expect(await variants.expand("Ioan")).toEqual(["ioan", "ion", "iohannes", "jan"].sort());
-    expect(await variants.expand("Iohannes")).toEqual(["ioan", "ion", "iohannes", "jan"].sort()); // reverse direction
+    expect(await variants.expand("Ioan")).toEqual(["ioan", "ion", "iohannes", "jan"].sort()); // directly paired with Ioan
+    expect(await variants.expand("Iohannes")).toEqual(["ioan", "iohannes"]);                  // finds its canonical, NOT Ion or Jan
+    expect(await variants.expand("Ion")).toEqual(["ioan", "ion"]);
     expect(await variants.expand("Ştefan")).toEqual(["stefan"]); // unknown names expand to themselves
+  });
+  it("does not chain pairs: a person linked across archives under different names is a link decision, not a spelling rule", async () => {
+    // Romanian archives (after 1918) vs Hungarian archives (before 1918): the same man appears as "Sfătu" and "Szvet".
+    await variants.add({ canonical: "Sfătu", variant: "Szvet", language: "hu" });
+    await variants.add({ canonical: "Szvet", variant: "Svet", language: "hu" });
+    expect(await variants.expand("Sfătu")).toEqual(["sfatu", "szvet"]);
+    expect(await variants.expand("Svet")).toEqual(["svet", "szvet"]);  // Sfătu is two hops away: not inferred
   });
   it("folds keys and validates input", async () => {
     const v = await variants.add({ canonical: "Ştefan", variant: "Stephan", language: "de" });

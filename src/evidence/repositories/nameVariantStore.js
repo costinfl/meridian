@@ -5,7 +5,10 @@ import { searchKey } from "../domain/normalize.js";
 export const VARIANT_ORIGINS = ["manual", "learned"];
 const STORE = "evNameVariants";
 
-/** Spellings and language forms of given names and surnames (Ioan = Iohannes = Jan = John...). */
+/**
+ * Spellings and language forms of given names and surnames that a person has paired (Ioan - Ion, Ioan - Iohannes).
+ * A pair is a statement about spelling, not about identity, and pairs are not chained.
+ */
 export function createNameVariantStore(storage) {
   return {
     async add({ canonical, variant, language = "", origin = "manual" } = {}) {
@@ -23,21 +26,16 @@ export function createNameVariantStore(storage) {
     },
     list: () => storage.dbGetAll(STORE),
     /**
-     * All folded spellings known to mean the same name as `name` (including its own key): follows
-     * canonical<->variant links in both directions, transitively.
+     * Search expansion: the folded spellings that were explicitly paired with `name` (either direction),
+     * plus its own key. ONE HOP ONLY: if Ioan~Ion and Ioan~Iohannes were entered, searching "Ion" finds
+     * "Ioan" but NOT "Iohannes". Nothing is inferred transitively, and these pairs never decide that two
+     * people are the same (that is a PersonaLink decision by a person).
      */
     async expand(name) {
-      const start = searchKey(name);
-      const seen = new Set([start]);
-      const queue = [start];
-      while (queue.length) {
-        const key = queue.shift();
-        const links = [
-          ...(await storage.dbGetAllByIndex(STORE, "byCanonicalKey", key)).map((r) => r.variantKey),
-          ...(await storage.dbGetAllByIndex(STORE, "byVariantKey", key)).map((r) => r.canonicalKey),
-        ];
-        for (const k of links) if (!seen.has(k)) { seen.add(k); queue.push(k); }
-      }
+      const key = searchKey(name);
+      const seen = new Set([key]);
+      for (const r of await storage.dbGetAllByIndex(STORE, "byCanonicalKey", key)) seen.add(r.variantKey);
+      for (const r of await storage.dbGetAllByIndex(STORE, "byVariantKey", key)) seen.add(r.canonicalKey);
       return [...seen].sort();
     },
   };
