@@ -1,5 +1,6 @@
 import { notFound } from "../domain/errors.js";
 import { fromStatedAge } from "../domain/fuzzyDate.js";
+import { createAssertionStore } from "./assertionStore.js";
 
 const newest = (a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0);
 const summary = (a) => ({
@@ -13,13 +14,14 @@ const summary = (a) => ({
  * reviewer can see what is waiting. Read-only and recomputed on demand (nothing here is stored).
  */
 export function createPersonaView(storage) {
+  const assertions = createAssertionStore(storage); // effective statuses (decisions are separate events)
   async function load(personaId) {
     const persona = await storage.dbGet("evPersonas", personaId);
     if (!persona) throw notFound("Persona", personaId);
     const record = await storage.dbGet("evRecords", persona.recordId);
     const [asSubject, asObject] = await Promise.all([
-      storage.dbGetAllByIndex("evAssertions", "bySubject", personaId),
-      storage.dbGetAllByIndex("evAssertions", "byObject", personaId),
+      assertions.listBySubject(personaId),
+      assertions.listByObject(personaId),
     ]);
     return { persona, record, asSubject, asObject };
   }

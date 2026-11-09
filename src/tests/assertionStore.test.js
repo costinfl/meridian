@@ -178,3 +178,67 @@ describe("Assertion: I1 append-only, corrections supersede", () => {
     await expect(age({ value: 2, unit: "weeks" })).rejects.toMatchObject({ code: "invalid" });
   });
 });
+
+describe("Assertion decisions are separate append-only events (I1, stricter)", () => {
+  it("confirming adds a decision event and leaves the stored assertion byte-for-byte unchanged", async () => {
+    const a = await lib.assertions.propose(nameClaim());
+    const before = JSON.stringify(await storage.dbGet("evAssertions", a.id));
+    const merged = await lib.assertions.confirmAssertion(a.id, { decidedBy: "researcher" });
+    expect(JSON.stringify(await storage.dbGet("evAssertions", a.id))).toBe(before); // raw row untouched
+    expect((await lib.assertions.getStored(a.id)).status).toBe("proposed");          // stored = as proposed
+    expect(merged.status).toBe("confirmed");
+    expect((await lib.assertions.get(a.id))).toMatchObject({ status: "confirmed", decidedBy: "researcher" });
+    const events = await lib.assertions.decisionsFor(a.id);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ assertionId: a.id, status: "confirmed", decidedBy: "researcher" });
+    expect(events[0].decidedAt).toBeTruthy();
+    expect(await storage.dbCount("evAssertionDecisions")).toBe(1);
+  });
+
+  it("a second decision is refused by the store and by the database (unique per assertion)", async () => {
+    const a = await lib.assertions.propose(nameClaim());
+    await lib.assertions.rejectAssertion(a.id, { decidedBy: "u" });
+    await expect(lib.assertions.confirmAssertion(a.id, { decidedBy: "u" })).rejects.toMatchObject({ code: "conflict" });
+    await expect(storage.dbAdd("evAssertionDecisions", { id: "forged", assertionId: a.id, status: "confirmed", decidedBy: "bot", decidedAt: "2026-01-01" })).rejects.toBeTruthy();
+    expect((await lib.assertions.get(a.id)).status).toBe("rejected");
+    expect(await storage.dbCount("evAssertionDecisions")).toBe(1);
+  });
+
+  it("effective status drives every reader: get, lists, listByStatus, history, current, persona view", async () => {
+    const proposed = await lib.assertions.propose(nameClaim({ property: "occupation", originalValue: "a" }));
+    const toConfirm = await lib.assertions.propose(nameClaim({ property: "residence", originalValue: "b" }));
+    const toReject = await lib.assertions.propose(nameClaim({ property: "houseNumber", originalValue: "c" }));
+    const entered = await lib.assertions.enterAsUser(nameClaim({ property: "sex", originalValue: "M", runId: ctx.manual.id }));
+    await lib.assertions.confirmAssertion(toConfirm.id, { decidedBy: "u" });
+    await lib.assertions.rejectAssertion(toReject.id, { decidedBy: "u" });
+
+    const ids = async (st) => (await lib.assertions.listByStatus(st)).map((a) => a.id).sort();
+    expect(await ids("proposed")).toEqual([proposed.id]);
+    expect(await ids("confirmed")).toEqual([toConfirm.id, entered.id].sort());
+    expect(await ids("rejected")).toEqual([toReject.id]);
+    await expect(lib.assertions.listByStatus("pending")).rejects.toMatchObject({ code: "invalid" });
+    expect((await lib.assertions.listBySubject(ctx.child.id)).map((a) => [a.property, a.status]).sort())
+      .toEqual([["houseNumber", "rejected"], ["occupation", "proposed"], ["residence", "confirmed"], ["sex", "confirmed"]]);
+    expect((await lib.assertions.findByRegionProperty(ctx.row.id, "houseNumber"))[0].status).toBe("rejected");
+    expect((await lib.assertions.listCurrentBySubject(ctx.child.id)).find((a) => a.id === toConfirm.id).status).toBe("confirmed");
+
+    const view = await lib.personaView.forPersona(ctx.child.id);
+    expect(Object.keys(view.facts).sort()).toEqual(["residence", "sex"]);
+    expect(view.pending).toEqual([proposed.id]);
+  });
+
+  it("a user-entered claim keeps its initial confirmed status and has no decision event", async () => {
+    const e = await lib.assertions.enterAsUser(nameClaim({ runId: ctx.manual.id }));
+    expect((await lib.assertions.getStored(e.id)).status).toBe("confirmed");
+    expect(await lib.assertions.decisionsFor(e.id)).toEqual([]);
+    await expect(lib.assertions.rejectAssertion(e.id, { decidedBy: "u" })).rejects.toMatchObject({ code: "conflict" }); // correct it instead
+  });
+
+  it("a confirmation (event) still protects the assertion from automated supersession (I6)", async () => {
+    const a = await lib.assertions.propose(nameClaim());
+    await lib.assertions.confirmAssertion(a.id, { decidedBy: "u" });
+    await expect(lib.assertions.propose(nameClaim({ originalValue: "other", supersedesId: a.id }))).rejects.toMatchObject({ code: "invariant" });
+    const userFix = await lib.assertions.enterAsUser(nameClaim({ originalValue: "fixed", runId: ctx.manual.id, supersedesId: a.id }));
+    expect((await lib.assertions.history(userFix.id)).map((x) => [x.originalValue, x.status])).toEqual([["Ştefan Hariton", "confirmed"], ["fixed", "confirmed"]]);
+  });
+});

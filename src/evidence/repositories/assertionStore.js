@@ -12,16 +12,17 @@ export const VALUE_PROPERTIES = [
 export const RELATION_PROPERTIES = ["childOf", "parentOf", "spouseOf", "godparentOf", "witnessFor", "informantFor"];
 const DATE_PROPERTIES = new Set(["birth.date", "death.date", "event.date"]);
 const AGE_UNITS = ["years", "months", "days"];
-const STORE = "evAssertions";
+const STORE = "evAssertions", DECISIONS = "evAssertionDecisions";
 const NO_REGION_AGENTS = ["manual", "import"]; // I2 exceptions
 
 const isExtension = (p) => typeof p === "string" && /^x-[a-z0-9.-]+$/.test(p);
 
 /**
  * Atomic claims about a record or persona. Source of truth for everything the conclusions layer uses.
- *  I1  content is append-only: this store never rewrites content fields; a correction is a new
- *      assertion with `supersedesId`. Only the workflow fields (status, decidedBy, decidedAt) change,
- *      and only once, from `proposed`.
+ *  I1  assertions are never rewritten. A correction is a new assertion with `supersedesId`; a decision
+ *      (confirm / reject) is a separate, append-only event row in `evAssertionDecisions` (one per assertion,
+ *      enforced by a unique index). The stored assertion keeps its initial status; every reader below
+ *      returns the EFFECTIVE status (initial status, or the decision if there is one).
  *  I2  a citation region is mandatory, except agent `manual` (source + page label) and `import` (source).
  *  I3  every assertion references the run that produced it; `agent` is that run's processor.
  *  I6  nothing is `confirmed` or `rejected` without an explicit user action: `propose` can only create
@@ -97,7 +98,9 @@ export function createAssertionStore(storage) {
       if (prev.subjectId !== subject.id || prev.property !== property) throw invalid("a correction must concern the same subject and property");
       if ((await o.getAllByIndex(STORE, "bySupersedes", supersedesId)).length) throw new EvidenceError("conflict", "that assertion is already superseded");
       // I6: a confirmed assertion is the user's decision; only another user action may replace it
-      if (prev.status === "confirmed" && status !== "confirmed") throw new EvidenceError("invariant", "a confirmed assertion can only be superseded by a user action");
+      const prevDecision = await o.getByIndex(DECISIONS, "byAssertion", supersedesId);
+      const prevStatus = prevDecision ? prevDecision.status : prev.status;
+      if (prevStatus === "confirmed" && status !== "confirmed") throw new EvidenceError("invariant", "a confirmed assertion can only be superseded by a user action");
     }
 
     return {
@@ -114,7 +117,7 @@ export function createAssertionStore(storage) {
       createdAt: nowIso(),
     };
   }
-  const STORES = [STORE, "evRuns", "evRecords", "evPersonas", "evRegions", "evSources"];
+  const STORES = [STORE, DECISIONS, "evRuns", "evRecords", "evPersonas", "evRegions", "evSources"];
 
   async function insert(input, status, decision) {
     let rec;
@@ -126,16 +129,32 @@ export function createAssertionStore(storage) {
     return rec;
   }
 
+  /** Merge an assertion row with its decision event (if any) into the effective assertion. */
+  const merge = (row, decision) => (decision ? { ...row, status: decision.status, decidedBy: decision.decidedBy, decidedAt: decision.decidedAt } : row);
+
+  async function hydrate(rows) {
+    if (!rows.length) return rows;
+    return storage.dbTransact([DECISIONS], "readonly", async (o) => {
+      const out = [];
+      for (const row of rows) out.push(merge(row, row.status === "proposed" ? await o.getByIndex(DECISIONS, "byAssertion", row.id) : null));
+      return out;
+    });
+  }
+  const hydrateOne = async (row) => (row ? (await hydrate([row]))[0] : null);
+
   async function decide(id, status, decidedBy) {
     requireOneOf(status, ["confirmed", "rejected"], "status");
     const who = requireString(decidedBy, "decidedBy");
     let out;
-    await storage.dbTransact([STORE], "readwrite", async (o) => {
+    await storage.dbTransact([STORE, DECISIONS], "readwrite", async (o) => {
       const cur = await o.get(STORE, id);
       if (!cur) throw notFound("Assertion", id);
-      if (cur.status !== "proposed") throw new EvidenceError("conflict", `assertion is already ${cur.status}; make a correction instead`);
-      out = { ...cur, status, decidedBy: who, decidedAt: nowIso() }; // content fields are carried over untouched
-      await o.put(STORE, out);
+      if (cur.status !== "proposed" || (await o.getByIndex(DECISIONS, "byAssertion", id))) {
+        throw new EvidenceError("conflict", "assertion has already been decided; make a correction instead");
+      }
+      const event = { id: newId(), assertionId: id, status, decidedBy: who, decidedAt: nowIso() };
+      await o.add(DECISIONS, event); // the assertion row itself is never touched
+      out = merge(cur, event);
     });
     return out;
   }
@@ -152,27 +171,44 @@ export function createAssertionStore(storage) {
     /** USER ACTION: reject a proposal (kept, so the same wrong extraction is not proposed again). */
     rejectAssertion: (id, { decidedBy } = {}) => decide(id, "rejected", decidedBy),
 
-    get: (id) => storage.dbGet(STORE, id).then((r) => r ?? null),
-    listBySubject: (subjectId) => storage.dbGetAllByIndex(STORE, "bySubject", subjectId),
-    listByObject: (personaId) => storage.dbGetAllByIndex(STORE, "byObject", personaId),
-    listByRegion: (regionId) => storage.dbGetAllByIndex(STORE, "byRegion", regionId),
-    listByStatus: (status) => storage.dbGetAllByIndex(STORE, "byStatus", status),
-    listByRun: (runId) => storage.dbGetAllByIndex(STORE, "byRun", runId),
+    /** The assertion with its effective status. */
+    get: (id) => storage.dbGet(STORE, id).then((r) => hydrateOne(r ?? null)),
+    /** The stored assertion exactly as written (initial status, no decision merged). */
+    getStored: (id) => storage.dbGet(STORE, id).then((r) => r ?? null),
+    /** Audit trail: decision events for an assertion (at most one). */
+    decisionsFor: (assertionId) => storage.dbGetAllByIndex(DECISIONS, "byAssertion", assertionId),
+    listBySubject: (subjectId) => storage.dbGetAllByIndex(STORE, "bySubject", subjectId).then(hydrate),
+    listByObject: (personaId) => storage.dbGetAllByIndex(STORE, "byObject", personaId).then(hydrate),
+    listByRegion: (regionId) => storage.dbGetAllByIndex(STORE, "byRegion", regionId).then(hydrate),
+    listByRun: (runId) => storage.dbGetAllByIndex(STORE, "byRun", runId).then(hydrate),
+    /** By EFFECTIVE status: `proposed` = not decided; `confirmed` includes claims the user entered directly. */
+    async listByStatus(status) {
+      requireOneOf(status, STATUSES, "status");
+      const ids = new Set(), rows = [];
+      const add = (r) => { if (r && !ids.has(r.id)) { ids.add(r.id); rows.push(r); } };
+      if (status === "proposed") {
+        for (const r of await storage.dbGetAllByIndex(STORE, "byStatus", "proposed")) add(r);
+      } else {
+        if (status === "confirmed") for (const r of await storage.dbGetAllByIndex(STORE, "byStatus", "confirmed")) add(r);
+        for (const d of await storage.dbGetAllByIndex(DECISIONS, "byStatus", status)) add(await storage.dbGet(STORE, d.assertionId));
+      }
+      return (await hydrate(rows)).filter((r) => r.status === status);
+    },
     /** All assertions for a region and property, any status (used to avoid re-proposing rejected ones). */
-    findByRegionProperty: (regionId, property) => storage.dbGetAllByIndex(STORE, "byRegionProperty", [regionId, property]),
+    findByRegionProperty: (regionId, property) => storage.dbGetAllByIndex(STORE, "byRegionProperty", [regionId, property]).then(hydrate),
     /** Assertions about `subjectId` that no later assertion supersedes. */
     async listCurrentBySubject(subjectId) {
-      const all = await storage.dbGetAllByIndex(STORE, "bySubject", subjectId);
+      const all = await hydrate(await storage.dbGetAllByIndex(STORE, "bySubject", subjectId));
       const superseded = new Set(all.map((a) => a.supersedesId).filter(Boolean));
       return all.filter((a) => !superseded.has(a.id));
     },
     /** Chain of corrections ending at `id`, oldest first. */
     async history(id) {
       const chain = [];
-      let cur = await storage.dbGet(STORE, id);
+      let cur = await hydrateOne(await storage.dbGet(STORE, id));
       while (cur && !chain.some((c) => c.id === cur.id)) {
         chain.unshift(cur);
-        cur = cur.supersedesId ? await storage.dbGet(STORE, cur.supersedesId) : null;
+        cur = cur.supersedesId ? await hydrateOne(await storage.dbGet(STORE, cur.supersedesId)) : null;
       }
       return chain;
     },
