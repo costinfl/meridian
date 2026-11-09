@@ -80,7 +80,7 @@ More detail, including the test setup, deployment and troubleshooting, is in the
 | [User guide](docs/user-guide.md) | Using the app: every screen, button and file format |
 | [Development guide](docs/development.md) | Running, testing, building, deploying, contributing |
 | [Architecture](docs/architecture.md) | How the code and data are organised |
-| [Architecture decisions](docs/adr/README.md) | Why key choices were made (ADR-0001 to 0005) |
+| [Architecture decisions](docs/adr/README.md) | Why key choices were made (ADR-0001 to 0006) |
 | [Evidence layer design](docs/evidence-layer/evidence-model.md) | Target design of the evidence features |
 | [Evidence layer plan](docs/evidence-layer/IMPLEMENTATION_PLAN.md) and [progress](docs/evidence-layer/PROGRESS.md) | What is being built, phase by phase |
 

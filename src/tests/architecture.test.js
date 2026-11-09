@@ -90,6 +90,8 @@ describe("architecture: import boundaries (I5)", () => {
       "search/v.js": "confirmLegacyVerified({ library, project })",
       "graph/f.js": "await setFactVerified({ library, fact, verified: true })",
       "ingest/ok.js": "addLink(project, { personId, personaId })",
-    })).toHaveLength(7);
+      "ingest/edit.js": "await applyFactEdit({ library, kind, personId, before, after })",
+      "workers/sup.js": "library.assertions.supersedeAsUser(input)",
+    })).toHaveLength(9);
   });
 });

@@ -99,7 +99,7 @@ describe("bundle v2: evidence.json (P4.T6)", () => {
     expect(await B.library.copies.get(project.legacyEvidence.copyId)).toBeTruthy();
     expect(await B.library.pages.getRegion(project.legacyEvidence.regionId)).toBeTruthy();
     // statuses, decisions and the correction chain survived
-    expect((await B.library.assertions.listByStatus("confirmed")).length).toBe(6);       // 5 legacy-verified + the researcher's
+    expect((await B.library.assertions.listByStatus("confirmed")).length).toBe(8);       // 7 legacy-verified (birth and death: date + place) + the researcher's
     expect((await B.library.assertions.get(s.assertion.id)).decidedBy).toBe("researcher");
     expect((await B.library.pages.currentRegion(s.row.id)).id).toBe(s.fixed.id);
     expect((await B.library.textLayers.current(s.fixed.id)).originalText).toBe("Ştefan Hariton, născut 1850");

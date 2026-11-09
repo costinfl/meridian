@@ -425,15 +425,16 @@ export default function App() {
     laneIsPerson: descriptor.laneKey ? descriptor.laneKey.startsWith("p:") : false,
   });
 
-  /* A fact that was converted to evidence keeps "verified <=> its preferred assertion is confirmed": toggling
-     the flag in the editor is a user decision, applied through the assertion functions (loaded lazily). */
-  const syncFactVerified = async ({ laneId, kind, id, verified }) => {
+  /* A fact that was converted to evidence stays consistent with it: an edit of its content supersedes the old
+     assertion, and "verified <=> its assertions are confirmed" is kept. An edit in the item editor is a user
+     decision, applied through the assertion functions (loaded lazily). */
+  const syncFactEdit = async ({ laneId, kind, id, values }) => {
     const person = people.find((p) => p.id === laneId);
-    const fact = kind === "birth" || kind === "death" ? person?.[kind] : (person?.[ARR_KEY[kind]] ?? []).find((x) => x.id === id);
-    if (!fact?.preferredAssertionId || !!fact.verified === !!verified) return;
+    const before = kind === "birth" || kind === "death" ? person?.[kind] : (person?.[ARR_KEY[kind]] ?? []).find((x) => x.id === id);
+    if (!before?.preferredAssertionId) return;
     try {
-      const [{ createEvidenceLibrary }, { setFactVerified }] = await Promise.all([import("./evidence/index.js"), import("./conclusions/legacyFacts.js")]);
-      const patch = await setFactVerified({ library: createEvidenceLibrary(storage), fact, verified: !!verified, runId: project?.legacyEvidence?.runIds?.at(-1) });
+      const [{ createEvidenceLibrary }, { applyFactEdit }] = await Promise.all([import("./evidence/index.js"), import("./conclusions/legacyFacts.js")]);
+      const patch = await applyFactEdit({ library: createEvidenceLibrary(storage), kind, personId: laneId, before, after: { ...before, ...values } });
       if (!patch) return;
       updatePerson(laneId, (p) => {
         const apply = (f) => ({ ...f, ...patch });
@@ -447,8 +448,8 @@ export default function App() {
   };
 
   const saveItem = ({ kind, mode, id, laneKey, laneId, values }) => {
-    if (mode === "edit" && (kind === "birth" || kind === "death" || ARR_KEY[kind]) && "verified" in values) {
-      syncFactVerified({ laneId, kind, id, verified: values.verified });
+    if (mode === "edit" && (kind === "birth" || kind === "death" || ["event", "period", "group"].includes(kind))) {
+      syncFactEdit({ laneId, kind, id, values });
     }
     if (kind === "birth" || kind === "death") {
       updatePerson(laneId, (p) => ({ ...p, [kind]: { ...p[kind], ...values } }));

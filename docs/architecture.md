@@ -183,7 +183,7 @@ Rules the library keeps (numbered as in the [plan](evidence-layer/IMPLEMENTATION
 - **Provenance (I3).** Text layers and assertions name the run that produced them.
 - **Coordinates (I4).** Region and word boxes are 0–1 on the unrotated page; a child region lies inside its parent.
 - **Direction (I5).** Evidence code imports nothing from conclusions or the interface.
-- **User decisions (I6).** Automated code can only propose. Confirming, rejecting and linking are user actions.
+- **User decisions (I6).** Automated code can only propose. Confirming, rejecting, linking and replacing a confirmed assertion are user actions.
 - **Nothing private leaves (I9).** Settings, keys and folder handles are never written to a bundle.
 
 Domain helpers worth knowing:
@@ -199,7 +199,8 @@ Duplicate files are flagged, not merged silently: identical bytes return the exi
 Conclusions are the researcher's decisions and live in the project document, so the timeline, bundle and GEDCOM code keep working.
 
 - **PersonaLinks** (`conclusions/personaLinks.js`): an append-only list. `addLink` creates a candidate; `decideLink` adds a superseding accepted or rejected link. Rejected pairs are remembered.
-- **Legacy facts** (`conclusions/legacyFacts.js`): `dryRunLegacyConversion` reports; `convertLegacyFacts` records each timeline fact as one proposed import assertion on a persona linked to its person; `confirmLegacyVerified` confirms those whose fact is verified; `setFactVerified` keeps "verified ⇔ preferred assertion confirmed" when a fact is toggled.
+- **Legacy facts** (`conclusions/legacyFacts.js`): `dryRunLegacyConversion` reports; `convertLegacyFacts` records timeline facts as proposed import assertions on a persona that is linked to its person as a *candidate*. A birth or death becomes a `birth.date` / `death.date` assertion (a year-precision FuzzyDate) and a `birth.place` / `death.place` assertion; an event, role or group becomes one `x-legacy.*` assertion. `confirmLegacyVerified` confirms the assertions of verified facts. `applyFactEdit` runs when a converted fact is edited: changed content supersedes the old assertion (agent `manual`), and a fact is verified exactly when all its active assertions are confirmed.
+- A fact's `assertionIds` lists every assertion ever made for it; the *active* ones are those no later assertion supersedes; `preferredAssertionId` is the primary one (the date, for a birth or death).
 - **Display name** (`conclusions/displayName.js`): the first accepted persona's name by default, or the researcher's choice.
 
 ## File formats
@@ -210,7 +211,7 @@ Conclusions are the researcher's decisions and live in the project document, so 
 | --- | --- |
 | `project.json` | The project document. The source of truth |
 | `media/<blobKey>-<fileName>` | Attached files; optional. A missing file sets `fileMissing` on its source at import |
-| `evidence.json` | Only when the project references evidence: `{ format: "meridian-evidence", version: 1, … }` with the library rows the project depends on. No raw outputs, page cache or settings |
+| `evidence.json` | ([ADR-0006](adr/0006-native-bundle-carries-evidence.md)) Only when the project references evidence: `{ format: "meridian-evidence", version: 1, … }` with the library rows the project depends on. No raw outputs, page cache or settings |
 
 Import gives the project a new id and "(imported)" name, saves the media, and merges `evidence.json` into the library in one transaction: rows are matched by id, copies by content hash (their pages and regions are remapped), and nothing existing is overwritten.
 

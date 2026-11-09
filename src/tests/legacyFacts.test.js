@@ -6,9 +6,9 @@ import { SAMPLE_PEOPLE } from "../sampleData.js";
 import { exportGedcom } from "../gedcom.js";
 import {
   dryRunLegacyConversion, formatDryRun, convertLegacyFacts, confirmLegacyVerified, countLegacyVerifiedPending, setFactVerified,
-  FACT_KINDS, LEGACY_METHOD,
+  applyFactEdit, activeAssertionsOf, FACT_KINDS, LEGACY_METHOD,
 } from "../conclusions/legacyFacts.js";
-import { currentLinks, linksOfPerson } from "../conclusions/personaLinks.js";
+import { currentLinks, linksOfPerson, decideLink } from "../conclusions/personaLinks.js";
 
 const clone = (x) => JSON.parse(JSON.stringify(x));
 let storage, library, blobs, deps;
@@ -43,7 +43,8 @@ describe("dry run (P4.T3): pure report, writes nothing", () => {
     expect(r.facts.group).toMatchObject({ total: 2, verified: 0 });
     expect(FACT_KINDS.reduce((n, k) => n + r.facts[k].total, 0)).toBe(countFacts(project));
     expect(r.wouldCreate).toMatchObject({ anchor: 1, records: 8, personas: 8, links: 8, sourcesToLink: 2 });
-    expect(r.wouldCreate.assertions).toEqual({ name: 8, sex: 8, facts: countFacts(project), total: 16 + countFacts(project) });
+    // 8 births + 8 deaths, each with a year and a place -> 2 assertions each; events, periods, groups -> 1 each
+    expect(r.wouldCreate.assertions).toEqual({ name: 8, sex: 8, facts: countFacts(project) + 16, total: 16 + countFacts(project) + 16 });
     expect(r.verifiedToConfirm).toBe(5);
     expect(r.anomalies.map((a) => a.message).join("|")).toMatch(/ghost/);        // dangling source id
     expect(r.anomalies.some((a) => /verified without a source/.test(a.message))).toBe(true);
@@ -78,7 +79,7 @@ describe("conversion (P4.T4): legacy facts become proposed import assertions", (
     expect(exportGedcom(out.people, { sources: out.sources })).toBe(exportGedcom(project.people, { sources: project.sources })); // I8
   });
 
-  it("every fact gets one proposed import assertion as its preferred assertion, cited to its source or the legacy source", async () => {
+  it("facts get proposed import assertions (birth/death split into date and place), cited to their source or the legacy source", async () => {
     const project = sampleProject();
     const { project: out } = await convertLegacyFacts({ ...deps, project });
     const hariton = out.people[0];
@@ -86,10 +87,15 @@ describe("conversion (P4.T4): legacy facts become proposed import assertions", (
     expect(legacy.title).toBe("Legacy Meridian data");
     const asr = (id) => library.assertions.get(id);
 
+    // a birth is split: a date assertion (primary, year-precision FuzzyDate) and a place assertion
+    expect(hariton.birth.assertionIds).toHaveLength(2);
     const birth = await asr(hariton.birth.preferredAssertionId);
-    expect(birth).toMatchObject({ status: "proposed", agent: "import", property: "x-legacy.birth", originalValue: "Born 1850, Săhăteni", citation: { sourceId: legacy.id } });
-    expect(birth.normalizedValue).toMatchObject({ year: 1850, place: "Săhăteni" });
-    expect(hariton.birth.assertionIds).toEqual([birth.id]);
+    expect(birth).toMatchObject({ status: "proposed", agent: "import", property: "birth.date", originalValue: "1850", citation: { sourceId: legacy.id } });
+    expect(birth.normalizedValue).toMatchObject({ asWritten: "1850", earliest: "1850-01-01", latest: "1850-12-31", precision: "year", calendar: "gregorian" });
+    const place = await asr(hariton.birth.assertionIds[1]);
+    expect(place).toMatchObject({ status: "proposed", property: "birth.place", originalValue: "Săhăteni", normalizedValue: "Săhăteni", citation: { sourceId: legacy.id } });
+    const death = await Promise.all(hariton.death.assertionIds.map(asr));
+    expect(death.map((x) => [x.property, x.originalValue])).toEqual([["death.date", "1927"], ["death.place", "Ploiești"]]);
 
     const mayor = hariton.events[1];                                // has the register as its source
     const a = await asr(mayor.preferredAssertionId);
@@ -110,11 +116,13 @@ describe("conversion (P4.T4): legacy facts become proposed import assertions", (
     expect((await library.assertions.listByStatus("proposed")).length).toBe(await storage.dbCount("evAssertions"));
   });
 
-  it("persons become import personas linked by an accepted legacy link; names and sex are asserted too", async () => {
+  it("persons become import personas linked by a CANDIDATE legacy link; names and sex are asserted too", async () => {
     const { project: out } = await convertLegacyFacts({ ...deps, project: sampleProject() });
     expect(currentLinks(out)).toHaveLength(8);
     const link = linksOfPerson(out, "i1")[0];
-    expect(link).toMatchObject({ status: "accepted", method: LEGACY_METHOD, decidedBy: LEGACY_METHOD });
+    expect(link).toMatchObject({ status: "candidate", method: LEGACY_METHOD, decidedBy: null });   // nothing accepted by conversion (I6)
+    expect(currentLinks(out).every((l) => l.status === "candidate")).toBe(true);
+    expect(out.personaLinks).toHaveLength(8);
     const persona = await library.records.getPersona(link.personaId);
     expect(persona).toMatchObject({ nameAsWritten: "Dumitru D. Hariton", role: "subject" });
     const props = (await library.assertions.listBySubject(persona.id)).map((a) => a.property);
@@ -161,47 +169,53 @@ describe("conversion (P4.T4): legacy facts become proposed import assertions", (
   });
 });
 
+const statuses = async (fact) => (await activeAssertionsOf(library, fact)).map((a) => [a.property, a.status, a.originalValue]);
+
 describe("one-time confirmation of verified facts, and keeping `verified` consistent (P4.T4, P4.T5)", () => {
-  it("counts the pending verified facts, confirms them with decidedBy 'legacy-verified', and leaves the rest proposed", async () => {
+  it("counts the pending verified facts, confirms all their assertions with decidedBy 'legacy-verified', leaves the rest proposed", async () => {
     const { project } = await convertLegacyFacts({ ...deps, project: sampleProject() });
-    expect(await countLegacyVerifiedPending({ library, project })).toBe(5);
+    expect(await countLegacyVerifiedPending({ library, project })).toBe(5);        // 5 FACTS: a birth, a death, 2 events, a period
     const r = await confirmLegacyVerified({ library, project });
-    expect(r).toEqual({ confirmed: 5, alreadyConfirmed: 0, skipped: 0 });
+    expect(r).toEqual({ confirmed: 5, alreadyConfirmed: 0, skipped: 0, assertions: 7 }); // birth and death have date + place
     expect(await countLegacyVerifiedPending({ library, project })).toBe(0);
     const confirmed = await library.assertions.listByStatus("confirmed");
-    expect(confirmed).toHaveLength(5);
+    expect(confirmed).toHaveLength(7);
     expect(new Set(confirmed.map((a) => a.decidedBy))).toEqual(new Set(["legacy-verified"]));
-    expect((await library.assertions.listByStatus("proposed")).length).toBe(await storage.dbCount("evAssertions") - 5);
-    // every verified fact now has a confirmed preferred assertion; every unverified one does not
+    expect((await library.assertions.listByStatus("proposed")).length).toBe(await storage.dbCount("evAssertions") - 7);
+    // a fact is verified <=> every one of its active assertions is confirmed
     for (const p of project.people) for (const f of [p.birth, p.death, ...p.events, ...p.periods, ...p.groups]) {
       if (!f?.preferredAssertionId) continue;
-      expect((await library.assertions.get(f.preferredAssertionId)).status === "confirmed").toBe(!!f.verified);
+      const active = await activeAssertionsOf(library, f);
+      expect(active.length).toBeGreaterThan(0);
+      expect(active.every((a) => a.status === "confirmed")).toBe(!!f.verified);
+      expect(active.some((a) => a.status === "confirmed")).toBe(!!f.verified);
     }
-    expect(await confirmLegacyVerified({ library, project })).toEqual({ confirmed: 0, alreadyConfirmed: 5, skipped: 0 });
+    expect(await confirmLegacyVerified({ library, project })).toEqual({ confirmed: 0, alreadyConfirmed: 5, skipped: 0, assertions: 0 });
   });
 
-  it("toggling verified goes through assertion decisions: verify confirms, un-verify adds a new proposed preferred assertion", async () => {
+  it("toggling verified: verify confirms date and place; un-verify supersedes each with a proposed copy and keeps the history", async () => {
     const { project } = await convertLegacyFacts({ ...deps, project: sampleProject() });
-    const unverified = project.people[1].birth;               // Dumitru S. Hariton, not verified
-    expect(unverified.verified).toBeFalsy();
-    const on = await setFactVerified({ library, fact: unverified, verified: true });
-    expect(on.preferredAssertionId).toBe(unverified.preferredAssertionId);   // same assertion, now confirmed by a user decision
-    const confirmed = await library.assertions.get(on.preferredAssertionId);
-    expect(confirmed).toMatchObject({ status: "confirmed", decidedBy: "user" });
+    const birth = project.people[1].birth;                      // Dumitru S. Hariton, 1818 Ploiești, not verified
+    const on = await setFactVerified({ library, fact: birth, verified: true });
+    expect(on).toEqual({ assertionIds: birth.assertionIds, preferredAssertionId: birth.preferredAssertionId }); // same assertions, now confirmed
+    expect(await statuses({ ...birth, ...on })).toEqual([["birth.date", "confirmed", "1818"], ["birth.place", "confirmed", "Ploiești"]]);
+    expect((await library.assertions.get(on.preferredAssertionId)).decidedBy).toBe("user");
 
-    const afterOn = { ...unverified, ...on, verified: true };
+    const afterOn = { ...birth, ...on, verified: true };
     const off = await setFactVerified({ library, fact: afterOn, verified: false });
+    expect(off.assertionIds).toHaveLength(4);                   // 2 confirmed (history) + 2 proposed copies
     expect(off.preferredAssertionId).not.toBe(on.preferredAssertionId);
-    expect(off.assertionIds).toEqual([on.preferredAssertionId, off.preferredAssertionId]);
-    expect((await library.assertions.get(off.preferredAssertionId)).status).toBe("proposed");
-    expect((await library.assertions.get(on.preferredAssertionId)).status).toBe("confirmed");   // history stays
-    expect((await library.assertions.getStored(off.preferredAssertionId))).toMatchObject({ originalValue: confirmed.originalValue, citation: confirmed.citation });
+    const afterOff = { ...afterOn, ...off, verified: false };
+    expect(await statuses(afterOff)).toEqual([["birth.date", "proposed", "1818"], ["birth.place", "proposed", "Ploiești"]]);
+    const pref = await library.assertions.get(off.preferredAssertionId);
+    expect(pref).toMatchObject({ property: "birth.date", supersedesId: on.preferredAssertionId, agent: "import" }); // same reading, nothing new was read
+    expect((await library.assertions.get(on.preferredAssertionId)).status).toBe("confirmed");                         // history stays
 
-    const again = await setFactVerified({ library, fact: { ...afterOn, ...off, verified: false }, verified: false });
-    expect(again.preferredAssertionId).toBe(off.preferredAssertionId);                       // already not verified: no new assertion
-    const back = await setFactVerified({ library, fact: { ...afterOn, ...off, verified: false }, verified: true });
-    expect(back.preferredAssertionId).toBe(off.preferredAssertionId);
-    expect((await library.assertions.get(back.preferredAssertionId)).status).toBe("confirmed");
+    const again = await setFactVerified({ library, fact: afterOff, verified: false });
+    expect(again).toEqual(off);                                 // already not verified: nothing new
+    const back = await setFactVerified({ library, fact: afterOff, verified: true });
+    expect(back).toEqual(off);
+    expect(await statuses(afterOff)).toEqual([["birth.date", "confirmed", "1818"], ["birth.place", "confirmed", "Ploiești"]]);
   });
 
   it("verifying a fact whose proposal was rejected re-proposes it first; unconverted facts are left to the plain flag", async () => {
@@ -210,7 +224,111 @@ describe("one-time confirmation of verified facts, and keeping `verified` consis
     await library.assertions.rejectAssertion(fact.preferredAssertionId, { decidedBy: "u" });
     const r = await setFactVerified({ library, fact, verified: true });
     expect(r.preferredAssertionId).not.toBe(fact.preferredAssertionId);
-    expect((await library.assertions.get(r.preferredAssertionId)).status).toBe("confirmed");
+    expect((await statuses({ ...fact, ...r })).map((x) => x[1])).toEqual(["confirmed", "confirmed"]);
+    expect((await library.assertions.get(fact.preferredAssertionId)).status).toBe("rejected");   // the rejection stays on record
     expect(await setFactVerified({ library, fact: { year: 1900, verified: false, assertionIds: [], preferredAssertionId: null }, verified: true })).toBeNull();
+  });
+});
+
+describe("editing a converted fact creates superseding assertions (Phase 4 review, question b)", () => {
+  const converted = async () => (await convertLegacyFacts({ ...deps, project: sampleProject() })).project;
+
+  it("changing a birth year supersedes only the date assertion, entered by the user (agent manual)", async () => {
+    const project = await converted();
+    const before = project.people[1].birth;                    // 1818, Ploiești, unverified
+    const patch = await applyFactEdit({ library, kind: "birth", personId: "i2", before, after: { ...before, year: 1819 } });
+    expect(patch.assertionIds).toHaveLength(3);
+    const after = { ...before, year: 1819, ...patch };
+    expect(await statuses(after)).toEqual([["birth.place", "proposed", "Ploiești"], ["birth.date", "proposed", "1819"]]);
+    const date = await library.assertions.get(patch.preferredAssertionId);
+    expect(date).toMatchObject({ property: "birth.date", agent: "manual", supersedesId: before.preferredAssertionId, citation: { pageLabel: "timeline" } });
+    expect(date.normalizedValue).toMatchObject({ earliest: "1819-01-01", latest: "1819-12-31", precision: "year" });
+    expect((await library.assertions.getStored(before.preferredAssertionId)).originalValue).toBe("1818");   // the old reading is kept
+    expect((await library.assertions.history(date.id)).map((a) => a.originalValue)).toEqual(["1818", "1819"]);
+    expect((await library.runs.getRun(date.runId))).toMatchObject({ processor: "manual", status: "succeeded" });
+  });
+
+  it("changing only the place supersedes only the place; an unchanged save creates nothing", async () => {
+    const project = await converted();
+    const before = project.people[1].birth;
+    const same = await applyFactEdit({ library, kind: "birth", personId: "i2", before, after: { ...before } });
+    expect(same).toEqual({ assertionIds: before.assertionIds, preferredAssertionId: before.preferredAssertionId });
+    const count = await storage.dbCount("evAssertions");
+    const patch = await applyFactEdit({ library, kind: "birth", personId: "i2", before, after: { ...before, place: "Câmpina" } });
+    expect(await storage.dbCount("evAssertions")).toBe(count + 1);
+    expect(patch.preferredAssertionId).toBe(before.preferredAssertionId);                // the date is still the primary
+    expect(await statuses({ ...before, ...patch })).toEqual([["birth.date", "proposed", "1818"], ["birth.place", "proposed", "Câmpina"]]);
+  });
+
+  it("editing a VERIFIED fact: the new value replaces the confirmed one and is confirmed by the same user action", async () => {
+    const project = await converted();
+    await confirmLegacyVerified({ library, project });
+    const before = project.people[0].birth;                    // 1850 Săhăteni, verified
+    const patch = await applyFactEdit({ library, kind: "birth", personId: "i1", before, after: { ...before, year: 1851 } });
+    const after = { ...before, year: 1851, ...patch };
+    expect(await statuses(after)).toEqual([["birth.place", "confirmed", "Săhăteni"], ["birth.date", "confirmed", "1851"]]);
+    expect((await library.assertions.get(patch.preferredAssertionId))).toMatchObject({ decidedBy: "user", agent: "manual" });
+    expect((await library.assertions.get(before.preferredAssertionId))).toMatchObject({ status: "confirmed", originalValue: "1850", decidedBy: "legacy-verified" }); // history
+  });
+
+  it("an edit that also un-verifies or verifies applies both in one go", async () => {
+    const project = await converted();
+    await confirmLegacyVerified({ library, project });
+    const v = project.people[0].birth;
+    const off = await applyFactEdit({ library, kind: "birth", personId: "i1", before: v, after: { ...v, year: 1852, verified: false } });
+    expect((await statuses({ ...v, ...off })).map((x) => [x[0], x[1]]).sort()).toEqual([["birth.date", "proposed"], ["birth.place", "proposed"]]);
+    const u = project.people[1].death;                        // unverified
+    const on = await applyFactEdit({ library, kind: "death", personId: "i2", before: u, after: { ...u, place: "București", verified: true } });
+    expect((await statuses({ ...u, ...on })).map((x) => [x[0], x[1], x[2]]).sort()).toEqual([["death.date", "confirmed", "1884"], ["death.place", "confirmed", "București"]]);
+  });
+
+  it("events, roles and groups: a changed label, year or note supersedes their single assertion", async () => {
+    const project = await converted();
+    const ev = project.people[0].events[0];                    // 1875 Marries Elena Băltăceanu
+    const patch = await applyFactEdit({ library, kind: "event", personId: "i1", before: ev, after: { ...ev, year: 1876, label: "Marries Elena Băltăceanu (civil)" } });
+    const a = await library.assertions.get(patch.preferredAssertionId);
+    expect(a).toMatchObject({ property: "x-legacy.event", originalValue: "Marries Elena Băltăceanu (civil)", supersedesId: ev.preferredAssertionId, agent: "manual" });
+    expect(a.normalizedValue).toMatchObject({ year: 1876 });
+    const per = project.people[0].periods[0];
+    const p2 = await applyFactEdit({ library, kind: "period", personId: "i1", before: per, after: { ...per, end: 1922 } });
+    expect((await library.assertions.get(p2.preferredAssertionId)).normalizedValue).toMatchObject({ start: 1880, end: 1922 });
+    // a change that is not part of the claim (colour) creates nothing
+    const n = await storage.dbCount("evAssertions");
+    await applyFactEdit({ library, kind: "event", personId: "i1", before: { ...ev, ...patch }, after: { ...ev, ...patch, year: 1876, label: "Marries Elena Băltăceanu (civil)", color: "#000" } });
+    expect(await storage.dbCount("evAssertions")).toBe(n);
+  });
+
+  it("a place added to a birth that had none gets a new assertion; a removed place keeps its old assertion", async () => {
+    const people = [{ id: "a", name: "A", sex: "F", birth: { year: 1900 }, death: {}, events: [], periods: [], groups: [] }];
+    const project = (await convertLegacyFacts({ ...deps, project: normalizeProject(createProject("T", { people })) })).project;
+    const before = project.people[0].birth;
+    expect(before.assertionIds).toHaveLength(1);
+    const patch = await applyFactEdit({ library, kind: "birth", personId: "a", before, after: { ...before, place: "Iași" } });
+    expect(await statuses({ ...before, ...patch })).toEqual([["birth.date", "proposed", "1900"], ["birth.place", "proposed", "Iași"]]);
+    const withPlace = { ...before, place: "Iași", ...patch };
+    const cleared = await applyFactEdit({ library, kind: "birth", personId: "a", before: withPlace, after: { ...withPlace, place: "" } });
+    expect(cleared.assertionIds).toEqual(patch.assertionIds);                          // evidence is never deleted
+    expect(await applyFactEdit({ library, kind: "birth", personId: "a", before: { year: 1900, assertionIds: [], preferredAssertionId: null }, after: { year: 1901 } })).toBeNull();
+  });
+
+  it("supersedeAsUser is the only way to replace a confirmed assertion with a proposed one, and needs a target", async () => {
+    const project = await converted();
+    await confirmLegacyVerified({ library, project });
+    const a = await library.assertions.get(project.people[0].birth.preferredAssertionId);
+    const input = { subjectType: "persona", subjectId: a.subjectId, property: a.property, originalValue: "1849", normalizedValue: a.normalizedValue, runId: a.runId, citation: a.citation };
+    await expect(library.assertions.propose({ ...input, supersedesId: a.id })).rejects.toMatchObject({ code: "invariant" });
+    await expect(library.assertions.supersedeAsUser(input)).rejects.toMatchObject({ code: "invalid" });
+    expect((await library.assertions.supersedeAsUser({ ...input, supersedesId: a.id })).status).toBe("proposed");
+  });
+
+  it("accepting a legacy link is a separate user action per person", async () => {
+    const project = await converted();
+    const link = linksOfPerson(project, "i1")[0];
+    const after = decideLink(project, link.id, "accepted", { decidedBy: "user" }).project;
+    expect(linksOfPerson(after, "i1")[0]).toMatchObject({ status: "accepted", decidedBy: "user", supersedesId: link.id });
+    expect(currentLinks(after).filter((l) => l.status === "candidate")).toHaveLength(7);
+    // converting again reuses the persona whatever the link's status
+    const again = await convertLegacyFacts({ ...deps, project: after });
+    expect(again.project).toBe(after);
   });
 });

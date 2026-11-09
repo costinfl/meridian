@@ -102,7 +102,7 @@ Because the live app stores users' data in their browsers, a release must never 
 
 2. **Database access.** Only `src/storage` and `src/evidence/repositories` may call the generic store methods (`dbAdd`, `dbPut`, `dbTransact`…). This is what keeps evidence append-only.
 
-3. **User decisions.** Code under `ingest`, `search`, `graph` and `workers` may not call `confirmAssertion`, `rejectAssertion`, `enterAsUser`, `decideLink`, `convertLegacyFacts`, `confirmLegacyVerified` or `setFactVerified`. Automated code may only propose.
+3. **User decisions.** Code under `ingest`, `search`, `graph` and `workers` may not call `confirmAssertion`, `rejectAssertion`, `enterAsUser`, `supersedeAsUser`, `decideLink`, `convertLegacyFacts`, `confirmLegacyVerified`, `setFactVerified` or `applyFactEdit`. Automated code may only propose.
 
 The rules themselves are in `src/tests/archRules.js`.
 

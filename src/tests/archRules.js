@@ -70,13 +70,13 @@ export function checkDbMethodUse(files) {
 }
 
 // I6: automated modules must never confirm/reject assertions or enter claims as the user.
-const USER_ACTION = /\b(confirmAssertion|rejectAssertion|enterAsUser|decideLink|convertLegacyFacts|confirmLegacyVerified|setFactVerified)\s*\(/;
+const USER_ACTION = /\b(confirmAssertion|rejectAssertion|enterAsUser|supersedeAsUser|decideLink|convertLegacyFacts|confirmLegacyVerified|setFactVerified|applyFactEdit)\s*\(/;
 const AUTOMATED = ["ingest/", "search/", "graph/", "workers/"];
 export function checkUserActionOnly(files) {
   const violations = [];
   for (const [file, source] of Object.entries(files)) {
     if (AUTOMATED.some((d) => file.startsWith(d)) && USER_ACTION.test(source)) {
-      violations.push(`${file} calls a user-action function (confirmAssertion, rejectAssertion, enterAsUser, decideLink, convertLegacyFacts, confirmLegacyVerified, setFactVerified); automated code may only propose`);
+      violations.push(`${file} calls a user-action function (confirmAssertion, rejectAssertion, enterAsUser, supersedeAsUser, decideLink, convertLegacyFacts, confirmLegacyVerified, setFactVerified, applyFactEdit); automated code may only propose`);
     }
   }
   return violations;

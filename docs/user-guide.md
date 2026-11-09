@@ -201,11 +201,12 @@ Switch it on for the open project in **Projects → Evidence layer (preview)**. 
 What the panel offers today:
 
 1. **Legacy facts report.** A summary of the facts on your timeline: how many of each kind, how many have a source, how many are verified, and anything unusual (for example a verified fact with no source).
-2. **Convert … legacy items to evidence.** Records each fact as a *proposed* statement, cited to the fact's own source or to a "Legacy Meridian data" source. This does not change your timeline and does not confirm anything.
+2. **Convert … legacy items to evidence.** Records each fact as *proposed* statements, cited to the fact's own source or to a "Legacy Meridian data" source. A birth or death becomes two statements, one for the date and one for the place. This does not change your timeline, and it confirms and accepts nothing.
 3. **Confirm … verified facts.** A separate step that records your earlier *Verified* ticks as confirmations. Facts you did not verify stay proposed.
-4. **Storage line.** Whether the browser has granted persistent storage, how much space is used, and when you last exported a bundle.
+4. **Accept link**, once per person. Conversion creates a record of each person from their old timeline data and *suggests* that it is that person. You accept each suggestion yourself.
+5. **Storage line.** Whether the browser has granted persistent storage, how much space is used, and when you last exported a bundle.
 
-After conversion, ticking or unticking **Verified** on a fact also records that decision in the evidence. Nothing else in the app behaves differently yet. Reading documents, OCR, extraction, search and matching people across records arrive in later phases; see the [plan](evidence-layer/IMPLEMENTATION_PLAN.md).
+After conversion, the evidence follows your edits. Ticking or unticking **Verified** records that decision. Changing a fact's year, place, label or dates records the new value as replacing the old one; the old value is kept in the history, never deleted. Nothing else in the app behaves differently yet. Reading documents, OCR, extraction, search and matching people across records arrive in later phases; see the [plan](evidence-layer/IMPLEMENTATION_PLAN.md).
 
 Export a bundle before trying the preview on a project you care about.
 
