@@ -12,6 +12,7 @@ import { createNameVariantStore } from "./repositories/nameVariantStore.js";
 import { createAssertionStore } from "./repositories/assertionStore.js";
 import { createPersonaView } from "./repositories/personaView.js";
 import { createStaleEvidence } from "./repositories/staleEvidence.js";
+import { createEvidenceBundle } from "./repositories/evidenceBundle.js";
 
 export { EvidenceError } from "./domain/errors.js";
 export { normalizedBox, boxFromPixels, WHOLE_PAGE_BOX } from "./domain/box.js";
@@ -39,5 +40,6 @@ export function createEvidenceLibrary(storage) {
     assertions: createAssertionStore(storage),
     personaView: createPersonaView(storage),
     ...createStaleEvidence(storage),
+    bundle: createEvidenceBundle(storage),
   };
 }

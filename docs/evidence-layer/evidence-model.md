@@ -83,7 +83,7 @@ Conclusions stay in the existing project object so the timeline, GEDCOM and bund
 | ConclusionEvidence | `project.conclusionEvidence` (new) | conclusion ref (fact, family, link or relationship), assertionId, stance (supports, contradicts) |
 | ProofNote | `project.proofNotes` (new) | subject refs, text, createdAt |
 
-- **`verified` keeps its ADR-0003 meaning:** a fact is verified exactly when its preferred assertion is confirmed. GEDCOM export logic is unchanged.
+- **`verified` keeps its ADR-0003 meaning:** a fact is verified exactly when all its active assertions are confirmed (a birth or death has a date and a place assertion). GEDCOM export logic is unchanged.
 - **Family is the source of truth for parents and spouses;** `fatherId`, `motherId` and `spouseIds` become values derived from families in `normalizeProject`, so existing components keep reading them (confirmed in Phase 0 review).
 - Entity-resolution output lands as `candidate` links; nothing becomes `accepted` without the user. Rejected links are kept so false matches are not re-suggested.
 - **Display name:** a person is shown under the first name identified for them (the earliest-linked persona's name). The researcher can choose "Display person with this name instead" for any other linked name (for example the Hungarian spelling found in pre-1918 archives instead of the Romanian one). This is display only: nothing is merged, renamed or re-linked.
@@ -134,7 +134,7 @@ A place has at most one parent per hierarchy at any moment (decision, 2026-11-09
 - All traversals are bounded or use a visited set, so endogamy (the same ancestor via several lines) cannot loop.
 - Rebuild from scratch equals the incrementally maintained result.
 
-**Native bundle v2** (ADR-0001/0002 extended): `project.json` (unchanged role), `evidence.json` (library entities referenced by the project: sources, copies, pages, regions, text layers, records, personas, assertions, places, name variants, runs), `media/` (copy blobs, optional as before). Raw outputs and page caches are optional. Importing merges library entities by id and by copy hash, never overwriting existing evidence. API keys and folder handles never enter a bundle.
+**Native bundle v2** (ADR-0006, extending ADR-0001/0002): `project.json` (unchanged role), `evidence.json` (library entities referenced by the project: sources, copies, pages, regions, text layers, records, personas, assertions, places, name variants, runs), `media/` (copy blobs, optional as before). Raw outputs and page caches are optional. Importing merges library entities by id and by copy hash, never overwriting existing evidence. API keys and folder handles never enter a bundle.
 
 ## Decisions
 
@@ -142,7 +142,7 @@ A place has at most one parent per hierarchy at any moment (decision, 2026-11-09
 | --- | --- |
 | Platform | Client-only, same repo, same Pages deployment (ADR-0005). No backend. |
 | Storage | IndexedDB: existing database, new object stores, forward-only version upgrades with tests that existing projects survive. |
-| Existing data | Kept in place. Each existing fact gets an import-agent assertion citing its `sourceId` source, or the "Legacy Meridian data" source; `verified` facts get confirmed assertions, others proposed. |
+| Existing data | Kept in place. Each existing fact gets import-agent assertions citing its `sourceId` source, or the "Legacy Meridian data" source: a birth or death gives a date assertion and a place assertion, other facts one assertion. All start proposed; a one-time user step confirms those of `verified` facts. The legacy persona is linked to its person as a candidate, accepted per person by the user. Editing a converted fact adds a user-entered assertion that supersedes the old one. |
 | Documents | Chromium: link the Drive-for-desktop folder with `showDirectoryPicker()` and read files on demand (handle stored in IndexedDB; permission re-confirmed per session). Fallback: file picker / drag-and-drop into blobs. |
 | Text extraction | pdf.js for embedded PDF text (with word positions) and rendering; mammoth for DOCX; legacy `.doc` unsupported (convert via Drive export to DOCX/PDF). |
 | OCR | tesseract.js in a Web Worker, `ron` default (configurable), versions recorded on the run. |

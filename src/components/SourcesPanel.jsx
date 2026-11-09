@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import { C, btnStyle, hexA, SOURCE_TYPES, SOURCE_TYPE_LABELS, SOURCE_TYPE_ACCEPT } from "../theme.js";
-import { createSource } from "../models/project.js";
+import { createSource, displayName } from "../models/project.js";
 
 const FILTER_TABS = ["all", ...SOURCE_TYPES];
 
@@ -185,7 +185,7 @@ function AddSourceModal({ people, storage, onSave, onClose }) {
                   const active = linkedPersonIds.includes(p.id);
                   return (
                     <button key={p.id} style={{ ...btnStyle(active), padding: "3px 9px", fontSize: 11 }} onClick={() => togglePerson(p.id)}>
-                      {p.name.split(" ")[0]}
+                      {displayName(p).split(" ")[0]}
                     </button>
                   );
                 })}

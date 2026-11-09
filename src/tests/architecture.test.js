@@ -85,6 +85,13 @@ describe("architecture: import boundaries (I5)", () => {
       "search/a.js": "assertions.rejectAssertion(id)",
       "graph/ok.js": "assertions.propose(x)",
       "components/evidence/Review.jsx": "assertions.confirmAssertion(id, { decidedBy: 'user' })",
-    })).toHaveLength(3);
+      "workers/links.js": "const r = decideLink(project, id, 'accepted', { decidedBy: 'bot' });",
+      "ingest/legacy.js": "await convertLegacyFacts({ library, project })",
+      "search/v.js": "confirmLegacyVerified({ library, project })",
+      "graph/f.js": "await setFactVerified({ library, fact, verified: true })",
+      "ingest/ok.js": "addLink(project, { personId, personaId })",
+      "ingest/edit.js": "await applyFactEdit({ library, kind, personId, before, after })",
+      "workers/sup.js": "library.assertions.supersedeAsUser(input)",
+    })).toHaveLength(9);
   });
 });

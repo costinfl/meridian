@@ -19,6 +19,7 @@ old one rather than editing history.
 | [0003](0003-standard-gedcom-exports-only-verified-facts.md)      | Standard GEDCOM exports only verified facts                 | Accepted |
 | [0004](0004-verified-sourcing-visual-affordance.md)              | Verified/unverified sourcing affordance                     | Accepted |
 | [0005](0005-evidence-layer-runs-client-side.md)                 | Evidence layer runs client-side                             | Accepted |
+| [0006](0006-native-bundle-carries-evidence.md)                  | Native bundle carries the evidence a project references     | Accepted |
 
 ## Adding a record
 

@@ -26,11 +26,11 @@ const isExtension = (p) => typeof p === "string" && /^x-[a-z0-9.-]+$/.test(p);
  *  I2  a citation region is mandatory, except agent `manual` (source + page label) and `import` (source).
  *  I3  every assertion references the run that produced it; `agent` is that run's processor.
  *  I6  nothing is `confirmed` or `rejected` without an explicit user action: `propose` can only create
- *      proposals; `confirmAssertion`, `rejectAssertion` and `enterAsUser` are the user-action entry points
+ *      proposals; `confirmAssertion`, `rejectAssertion`, `enterAsUser` and `supersedeAsUser` are the user-action entry points
  *      (the architecture test keeps automated modules from calling them).
  */
 export function createAssertionStore(storage) {
-  async function build(o, input, status, decision) {
+  async function build(o, input, status, decision, byUser = false) {
     const runId = requireString(input.runId, "runId");
     const run = await o.get("evRuns", runId);
     if (!run) throw notFound("ProcessingRun", runId);
@@ -100,7 +100,7 @@ export function createAssertionStore(storage) {
       // I6: a confirmed assertion is the user's decision; only another user action may replace it
       const prevDecision = await o.getByIndex(DECISIONS, "byAssertion", supersedesId);
       const prevStatus = prevDecision ? prevDecision.status : prev.status;
-      if (prevStatus === "confirmed" && status !== "confirmed") throw new EvidenceError("invariant", "a confirmed assertion can only be superseded by a user action");
+      if (prevStatus === "confirmed" && status !== "confirmed" && !byUser) throw new EvidenceError("invariant", "a confirmed assertion can only be superseded by a user action");
     }
 
     return {
@@ -119,10 +119,10 @@ export function createAssertionStore(storage) {
   }
   const STORES = [STORE, DECISIONS, "evRuns", "evRecords", "evPersonas", "evRegions", "evSources"];
 
-  async function insert(input, status, decision) {
+  async function insert(input, status, decision, byUser = false) {
     let rec;
     await storage.dbTransact(STORES, "readwrite", async (o) => {
-      rec = await build(o, input, status, decision);
+      rec = await build(o, input, status, decision, byUser);
       if (decision?.requireManual && rec.agent !== "manual") throw new EvidenceError("invariant", "enterAsUser requires a run whose processor is 'manual'");
       await o.add(STORE, rec);
     });
@@ -162,6 +162,14 @@ export function createAssertionStore(storage) {
   return {
     /** Any agent may propose. The result is always `proposed`. */
     propose: (input) => insert(input, "proposed", null),
+    /**
+     * USER ACTION: the researcher replaces an assertion (even a confirmed one) with a new PROPOSED one, e.g. by
+     * editing a fact or withdrawing a verification. `supersedesId` is required; confirm it separately if wanted.
+     */
+    supersedeAsUser(input) {
+      if (!input?.supersedesId) return Promise.reject(invalid("supersedeAsUser requires supersedesId"));
+      return insert(input, "proposed", null, true);
+    },
     /** USER ACTION: the researcher enters a claim by hand (run processor must be `manual`); stored confirmed. */
     async enterAsUser(input, { decidedBy = "user" } = {}) {
       return insert(input, "confirmed", { decidedBy: requireString(decidedBy, "decidedBy"), requireManual: true });

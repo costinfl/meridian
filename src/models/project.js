@@ -1,3 +1,5 @@
+import { buildFamilies, derivePeopleFromFamilies } from "./families.js";
+
 export function createProject(name, { people = [], annotations = [], eras = [], sources = [], settings = {} } = {}) {
   const now = new Date().toISOString();
   return {
@@ -10,6 +12,13 @@ export function createProject(name, { people = [], annotations = [], eras = [], 
     annotations,
     eras,
     sources,
+    // Layer 4 conclusions (evidence-model.md). Families are the source of truth for parents/spouses.
+    families: buildFamilies(people),
+    personaLinks: [],
+    relationships: [],
+    conclusionEvidence: [],
+    proofNotes: [],
+    legacyEvidence: null, // set when legacy facts were converted to evidence (conclusions/legacyFacts.js)
     settings: {
       focusPersonId: people[0]?.id ?? null,
       relativeIds: [],
@@ -46,6 +55,11 @@ export function createSource({ title = "Untitled source", type = "text", ...rest
   };
 }
 
+/* How a person is shown. `name` is the canonical timeline name (and what GEDCOM exports); the researcher may choose
+   to DISPLAY a person under another name linked to them (conclusions/displayName.js sets `displayNameChoice`).
+   Display only: nothing is merged, renamed or re-linked. */
+export const displayName = (person) => person?.displayNameChoice?.name || person?.name || "";
+
 /* ---- timeline sub-item factories ----
    Every timeline item carries a stable `id` so it can be edited/deleted, plus
    optional `color`, `note`, and `sourceId` (a reference into project.sources). */
@@ -81,26 +95,40 @@ export function createMediaPin({ year, sourceId = null, label = "", color = null
 
 /* Ensure a loaded project has every array + stable ids on sub-items, so older
    projects (and GEDCOM imports) upgrade transparently. Returns the same object
-   when nothing needed changing, otherwise a shallow-cloned, upgraded project. */
+   when nothing needed changing, otherwise a shallow-cloned, upgraded project.
+
+   Conclusions (Phase 4): older projects gain empty conclusion arrays, every fact gains
+   `assertionIds` / `preferredAssertionId`, and families become the source of truth for
+   fatherId / motherId / spouseIds. Projects without `families` get them built from the legacy
+   fields; afterwards the legacy fields are derived from families. */
+const EVIDENCE_LISTS = ["personaLinks", "relationships", "conclusionEvidence", "proofNotes"];
+
 export function normalizeProject(project) {
   if (!project) return project;
   const withId = (item) => (item && item.id ? item : { id: crypto.randomUUID(), ...item });
+  const withEvidence = (item) => {
+    if (!item || (Array.isArray(item.assertionIds) && "preferredAssertionId" in item)) return item;
+    return { ...item, assertionIds: Array.isArray(item.assertionIds) ? item.assertionIds : [], preferredAssertionId: item.preferredAssertionId ?? null };
+  };
 
   let peopleChanged = false;
-  const people = (project.people ?? []).map((p) => {
-    const events = (p.events ?? []).map(withId);
-    const periods = (p.periods ?? []).map(withId);
-    const groups = (p.groups ?? []).map(withId);
+  let people = (project.people ?? []).map((p) => {
+    const events = (p.events ?? []).map(withId).map(withEvidence);
+    const periods = (p.periods ?? []).map(withId).map(withEvidence);
+    const groups = (p.groups ?? []).map(withId).map(withEvidence);
     const media = (p.media ?? []).map(withId);
+    const birth = p.birth && typeof p.birth === "object" ? withEvidence(p.birth) : p.birth;
+    const death = p.death && typeof p.death === "object" ? withEvidence(p.death) : p.death;
     const changed =
       !p.events || !p.periods || !p.groups || !p.media ||
       events.some((e, i) => e !== p.events?.[i]) ||
       periods.some((e, i) => e !== p.periods?.[i]) ||
       groups.some((e, i) => e !== p.groups?.[i]) ||
-      media.some((e, i) => e !== p.media?.[i]);
+      media.some((e, i) => e !== p.media?.[i]) ||
+      birth !== p.birth || death !== p.death;
     if (!changed) return p;
     peopleChanged = true;
-    return { ...p, events, periods, groups, media };
+    return { ...p, events, periods, groups, media, birth, death };
   });
 
   const annotations = (project.annotations ?? []).map(withId);
@@ -110,6 +138,22 @@ export function normalizeProject(project) {
   const annotationsChanged = annotations.some((a, i) => a !== project.annotations?.[i]);
   const erasChanged = needsEras || eras.some((e, i) => e !== project.eras?.[i]);
 
-  if (!peopleChanged && !annotationsChanged && !erasChanged) return project;
-  return { ...project, people, annotations, eras };
+  // conclusions
+  const missingLists = EVIDENCE_LISTS.filter((k) => !Array.isArray(project[k]));
+  let families = project.families;
+  let familiesChanged = false;
+  if (!Array.isArray(families)) {
+    families = buildFamilies(people);   // first upgrade: the legacy fields are the only record of who is related
+    familiesChanged = true;
+  } else {
+    const derived = derivePeopleFromFamilies(people, families);
+    if (derived !== people) { people = derived; peopleChanged = true; }
+  }
+
+  const legacyMissing = !("legacyEvidence" in project);
+  if (!peopleChanged && !annotationsChanged && !erasChanged && !familiesChanged && !missingLists.length && !legacyMissing) return project;
+  const next = { ...project, people, annotations, eras, families };
+  for (const k of missingLists) next[k] = [];
+  if (legacyMissing) next.legacyEvidence = null;
+  return next;
 }
