@@ -35,7 +35,8 @@ Meridian is a **client-only** React 18 / Vite 5 app, deployed as static files to
 
 - `parentSourceId` builds hierarchies: newspaper title → issue, register series → volume.
 - **Content hash, not file name or Drive id, is the identity of a copy.** Re-adding or moving a file never duplicates it.
-- Regions nest (article → blocks; page → rows → cells). Every citation ends at a region; a "whole page" region exists for every page.
+- **Duplicates are flagged, not silently merged.** A byte-identical file returns the existing copy, flagged `identical`. A file with the same name in the same source (or the same folder path) but different bytes may be another edition or a better scan: it is stored as its own copy, flagged `possible-version`, and a person chooses **keep both** (the new copy gets a distinguishing label) or **replace** (the new copy takes over; the old copy is kept, marked superseded, because evidence read from it still cites it). Evidence derived from a replaced copy is listed for re-review and is never rewritten.
+- Regions nest (article → blocks; page → rows → cells) and **a child region must lie inside its parent's box**. Regions are never edited: a wrong box is corrected by adding a region that **supersedes** it; old citations keep pointing at the region that was actually read, and text read from the old box is not carried over to the new one. Every citation ends at a region; a "whole page" region exists for every page.
 - **One coordinate convention:** boxes normalised to 0–1 in the unrotated page image. Processor-specific coordinates are converted once, on import; originals stay in the raw processor output.
 - Existing `project.sources` entries (ADR-0002) stay as the project's source list; each gets a `librarySourceId` (and its blob becomes a DigitalCopy) when it is first used as evidence.
 
@@ -64,7 +65,7 @@ Meridian is a **client-only** React 18 / Vite 5 app, deployed as static files to
 
 - Assertions are the source of truth; persona fields are a convenience view of current confirmed assertions.
 - Relations inside a record are assertions whose subject and object are both personas of that record.
-- Status workflow: `proposed` → `confirmed` | `rejected`, only through an explicit user action. Rejected assertions stay, so the same wrong extraction is not re-proposed.
+- Status workflow: `proposed` → `confirmed` | `rejected`, only through an explicit user action. **A decision is its own append-only event** (one per assertion); the assertion itself is never rewritten, and readers see the effective status. Rejected assertions stay, so the same wrong extraction is not re-proposed.
 - Witnesses and godparents are personas, not notes (they feed FAN analysis).
 - A citation region is mandatory, except agent `manual` (source + page label) and agent `import` (source, possibly the "Legacy Meridian data" source).
 - **Extraction contract:** LLM/OCR extraction returns JSON matching a versioned JSON Schema (a record, its personas, assertions with region references), validated before anything is stored; the schema version is stored on the run.
@@ -85,6 +86,7 @@ Conclusions stay in the existing project object so the timeline, GEDCOM and bund
 - **`verified` keeps its ADR-0003 meaning:** a fact is verified exactly when its preferred assertion is confirmed. GEDCOM export logic is unchanged.
 - **Family is the source of truth for parents and spouses;** `fatherId`, `motherId` and `spouseIds` become values derived from families in `normalizeProject`, so existing components keep reading them (confirmed in Phase 0 review).
 - Entity-resolution output lands as `candidate` links; nothing becomes `accepted` without the user. Rejected links are kept so false matches are not re-suggested.
+- **Display name:** a person is shown under the first name identified for them (the earliest-linked persona's name). The researcher can choose "Display person with this name instead" for any other linked name (for example the Hungarian spelling found in pre-1918 archives instead of the Romanian one). This is display only: nothing is merged, renamed or re-linked.
 - Person facts are chosen, not merged: conflicting assertions stay visible, the preferred one is marked (with a ProofNote when it matters). A computed best guess may be displayed when nothing is pinned, but is never stored as a conclusion.
 - Research braces (`project.annotations`) may cite assertions or ProofNotes in addition to sources.
 
@@ -95,7 +97,11 @@ Conclusions stay in the existing project object so the timeline, GEDCOM and bund
 | Place (`evPlaces`) | Settlement, parish or administrative unit | kind, coordinates, GeoNames and Wikidata ids |
 | PlaceName (`evPlaceNames`) | One name of a place | placeId, name, language, valid from, valid to |
 | PlaceParent (`evPlaceParents`) | Position in a hierarchy at a time | childId, parentId, hierarchy (civil or church), valid from, valid to |
-| NameVariant (`evNameVariants`) | Spellings/language forms of a given name or surname | canonical form, variant, language, origin (manual or learned from confirmed links) |
+
+A place has at most one parent per hierarchy at any moment (decision, 2026-11-09): overlapping parents are rejected. Where sources disagree, the researcher picks one parent or splits the dates and records the disagreement in notes; competing parent claims are not modelled.
+| NameVariant (`evNameVariants`) | A spelling/language pair a person has entered (Ioan – Ion) | canonical form, variant, language, origin (manual or learned from confirmed links) |
+
+- NameVariant pairs are statements about spelling, **not** about identity: search expands a name by its directly paired spellings only (one hop, either direction), never transitively, and a pair never links two personas. Whether two people are the same is a PersonaLink decision.
 
 **FuzzyDate** (plain object embedded wherever a date appears):
 

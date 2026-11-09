@@ -68,3 +68,16 @@ export function checkDbMethodUse(files) {
   }
   return violations;
 }
+
+// I6: automated modules must never confirm/reject assertions or enter claims as the user.
+const USER_ACTION = /\.(confirmAssertion|rejectAssertion|enterAsUser)\s*\(/;
+const AUTOMATED = ["ingest/", "search/", "graph/", "workers/"];
+export function checkUserActionOnly(files) {
+  const violations = [];
+  for (const [file, source] of Object.entries(files)) {
+    if (AUTOMATED.some((d) => file.startsWith(d)) && USER_ACTION.test(source)) {
+      violations.push(`${file} calls a user-action method (confirmAssertion/rejectAssertion/enterAsUser); automated code may only propose`);
+    }
+  }
+  return violations;
+}

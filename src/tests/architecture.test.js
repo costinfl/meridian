@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { checkImports, importsOf, checkDbMethodUse } from "./archRules.js";
+import { checkImports, importsOf, checkDbMethodUse, checkUserActionOnly } from "./archRules.js";
 
 const SRC = path.resolve(__dirname, "..");
 
@@ -75,5 +75,16 @@ describe("architecture: import boundaries (I5)", () => {
       "conclusions/b.js": "await storage.dbPut('evSources', x);",
       "components/evidence/P.jsx": "storage.dbTransact(['a'], 'readwrite', fn)",
     })).toHaveLength(2);
+  });
+
+  it("automated modules never take user decisions on assertions (I6)", () => {
+    expect(checkUserActionOnly(readSources())).toEqual([]);
+    expect(checkUserActionOnly({
+      "ingest/extract.js": "await lib.assertions.confirmAssertion(id, { decidedBy: 'bot' });",
+      "workers/er.js": "assertions.enterAsUser(x)",
+      "search/a.js": "assertions.rejectAssertion(id)",
+      "graph/ok.js": "assertions.propose(x)",
+      "components/evidence/Review.jsx": "assertions.confirmAssertion(id, { decidedBy: 'user' })",
+    })).toHaveLength(3);
   });
 });

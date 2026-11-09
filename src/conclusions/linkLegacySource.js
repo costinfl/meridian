@@ -59,7 +59,7 @@ export async function linkProjectSourceToLibrary({ library, loadBlob, project, s
   if (src.blobKey && !src.fileMissing) {
     const blob = await loadBlob(src.blobKey);
     if (blob) {
-      const { copy, created } = await library.copies.registerFile(blob, {
+      const { copy, created, duplicate } = await library.copies.registerFile(blob, {
         sourceId: libSource.id,
         fileName: src.fileName ?? "",
         mimeType: src.mimeType ?? blob.type ?? "",
@@ -67,6 +67,7 @@ export async function linkProjectSourceToLibrary({ library, loadBlob, project, s
         accessUrl: src.url ?? "",
       });
       copyId = copy.id; copyCreated = created;
+      if (duplicate?.kind === "possible-version") warnings.push("this file looks like another version of a file already in the library (same name, different content); it is flagged for a keep-both / replace decision");
       if (!created && copy.sourceId !== libSource.id) {
         if (!copy.sourceId) await library.copies.update(copy.id, { sourceId: libSource.id });
         else warnings.push("the same file is already registered under another library source");
