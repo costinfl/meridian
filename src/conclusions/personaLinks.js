@@ -52,7 +52,12 @@ export function decideLink(project, linkId, status, { decidedBy, rationale } = {
     ...current, id: crypto.randomUUID(), status, rationale: rationale ?? current.rationale,
     decidedBy: String(decidedBy).trim(), decidedAt: isoNow(), supersedesId: current.id, createdAt: isoNow(),
   };
-  return { project: { ...project, personaLinks: [...own(project), link] }, link };
+  let next = { ...project, personaLinks: [...own(project), link] };
+  // a display-name choice that rests on a link no longer accepted would show a name the researcher rejected
+  if (status !== "accepted") {
+    next = { ...next, people: (next.people ?? []).map((p) => (p.id === current.personId && p.displayNameChoice?.personaId === current.personaId ? { ...p, displayNameChoice: null } : p)) };
+  }
+  return { project: next, link };
 }
 
 /** Personas accepted for a person, earliest decision first (this order defines the "first name identified"). */

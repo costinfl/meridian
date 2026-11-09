@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo, Suspense, lazy } from "react";
 import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifiedBorderStyle, verifiedMarker, VERIFIED_MARK } from "./theme.js";
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
-import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin } from "./models/project.js";
+import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin, displayName } from "./models/project.js";
 import { exportGedcom, parseGedcom } from "./gedcom.js";
 import { exportProjectZip, importProjectBundle } from "./share.js";
 import { storage } from "./storage/StorageService.js";
@@ -175,7 +175,7 @@ function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, a
       })}
 
       {person.birth?.year && visible(person.birth.year, lifeEnd) && (
-        <div title={`${person.name} · ${person.birth.year}–${person.death?.year || "…"}`} style={{
+        <div title={`${displayName(person)} · ${person.birth.year}–${person.death?.year || "…"}`} style={{
           position: "absolute", left: x(person.birth.year), top: lifeY, width: Math.max(2, (lifeEnd - person.birth.year) * ppy), height: 6,
           borderRadius: person.death?.year ? 3 : "3px 0 0 3px", zIndex: 1, background: hexA(color, 0.75),
         }} />
@@ -622,7 +622,7 @@ export default function App() {
         <label style={{ font: "600 11px Archivo, sans-serif", color: C.inkSoft }}>Focus</label>
         <select value={focusId} onChange={(e) => { setFocusId(e.target.value); setRelativeIds((r) => r.filter((q) => q !== e.target.value)); }}
           style={{ font: "600 12px Archivo, sans-serif", background: C.paperHi, color: C.ink, border: `1px solid ${C.ink}`, borderRadius: 3, padding: "4px 6px" }}>
-          {people.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {people.map((p) => <option key={p.id} value={p.id}>{displayName(p)}</option>)}
         </select>
 
         <button style={btnStyle(false)} onClick={() => setAddRelOpen(true)}>+ relative</button>
@@ -743,7 +743,7 @@ export default function App() {
               <>
                 {headerCell(
                   <React.Fragment>
-                    <div style={{ font: "700 14px Fraunces, Georgia, serif", color: C.focus }}>{focus.name}</div>
+                    <div style={{ font: "700 14px Fraunces, Georgia, serif", color: C.focus }}>{displayName(focus)}</div>
                     <div style={{ font: "500 10px 'IBM Plex Mono', monospace", color: C.inkSoft }}>{focus.birth?.year}–{focus.death?.year || "…"}</div>
                     <div style={{ position: "absolute", bottom: 7, left: 12, font: "700 8.5px Archivo, sans-serif", letterSpacing: ".12em", color: C.paperHi, background: C.focus, padding: "2px 6px", borderRadius: 2 }}>FOCUS</div>
                   </React.Fragment>, FOCUS_H, "Focus"
@@ -770,7 +770,7 @@ export default function App() {
             <div key={p.id} style={{ display: "flex", position: "relative", zIndex: 1 }}>
               {headerCell(
                 <React.Fragment>
-                  <div style={{ font: "600 12.5px Fraunces, Georgia, serif", color: relColor(i) }}>{p.name}</div>
+                  <div style={{ font: "600 12.5px Fraunces, Georgia, serif", color: relColor(i) }}>{displayName(p)}</div>
                   <div style={{ font: "500 10px 'IBM Plex Mono', monospace", color: C.inkSoft }}>
                     {p.birth?.year}–{p.death?.year || "…"}
                     <span style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", marginLeft: 6 }}>{relationTo(p, focus, byId)}</span>
@@ -794,7 +794,7 @@ export default function App() {
             <div style={{ display: "flex" }}>
               {headerCell(<div style={{ font: "500 10px Archivo, sans-serif", color: C.inkSoft }}>No comparison lanes</div>, 64, "Compare")}
               <div style={{ flex: 1, display: "flex", alignItems: "center", padding: "0 16px", font: "italic 500 12px Fraunces, Georgia, serif", color: C.inkSoft, borderBottom: `1px solid ${C.rule}` }}>
-                Add a relative to lay their life against {focus?.name?.split(" ")[0]}'s years.
+                Add a relative to lay their life against {displayName(focus).split(" ")[0]}'s years.
               </div>
             </div>
           )}
@@ -890,7 +890,7 @@ export default function App() {
             {people.filter((p) => p.id !== focusId && !relativeIds.includes(p.id)).map((p) => (
               <button key={p.id} onClick={() => { setRelativeIds((r) => [...r, p.id]); setAddRelOpen(false); }}
                 style={{ ...btnStyle(false), textAlign: "left", display: "flex", justifyContent: "space-between", gap: 10 }}>
-                <span>{p.name} <em style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", color: C.inkSoft }}>{relationTo(p, focus, byId)}</em></span>
+                <span>{displayName(p)} <em style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", color: C.inkSoft }}>{relationTo(p, focus, byId)}</em></span>
                 <span style={{ font: "400 11px 'IBM Plex Mono', monospace", color: C.inkSoft }}>{p.birth?.year}–{p.death?.year || "…"}</span>
               </button>
             ))}

@@ -55,6 +55,11 @@ export function createSource({ title = "Untitled source", type = "text", ...rest
   };
 }
 
+/* How a person is shown. `name` is the canonical timeline name (and what GEDCOM exports); the researcher may choose
+   to DISPLAY a person under another name linked to them (conclusions/displayName.js sets `displayNameChoice`).
+   Display only: nothing is merged, renamed or re-linked. */
+export const displayName = (person) => person?.displayNameChoice?.name || person?.name || "";
+
 /* ---- timeline sub-item factories ----
    Every timeline item carries a stable `id` so it can be edited/deleted, plus
    optional `color`, `note`, and `sourceId` (a reference into project.sources). */
