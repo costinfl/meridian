@@ -4,10 +4,10 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 4 — Conclusions, legacy facts, bundle v2
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
+- **Current phase:** 5 — Ingestion v1
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
 - **Next action:** P5.T3 (pages from PDF/DOCX, page cache).
-- **Last updated:** 2026-11-08 (Phase 3 complete)
+- **Last updated:** 2026-11-09 (Phase 4 approved, Phase 5 started)
 
 ## Phase overview
 
@@ -17,8 +17,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 1 Foundation | approved | evidence/p1 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-06 |
 | 2 Library sources and text | approved | evidence/p2 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-08 |
 | 3 Evidence, places, names, dates | approved | evidence/p3 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
-| 4 Conclusions, legacy facts, bundle v2 | awaiting review | evidence/p4 | |
-| 5 Ingestion v1 | not started | evidence/p5 | |
+| 4 Conclusions, legacy facts, bundle v2 | approved | evidence/p4 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
+| 5 Ingestion v1 | in progress | evidence/p5 | |
 | 6 Extraction and review | not started | evidence/p6 | |
 | 7 Search | not started | evidence/p7 | |
 | 8 Graph projection | not started | evidence/p8 | |
@@ -338,7 +338,7 @@ Anomalies: 5
 - **Questions for the reviewer:** *(all answered 2026-11-09, see Review follow-up)* (a) stay candidates; (b) yes; (c) yes; (d) split now; (e) yes.
 
 **Review**
-- Approved: no
+- Approved: yes (2026-11-09, PR #9 merged)
 - Reviewer notes:
 
 ### Phase 3 report
