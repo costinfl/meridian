@@ -259,7 +259,7 @@ export default function App() {
     projectList, project, isDirty, isLoading,
     openProject, createProject, importProject, deleteProject, renameProject,
     addSource, deleteSource, updateSource,
-    setPeople, updatePerson, setAnnotations, setEras, setFocusId, setRelativeIds, setView, setCtxOn, setEvidenceUi,
+    setPeople, updatePerson, setAnnotations, setEras, setFocusId, setRelativeIds, setView, setCtxOn, setEvidenceUi, updateProject,
   } = useProject(storage);
 
   // Derive working state from project (fallbacks keep UI stable during load)
@@ -425,7 +425,31 @@ export default function App() {
     laneIsPerson: descriptor.laneKey ? descriptor.laneKey.startsWith("p:") : false,
   });
 
+  /* A fact that was converted to evidence keeps "verified <=> its preferred assertion is confirmed": toggling
+     the flag in the editor is a user decision, applied through the assertion functions (loaded lazily). */
+  const syncFactVerified = async ({ laneId, kind, id, verified }) => {
+    const person = people.find((p) => p.id === laneId);
+    const fact = kind === "birth" || kind === "death" ? person?.[kind] : (person?.[ARR_KEY[kind]] ?? []).find((x) => x.id === id);
+    if (!fact?.preferredAssertionId || !!fact.verified === !!verified) return;
+    try {
+      const [{ createEvidenceLibrary }, { setFactVerified }] = await Promise.all([import("./evidence/index.js"), import("./conclusions/legacyFacts.js")]);
+      const patch = await setFactVerified({ library: createEvidenceLibrary(storage), fact, verified: !!verified, runId: project?.legacyEvidence?.runIds?.at(-1) });
+      if (!patch) return;
+      updatePerson(laneId, (p) => {
+        const apply = (f) => ({ ...f, ...patch });
+        if (kind === "birth" || kind === "death") return { ...p, [kind]: apply(p[kind]) };
+        return { ...p, [ARR_KEY[kind]]: (p[ARR_KEY[kind]] ?? []).map((x) => (x.id === id ? apply(x) : x)) };
+      });
+    } catch (err) {
+      console.error("Meridian: could not update the evidence for a fact", err);
+      flash("The fact was saved, but its evidence could not be updated — see console.");
+    }
+  };
+
   const saveItem = ({ kind, mode, id, laneKey, laneId, values }) => {
+    if (mode === "edit" && (kind === "birth" || kind === "death" || ARR_KEY[kind]) && "verified" in values) {
+      syncFactVerified({ laneId, kind, id, verified: values.verified });
+    }
     if (kind === "birth" || kind === "death") {
       updatePerson(laneId, (p) => ({ ...p, [kind]: { ...p[kind], ...values } }));
     } else if (kind === "era") {
@@ -906,7 +930,7 @@ export default function App() {
       {/* evidence layer (behind the evidenceUi flag, lazy-loaded) */}
       {evidenceOn && evidenceOpen && (
         <Suspense fallback={null}>
-          <EvidencePanel storage={storage} onClose={() => setEvidenceOpen(false)} />
+          <EvidencePanel storage={storage} project={project} onProjectChange={updateProject} onClose={() => setEvidenceOpen(false)} />
         </Suspense>
       )}
 

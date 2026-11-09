@@ -7,7 +7,7 @@ import { dmCodesOfName, searchKey } from "../domain/normalize.js";
 export const RECORD_KINDS = ["baptism", "birth", "marriage", "death", "burial", "census", "notice", "deed", "other"];
 export const ROLES = [
   "child", "father", "mother", "godparent", "witness", "groom", "bride", "deceased", "priest",
-  "informant", "spouse", "head", "member", "other",
+  "informant", "spouse", "head", "member", "subject", "other",
 ];
 export const AGE_UNITS = ["years", "months", "days"];
 const RECORDS = "evRecords", PERSONAS = "evPersonas";

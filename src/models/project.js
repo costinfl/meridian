@@ -18,6 +18,7 @@ export function createProject(name, { people = [], annotations = [], eras = [], 
     relationships: [],
     conclusionEvidence: [],
     proofNotes: [],
+    legacyEvidence: null, // set when legacy facts were converted to evidence (conclusions/legacyFacts.js)
     settings: {
       focusPersonId: people[0]?.id ?? null,
       relativeIds: [],
@@ -144,8 +145,10 @@ export function normalizeProject(project) {
     if (derived !== people) { people = derived; peopleChanged = true; }
   }
 
-  if (!peopleChanged && !annotationsChanged && !erasChanged && !familiesChanged && !missingLists.length) return project;
+  const legacyMissing = !("legacyEvidence" in project);
+  if (!peopleChanged && !annotationsChanged && !erasChanged && !familiesChanged && !missingLists.length && !legacyMissing) return project;
   const next = { ...project, people, annotations, eras, families };
   for (const k of missingLists) next[k] = [];
+  if (legacyMissing) next.legacyEvidence = null;
   return next;
 }

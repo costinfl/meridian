@@ -218,6 +218,9 @@ export function useProject(storage) {
     }));
   }, [mutate]);
 
+  // Replace parts of the project from outside the timeline (evidence conversion, family edits).
+  const updateProject = useCallback((fn) => { mutate((prev) => fn(prev)); }, [mutate]);
+
   const setEvidenceUi = useCallback((on) => {
     mutate((prev) => ({ ...prev, settings: { ...prev.settings, evidenceUi: !!on } }));
   }, [mutate]);
@@ -245,5 +248,6 @@ export function useProject(storage) {
     setView,
     setCtxOn,
     setEvidenceUi,
+    updateProject,
   };
 }
