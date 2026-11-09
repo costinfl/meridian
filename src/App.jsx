@@ -3,7 +3,7 @@ import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifie
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin } from "./models/project.js";
 import { exportGedcom, parseGedcom } from "./gedcom.js";
-import { exportProjectZip, importProjectZip } from "./share.js";
+import { exportProjectZip, importProjectBundle } from "./share.js";
 import { storage } from "./storage/StorageService.js";
 import { useProject } from "./hooks/useProject.js";
 import { Modal } from "./components/Modal.jsx";
@@ -520,10 +520,12 @@ export default function App() {
     if (!f) return;
     try {
       if (f.name.toLowerCase().endsWith(".zip")) {
-        const proj = await importProjectZip(f, storage);
+        const { project: proj, evidence } = await importProjectBundle(f, storage);
         await importProject(proj);
         initRef.current = false;
-        flash(`Imported project "${proj.name}".`);
+        const sum = (o) => Object.values(o ?? {}).reduce((n, x) => n + x, 0);
+        const ev = evidence && !evidence.skipped ? ` Evidence: ${sum(evidence.added)} entries added, ${sum(evidence.skipped)} already in your library.` : "";
+        flash(`Imported project "${proj.name}".${ev}`);
       } else {
         const { people: imp, sources: impSrc } = parseGedcom(await f.text());
         if (!imp.length) { flash("No individuals found in that file."); }
