@@ -4,9 +4,9 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 3 — Evidence, places, names, dates
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 3.
+- **Current phase:** 4 — Conclusions, legacy facts, bundle v2
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** P4.T3 (legacy facts dry-run report).
 - **Last updated:** 2026-11-08 (Phase 3 complete)
 
 ## Phase overview
@@ -16,8 +16,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 0 Discovery | approved | evidence/p0 (done on `ccr-adaa4345-wbnkkm`, see log) | 2026-11-02 |
 | 1 Foundation | approved | evidence/p1 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-06 |
 | 2 Library sources and text | approved | evidence/p2 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-08 |
-| 3 Evidence, places, names, dates | awaiting review | evidence/p3 | |
-| 4 Conclusions, legacy facts, bundle v2 | not started | evidence/p4 | |
+| 3 Evidence, places, names, dates | approved | evidence/p3 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
+| 4 Conclusions, legacy facts, bundle v2 | in progress | evidence/p4 | |
 | 5 Ingestion v1 | not started | evidence/p5 | |
 | 6 Extraction and review | not started | evidence/p6 | |
 | 7 Search | not started | evidence/p7 | |
@@ -74,8 +74,8 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 4
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P4.T1 | todo | | |
-| P4.T2 | todo | | |
+| P4.T1 | done | src/models/project.js, src/models/families.js (types), src/tests/families.test.js, src/tests/models.test.js | Project gains `families`, `personaLinks`, `relationships`, `conclusionEvidence`, `proofNotes` (createProject creates them; normalizeProject adds missing ones). Every fact (birth, death, events, periods, groups) gains `assertionIds: []` and `preferredAssertionId: null`; existing values are kept; people without birth/death objects are left alone. Normalising is idempotent (second call returns the same object). One existing test was reworded: 'preserves existing ids' used to assert the person object was untouched, but facts now legitimately gain the evidence fields, so it asserts ids are kept and a second normalise is a no-op. |
+| P4.T2 | done | src/models/families.js, src/models/project.js, src/tests/families.test.js | `partner1Id` is the fatherId slot and `partner2Id` the motherId slot (same convention as GEDCOM HUSB/WIFE). First upgrade (no `families`): built from fatherId/motherId/spouseIds in GEDCOM order, one family per couple (couples of unknown sex listing each other become one family, where the GEDCOM export would have written two). Afterwards `normalizeProject` derives fatherId/motherId/spouseIds from families: only changed values are replaced, null/undefined preserved, a spouse array with the same members keeps its order, so an untouched project is returned unchanged. **I8 verified:** derived fields of the sample equal the originals, and GEDCOM export of the sample is byte-identical before/after (also for a legacy project upgraded on load). Family functions `setParents`, `addPartners`, `removePartners` are the way to edit relations (pure functions on the project). No UI writes these fields today (Phase 0 finding), so no component changed. Limitation: direct edits of fatherId/motherId on a project that already has families are overwritten on the next load. |
 | P4.T3 | todo | | |
 | P4.T4 | todo | | |
 | P4.T5 | todo | | |
@@ -312,7 +312,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - **Questions for the reviewer:** *(all answered 2026-11-09, see Review follow-up)* (a) "about" = +-2 years: yes. (b) decisions as events: yes. (c) one parent per place/hierarchy/moment: keep the hard rule (option A). (d) property list: yes. (e) name variants: no transitive assumptions; display name via user choice.
 
 **Review**
-- Approved: no
+- Approved: yes (2026-11-09, PR #8 merged)
 - Reviewer notes: answers to the Phase 3 questions received 2026-11-09 and applied (see Review follow-up).
 
 ### Phase 2 report

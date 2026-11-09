@@ -196,7 +196,7 @@ describe("normalizeProject", () => {
     };
     const out = normalizeProject(legacy);
     expect(out.people[0].events[0].id).toBe("keep-me");
-    expect(out.people[0]).toBe(legacy.people[0]);
+    expect(normalizeProject(out)).toBe(out); // nothing left to upgrade: no needless cloning
   });
 
   it("handles null input", () => {
