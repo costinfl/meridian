@@ -6,7 +6,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 4 — Conclusions, legacy facts, bundle v2
 - **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 4.
+- **Next action:** P5.T3 (pages from PDF/DOCX, page cache).
 - **Last updated:** 2026-11-08 (Phase 3 complete)
 
 ## Phase overview
@@ -85,8 +85,8 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 5
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P5.T1 | todo | | |
-| P5.T2 | todo | | |
+| P5.T1 | done | src/ingest/folder.js, src/ingest/scanner.js (`importFiles`), src/tests/scanner.test.js, src/tests/ingestHelpers.js | `linkFolder` (showDirectoryPicker, read-only) stores `{handle, name, linkedAt}` in the device-local `settings` store only (I9); `folderPermission(handle, {request})` re-asks only from a user click; `walkFolder` (stable order, hidden entries skipped), `readFolderFile`. Fallback `importFiles`: picked or dropped files are stored as blobs (key `doc_<hash16>_<name>`) and registered as blob-mode copies; the same file found later in the linked folder is the same copy. Unit tests use an in-memory directory handle (fake-indexeddb cannot store handles); the real picker cannot be automated, so handle persistence is checked in Chromium with an OPFS directory handle (see Phase report). |
+| P5.T2 | done | src/ingest/scanner.js, src/ingest/fileTypes.js, src/ingest/sidecar.js, src/evidence/repositories/copyStore.js (+`pageLabelHint`), src/tests/scanner.test.js, src/tests/fixtures/ | `scanEntries`: PDF, DOCX, JPG/PNG/TIFF by extension; hashes each file and registers a folder-mode copy; no sidecar -> Inbox (`sourceId: null`). Re-scan adds nothing; a moved or renamed file is recognised by hash and relocated; the same content at two paths is one copy (reported); a same-name file with different content is flagged for keep-both / replace; files that disappeared are reported as `missing`, never deleted; `.doc` and other types are skipped with a reason. **Sidecar format** `<file name>.meta.json`: optional `sourceTitle`, `repository`, `date`, `pageLabel`, `accessUrl`, `kind`, `handwritten` (documented in `src/ingest/sidecar.js`); it links the copy to a LibrarySource matched by title + repository (created once), also for a copy already waiting in the inbox; bad JSON or unknown fields are warnings. Progress callback and AbortSignal (a cancelled scan reports no `missing`). New dependencies installed for this phase: pdfjs-dist 6.5.438, mammoth 1.13.0, tesseract.js 7.0.0, @tesseract.js-data/ron 1.0.0. |
 | P5.T3 | todo | | |
 | P5.T4 | todo | | |
 | P5.T5 | todo | | |
