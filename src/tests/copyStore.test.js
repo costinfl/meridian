@@ -86,3 +86,111 @@ describe("DigitalCopy store", () => {
     await expect(copies.relocate("missing", blobLoc())).rejects.toMatchObject({ code: "not-found" });
   });
 });
+
+describe("DigitalCopy: duplicates are flagged and decided by a person (keep both / replace)", () => {
+  const folder = (path) => ({ mode: "folder", path });
+
+  it("byte-identical file: the existing copy is returned and flagged as an identical duplicate", async () => {
+    const first = await copies.registerFile(bytes("same"), { fileName: "a.pdf", storage: folder("a.pdf") });
+    const again = await copies.registerFile(bytes("same"), { fileName: "copy of a.pdf", storage: folder("other/a.pdf") });
+    expect(first.duplicate).toBeNull();
+    expect(again).toMatchObject({ created: false, duplicate: { kind: "identical", of: [first.copy.id] } });
+    expect(await copies.listPendingDuplicates()).toEqual([]); // nothing to decide: same bytes
+  });
+
+  it("same name in the same source with different bytes: stored as its own copy and flagged as a possible version", async () => {
+    const src = await sources.create({ title: "Register", kind: "parish-register" });
+    const old = await copies.registerFile(bytes("low quality scan"), { sourceId: src.id, fileName: "register-1843.pdf", storage: folder("a/register-1843.pdf") });
+    const better = await copies.registerFile(bytes("better scan, 600 dpi"), { sourceId: src.id, fileName: "Register-1843.PDF", storage: folder("b/Register-1843.PDF") });
+    expect(better.created).toBe(true);
+    expect(better.duplicate).toEqual({ kind: "possible-version", of: [old.copy.id] });
+    expect(better.copy).toMatchObject({ duplicateResolution: "pending", possibleDuplicateOf: [old.copy.id], supersededByCopyId: null });
+    expect((await copies.listPendingDuplicates()).map((c) => c.id)).toEqual([better.copy.id]);
+    expect(await storage.dbCount("evCopies")).toBe(2); // both exist until a person decides
+    expect((await copies.get(old.copy.id)).duplicateResolution).toBeNull();
+  });
+
+  it("same folder path with changed bytes is flagged too (a file edited or re-exported in place)", async () => {
+    const a = await copies.registerFile(bytes("v1"), { storage: folder("Drive/x.pdf") });
+    const b = await copies.registerFile(bytes("v2"), { storage: folder("Drive/x.pdf") });
+    expect(b.duplicate).toEqual({ kind: "possible-version", of: [a.copy.id] });
+  });
+
+  it("different names, or different sources, or no name are not flagged", async () => {
+    const s1 = await sources.create({ title: "S1" }), s2 = await sources.create({ title: "S2" });
+    await copies.registerFile(bytes("1"), { sourceId: s1.id, fileName: "scan.pdf", storage: folder("1/scan.pdf") });
+    expect((await copies.registerFile(bytes("2"), { sourceId: s2.id, fileName: "scan.pdf", storage: folder("2/scan.pdf") })).duplicate).toBeNull();
+    expect((await copies.registerFile(bytes("3"), { sourceId: s1.id, fileName: "other.pdf", storage: folder("3/other.pdf") })).duplicate).toBeNull();
+    expect((await copies.registerFile(bytes("4"), { storage: { mode: "blob", blobKey: "k4" } })).duplicate).toBeNull();
+    expect((await copies.registerFile(bytes("5"), { storage: { mode: "blob", blobKey: "k5" } })).duplicate).toBeNull();
+    expect(await copies.listPendingDuplicates()).toEqual([]);
+  });
+
+  it("keep-both: both copies stay; the new one gets a distinguishing label", async () => {
+    const old = (await copies.registerFile(bytes("v1"), { fileName: "reg.pdf", storage: folder("a/reg.pdf") })).copy;
+    const neu = (await copies.registerFile(bytes("v2"), { fileName: "reg.pdf", storage: folder("b/reg.pdf") })).copy;
+    const kept = await copies.resolveDuplicate(neu.id, "keep-both", { label: "1962 reprint" });
+    expect(kept).toMatchObject({ label: "1962 reprint", duplicateResolution: "kept-both", supersededByCopyId: null });
+    expect((await copies.get(old.id)).supersededByCopyId).toBeNull();
+    expect((await copies.listCurrent()).map((c) => c.id).sort()).toEqual([old.id, neu.id].sort());
+    expect(await copies.listPendingDuplicates()).toEqual([]);
+    // default label when none is given
+    const x = (await copies.registerFile(bytes("v3"), { fileName: "reg.pdf", storage: folder("c/reg.pdf") })).copy;
+    expect((await copies.resolveDuplicate(x.id, "keep-both")).label).toBe("reg.pdf (2)");
+  });
+
+  it("replace: the new copy takes over, the old one is kept and marked superseded, and the source carries over", async () => {
+    const src = await sources.create({ title: "Register" });
+    const old = (await copies.registerFile(bytes("poor"), { sourceId: src.id, fileName: "reg.pdf", storage: folder("a/reg.pdf") })).copy;
+    const neu = (await copies.registerFile(bytes("good"), { sourceId: src.id, fileName: "reg.pdf", storage: folder("b/reg.pdf") })).copy;
+    const done = await copies.resolveDuplicate(neu.id, "replace");
+    expect(done).toMatchObject({ duplicateResolution: "replaced", sourceId: src.id });
+    const oldAfter = await copies.get(old.id);
+    expect(oldAfter).toMatchObject({ supersededByCopyId: neu.id, sha256: old.sha256, storage: old.storage }); // bytes identity and location untouched
+    expect((await copies.listCurrent()).map((c) => c.id)).toEqual([neu.id]);
+    expect((await copies.listBySource(src.id)).map((c) => c.id).sort()).toEqual([old.id, neu.id].sort()); // history stays
+    // a later file with the same name is compared with the current copy only
+    const third = await copies.registerFile(bytes("best"), { sourceId: src.id, fileName: "reg.pdf", storage: folder("c/reg.pdf") });
+    expect(third.duplicate.of).toEqual([neu.id]);
+  });
+
+  it("replace needs an unambiguous target; decisions are one-shot; unknown copies fail", async () => {
+    const a = (await copies.registerFile(bytes("a"), { fileName: "r.pdf", storage: folder("1/r.pdf") })).copy;
+    const b = (await copies.registerFile(bytes("b"), { fileName: "r.pdf", storage: { mode: "folder", path: "2/r.pdf" } })).copy;
+    const c = (await copies.registerFile(bytes("c"), { fileName: "r.pdf", storage: folder("3/r.pdf") })).copy; // flagged against a and b
+    expect(c.possibleDuplicateOf.sort()).toEqual([a.id, b.id].sort());
+    await expect(copies.resolveDuplicate(c.id, "replace")).rejects.toMatchObject({ code: "invalid" });
+    await expect(copies.resolveDuplicate(c.id, "replace", { replacesCopyId: "nope" })).rejects.toMatchObject({ code: "invalid" });
+    await copies.resolveDuplicate(c.id, "replace", { replacesCopyId: b.id });
+    await expect(copies.resolveDuplicate(c.id, "keep-both")).rejects.toMatchObject({ code: "conflict" });
+    await expect(copies.resolveDuplicate(a.id, "keep-both")).rejects.toMatchObject({ code: "conflict" }); // never flagged
+    await expect(copies.resolveDuplicate("missing", "keep-both")).rejects.toMatchObject({ code: "not-found" });
+    await expect(copies.resolveDuplicate(c.id, "delete")).rejects.toMatchObject({ code: "invalid" });
+  });
+});
+
+describe("staleEvidenceFor: what was read from a copy that has been replaced", () => {
+  it("lists pages, regions, text layers, records and assertions that cite the old copy", async () => {
+    const { createEvidenceLibrary } = await import("../evidence/index.js");
+    const lib = createEvidenceLibrary(storage);
+    const src = await lib.sources.create({ title: "Register", kind: "parish-register" });
+    const old = (await lib.copies.registerFile(bytes("poor"), { sourceId: src.id, fileName: "r.pdf", storage: { mode: "folder", path: "a/r.pdf" } })).copy;
+    const { page, wholePageRegion } = await lib.pages.addPage({ copyId: old.id, pageIndex: 0, width: 10, height: 10 });
+    const row = await lib.pages.addRegion({ pageId: page.id, box: { x0: 0, y0: 0, x1: 1, y1: 0.2 }, kind: "row" });
+    const run = await lib.runs.startRun({ processor: "tesseract" });
+    const text = await lib.textLayers.add({ regionId: wholePageRegion.id, runId: run.id, originalText: "Hariton?" });
+    const { record, personas } = await lib.records.createRecord({ kind: "baptism", regionIds: [row.id], runId: run.id, personas: [{ nameAsWritten: "Hariton?", role: "child" }] });
+    const a = await lib.assertions.propose({ subjectType: "persona", subjectId: personas[0].id, property: "name", originalValue: "Hariton?", runId: run.id, citation: { regionId: row.id } });
+
+    const neu = (await lib.copies.registerFile(bytes("good"), { sourceId: src.id, fileName: "r.pdf", storage: { mode: "folder", path: "b/r.pdf" } })).copy;
+    await lib.copies.resolveDuplicate(neu.id, "replace");
+
+    const stale = await lib.staleEvidenceFor(old.id);
+    expect(stale).toMatchObject({ supersededByCopyId: neu.id, pageIds: [page.id], textLayerIds: [text.id], recordIds: [record.id], assertionIds: [a.id] });
+    expect(stale.regionIds.sort()).toEqual([wholePageRegion.id, row.id].sort());
+    expect(await lib.assertions.get(a.id)).toMatchObject({ originalValue: "Hariton?" }); // not rewritten
+    const fresh = await lib.staleEvidenceFor(neu.id);
+    expect(fresh).toMatchObject({ supersededByCopyId: null, pageIds: [], assertionIds: [] });
+    expect((await lib.staleEvidenceFor("missing")).copy).toBeUndefined();
+  });
+});
