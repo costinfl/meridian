@@ -97,6 +97,8 @@ Conclusions stay in the existing project object so the timeline, GEDCOM and bund
 | Place (`evPlaces`) | Settlement, parish or administrative unit | kind, coordinates, GeoNames and Wikidata ids |
 | PlaceName (`evPlaceNames`) | One name of a place | placeId, name, language, valid from, valid to |
 | PlaceParent (`evPlaceParents`) | Position in a hierarchy at a time | childId, parentId, hierarchy (civil or church), valid from, valid to |
+
+A place has at most one parent per hierarchy at any moment (decision, 2026-11-09): overlapping parents are rejected. Where sources disagree, the researcher picks one parent or splits the dates and records the disagreement in notes; competing parent claims are not modelled.
 | NameVariant (`evNameVariants`) | A spelling/language pair a person has entered (Ioan – Ion) | canonical form, variant, language, origin (manual or learned from confirmed links) |
 
 - NameVariant pairs are statements about spelling, **not** about identity: search expands a name by its directly paired spellings only (one hop, either direction), never transitively, and a pair never links two personas. Whether two people are the same is a PersonaLink decision.
