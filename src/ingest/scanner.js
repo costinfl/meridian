@@ -129,3 +129,11 @@ export async function importFiles({ library, storage, files, onProgress, signal 
   onProgress?.({ done, total: files.length, path: "" });
   return report;
 }
+
+/** USER ACTION: take a copy out of the Inbox by naming its source (found by title, or created). */
+export async function assignSource({ library, copyId, title }) {
+  const t = String(title ?? "").trim();
+  if (!t) throw new Error("A source title is required");
+  const source = (await library.sources.list()).find((s) => searchKey(s.title) === searchKey(t)) ?? (await library.sources.create({ title: t, kind: "other" }));
+  return { source, copy: await library.copies.update(copyId, { sourceId: source.id }) };
+}
