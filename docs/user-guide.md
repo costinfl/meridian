@@ -204,11 +204,57 @@ What the panel offers today:
 2. **Convert … legacy items to evidence.** Records each fact as *proposed* statements, cited to the fact's own source or to a "Legacy Meridian data" source. A birth or death becomes two statements, one for the date and one for the place. This does not change your timeline, and it confirms and accepts nothing.
 3. **Confirm … verified facts.** A separate step that records your earlier *Verified* ticks as confirmations. Facts you did not verify stay proposed.
 4. **Accept link**, once per person. Conversion creates a record of each person from their old timeline data and *suggests* that it is that person. You accept each suggestion yourself.
-5. **Storage line.** Whether the browser has granted persistent storage, how much space is used, and when you last exported a bundle.
+5. **Documents.** Register your scans and documents and read their text; see [Documents](#documents) below.
+6. **Storage line.** Whether the browser has granted persistent storage, how much space is used, and when you last exported a bundle.
 
-After conversion, the evidence follows your edits. Ticking or unticking **Verified** records that decision. Changing a fact's year, place, label or dates records the new value as replacing the old one; the old value is kept in the history, never deleted. Nothing else in the app behaves differently yet. Reading documents, OCR, extraction, search and matching people across records arrive in later phases; see the [plan](evidence-layer/IMPLEMENTATION_PLAN.md).
+After conversion, the evidence follows your edits. Ticking or unticking **Verified** records that decision. Changing a fact's year, place, label or dates records the new value as replacing the old one; the old value is kept in the history, never deleted. Nothing else in the app behaves differently yet. Extracting people and facts from documents, search, and matching people across records arrive in later phases; see the [plan](evidence-layer/IMPLEMENTATION_PLAN.md).
 
 Export a bundle before trying the preview on a project you care about.
+
+### Documents
+
+The **Documents** part of the Evidence panel registers your scans and documents and reads their text. Everything happens in your browser: nothing is uploaded.
+
+**Supported files:** PDF, DOCX, JPG, PNG. Old Word `.doc` files are not read; open them in Word or Google Drive and save as DOCX or PDF. TIFF files are registered but most browsers cannot display them, so convert them to PNG or PDF before reading.
+
+**Bring documents in**, either way:
+
+- **Link documents folder** (Chrome or Edge). Choose the folder that holds your documents, for example your Google Drive folder on this computer. Meridian only reads it. Then click **Scan folder**. Scan again whenever you add, move or rename files: a file is recognised by its content, so moving or renaming it does not create a duplicate. After restarting the browser you may be asked again for permission to read the folder.
+- **Add files…** or drag files onto the section (any browser). These files are stored inside the browser.
+
+A file that has the same name as one you already have but different content (a better scan, another edition) is flagged. Choose **Keep both** or **Replace old**. Replacing keeps the old file on record, because anything read from it still points to it.
+
+**The Inbox.** A new document has no source until you say which work it belongs to. Type the source title and click **Set source**.
+
+**Sidecar files (optional).** To set the source while scanning, put a small text file next to the document, named like the document plus `.meta.json`. For `botezuri-1843.pdf` that is `botezuri-1843.pdf.meta.json`:
+
+```json
+{
+  "sourceTitle": "Registrul de botezuri, Sf. Nicolae, 1843",
+  "repository": "Arhivele Naționale Prahova",
+  "date": "1843",
+  "pageLabel": "f. 23v",
+  "accessUrl": "https://example.org/register",
+  "kind": "parish-register",
+  "handwritten": true
+}
+```
+
+Every field is optional. `kind` is one of `parish-register`, `civil-register`, `census`, `newspaper-title`, `newspaper-issue`, `book`, `archival-document`, `image`, `web`, `other`. `pageLabel` is the printed folio or page number of the first page. Unknown fields are ignored with a warning.
+
+**Read.** **Read** (one document) or **Read N unread** (all) extracts the text of every page:
+
+- a PDF that contains text, or a DOCX, gives its own text straight away;
+- a scanned PDF or an image goes through OCR (Romanian). OCR takes a few seconds per page and downloads about 6 MB the first time;
+- a document whose source is marked `"handwritten": true` is not OCR'd; its pages wait for handwriting recognition, which comes later.
+
+A document already read is not read again unless you click **Read again**. **Cancel** stops after the current page; reading again later continues with the pages still missing.
+
+**Processing runs** lists the recent runs and any page that failed, with the reason. **Re-run page** tries that page again, for example after you are back online.
+
+**Page image cache.** Pages are drawn into images for OCR and kept to save time. **Clear cache** frees the space; the images are made again when needed.
+
+The text read from documents is stored as evidence, but nothing uses it on the timeline yet. Extracting people and events from it is the next phase.
 
 ## Limits you should know about
 

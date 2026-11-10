@@ -88,7 +88,7 @@ More detail, including the test setup, deployment and troubleshooting, is in the
 
 The timeline, sources, projects, bundles and GEDCOM exchange work today.
 
-An **evidence layer** is being added in phases: document ingestion, OCR, extraction of people and facts with a citation to the exact region of a scan, search, and matching of the same person across records. Of the ten phases (0 to 9), phases 0 to 4 are built: the data model, storage, and conversion of existing facts into evidence. Phases 5 to 9 are not started. It is switched off by default; you can preview it per project from **Projects → Evidence layer (preview)**. What it does today is described in the [user guide](docs/user-guide.md#evidence-layer-preview).
+An **evidence layer** is being added in phases: document ingestion, OCR, extraction of people and facts with a citation to the exact region of a scan, search, and matching of the same person across records. Of the ten phases (0 to 9), phases 0 to 5 are built: the data model, storage, conversion of existing facts into evidence, and reading documents (PDF and DOCX text, and OCR of scans and images). Phases 6 to 9 are not started. It is switched off by default; you can preview it per project from **Projects → Evidence layer (preview)**. What it does today is described in the [user guide](docs/user-guide.md#evidence-layer-preview).
 
 Known gaps in the current app:
 

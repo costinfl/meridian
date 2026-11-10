@@ -23,6 +23,8 @@ How to run, test, build and deploy Meridian, and the rules to follow when changi
 
 There is no backend, database server, Docker setup or environment file. Everything runs in the browser.
 
+Runtime dependencies: `react`, `react-dom`, `jszip`, and for document reading `pdfjs-dist`, `mammoth`, `tesseract.js` with `@tesseract.js-data/ron` (Romanian OCR data). The document libraries are loaded only when a document is read.
+
 ## Set up
 
 ```bash
@@ -45,7 +47,7 @@ If you cannot or do not want to update npm globally, use `npx -y npm@latest ci` 
 | `npm test` | Vitest in watch mode |
 | `npm test -- --run` | Run all tests once (what CI runs) |
 | `npx vitest run src/tests/gedcom.test.js` | Run one test file |
-| `npm run build` | Production build into `dist/` |
+| `npm run build` | Production build into `dist/`, including the self-hosted OCR assets in `dist/ocr/` (about 13.5 MB; see `ocrAssets` in `vite.config.js`) |
 | `npm run preview` | Serve `dist/` at <http://localhost:4173/meridian/> |
 
 Before you push: `npm test -- --run` and `npm run build` must both pass.
@@ -59,7 +61,8 @@ Tests live in `src/tests/` and run with [Vitest](https://vitest.dev/) in a jsdom
 | Model and format | `models.test.js`, `families.test.js`, `gedcom.test.js`, `share.test.js`, `bundleV2.test.js` | Pure functions; most of the suite |
 | Storage | `storage.test.js`, `upgrade.test.js`, `dbMethods.test.js` | Each test gets a fresh in-memory database |
 | Evidence library | `*Store.test.js`, `fuzzyDate.test.js`, `normalize.test.js`, `personaView.test.js` | Use `freshStorage()` from `evidenceHelpers.js` |
-| Components | `evidenceFlag.test.jsx`, `legacyPanel.test.jsx`, `persistence.test.jsx` | Files containing JSX must end in `.jsx` |
+| Ingestion | `scanner.test.js`, `documents.test.js`, `pipeline.test.js`, `ocrEngine.test.js` | Fixtures in `src/tests/fixtures/` (a text PDF, a scanned PDF, a DOCX, a PNG). `documents` and `pipeline` run in the Node environment (`// @vitest-environment node`) so the real pdf.js and mammoth can read the fixtures |
+| Components | `evidenceFlag.test.jsx`, `legacyPanel.test.jsx`, `persistence.test.jsx`, `documentsSection.test.jsx` | Files containing JSX must end in `.jsx` |
 | Architecture | `architecture.test.js` | Scans the source tree; see below |
 
 Things to know:
@@ -67,8 +70,10 @@ Things to know:
 - fake-indexeddb copies `Blob` values without their prototype, so tests assert that a blob exists and check its record, not its bytes.
 - jsdom has no `ResizeObserver`; tests that render `App` define a stub.
 - Tests never call external services.
+- **OCR is not run with the real engine in tests**: tesseract.js does not load under Node 22. The pipeline uses an OCR stub with the same result shape, and `ocrEngine.test.js` tests the browser wrapper against a fake tesseract module. Real OCR was checked in Chromium by hand.
+- Folder access is tested with an in-memory directory handle (`fakeDirectory` in `ingestHelpers.js`); fake-indexeddb cannot store real handles, and the folder picker cannot be automated.
 
-Checks in a real browser (upgrading a real database, file download and import) are done by hand or with a throwaway Playwright script; none are committed.
+Checks in a real browser (upgrading a real database, file download and import, reading documents with the real pdf.js and tesseract.js) are done by hand or with a throwaway Playwright script; none are committed. In this project's sandboxed headless Chromium, reading a folder handle back from IndexedDB crashes the browser, so remembering a linked folder across reloads must be checked in a normal Chrome window.
 
 ## Deployment
 

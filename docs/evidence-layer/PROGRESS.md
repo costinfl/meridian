@@ -5,9 +5,9 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 ## Current status
 
 - **Current phase:** 5 — Ingestion v1
-- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Phase 5 report and documentation.
-- **Last updated:** 2026-11-09 (Phase 4 approved, Phase 5 started)
+- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** Wait for review of Phase 5.
+- **Last updated:** 2026-11-10 (Phase 5 complete)
 
 ## Phase overview
 
@@ -18,7 +18,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 2 Library sources and text | approved | evidence/p2 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-08 |
 | 3 Evidence, places, names, dates | approved | evidence/p3 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
 | 4 Conclusions, legacy facts, bundle v2 | approved | evidence/p4 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
-| 5 Ingestion v1 | in progress | evidence/p5 | |
+| 5 Ingestion v1 | awaiting review | evidence/p5 | |
 | 6 Extraction and review | not started | evidence/p6 | |
 | 7 Search | not started | evidence/p7 | |
 | 8 Graph projection | not started | evidence/p8 | |
@@ -141,6 +141,7 @@ Pre-filled from commit `243bf1c` by the planning session; **confirmed in P0.T1 o
 | Tests | Vitest 4 + jsdom + `fake-indexeddb` + Testing Library; `src/tests/*.test.js`; script `npm test` (use `npm test -- --run` for a single pass) |
 | Build / deploy | `npm run build` → `dist/`, Vite `base: "/meridian/"`; GitHub Actions deploys to Pages on push to `master` (Node **22** since the CI fix on 2026-11-06; was 20); test job added in P1.T3 |
 | Lint / format | No ESLint or Prettier config in the repo at this commit |
+| Dependencies (Phase 5) | `pdfjs-dist` 6.5.438, `mammoth` 1.13.0, `tesseract.js` 7.0.0, `@tesseract.js-data/ron` 1.0.0; loaded lazily; OCR assets self-hosted in `dist/ocr/` |
 | Docs | ADRs in `docs/adr/` (0001–0006); `README.md` rewritten and `docs/user-guide.md`, `docs/development.md`, `docs/architecture.md` added on 2026-11-09 |
 
 **P0.T1 confirmation and corrections**
@@ -259,6 +260,9 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | --- | --- | --- | --- | --- |
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
+| 2026-11-10 | P5 | No Meridian Web Worker (`src/workers/` stays empty): pdf.js parses in its own worker and tesseract.js recognises in its own worker, so the timeline stays responsive without one | The plan asks for heavy work in workers; the libraries already provide them | A Meridian worker hosting the pipeline (more code, IndexedDB access from two threads) |
+| 2026-11-10 | P5 | "Handwritten" is a property of the LibrarySource (`script: "handwritten"`, set by a sidecar's `handwritten: true`); such pages get router status `awaiting-htr` and no OCR | The plan says "sources flagged handwritten" without saying where the flag lives | A per-copy or per-page flag |
+| 2026-11-10 | P5 | tesseract.js 7 bug worked around: `createWorker` never settles when the language data cannot load. The wrapper listens to its `errorHandler`, adds load and page timeouts, fails fast for 30 s after a load failure, and resets on every user click | Found in real Chromium: reading hung forever with the language data unreachable (offline) | Waiting for an upstream fix |
 | 2026-11-09 | P4 review answers | (a) legacy PersonaLinks stay candidates, accepted per person; (b) editing a converted fact creates a superseding user-entered assertion; (c) ADR-0006 for bundle v2; (d) births and deaths split into date and place assertions now; (e) panel wording accepted | Reviewer answers | (a) accepted by the Convert click; (d) one assertion per fact |
 | 2026-11-09 | P2/P3 review answers | Reviewer decisions applied as review follow-ups on PR #8 (IndexedDB v5): (P2a) a region's box is corrected by a superseding region; (P2b) a child region must lie inside its parent's box; (P2c) duplicate files are flagged, with keep-both / replace; (P2d) 0-based page indexes kept; (P2e) linking wired into the Sources panel in Phase 4/5; (P3a) "about" = +-2 years kept; (P3b) assertion decisions are separate append-only events; (P3d) assertion property list kept for the Phase 6 contract; (P3e) NameVariant expansion is one hop, never transitive, and never decides identity; display name = first name identified, user override (new task P4.T7); (P3c) one parent per place/hierarchy/moment kept until the reviewer decides | Reviewer answers | See each answer below |
 | 2026-11-09 | P2c / P3c | Reviewer confirmed: "replace" means the new copy takes over and the old copy is kept, marked superseded (no in-place overwrite). Place hierarchy keeps one parent per child, hierarchy and moment (option A); competing parent claims are not planned | Reviewer answers; the app is already getting complex | Destructive overwrite; option B (competing parents with a preferred one) |
@@ -291,6 +295,40 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - Refresh `README.md` (still describes the single-file app) when the evidence layer lands (already in Backlog of the plan).
 
 ## Phase reports
+
+### Phase 5 report
+- **Built:** document ingestion in the Evidence panel's new **Documents** section (behind the flag):
+  - *P5.T1* link a documents folder (Chromium; the handle is kept in the device-local `settings` store only, never exported) or add/drop files (any browser; stored as blobs);
+  - *P5.T2* scanner: content-hash identity (re-scan adds nothing, moved/renamed files are relocated), Inbox for documents without a source, optional `<file>.meta.json` sidecar (format in the user guide and `src/ingest/sidecar.js`), same-name/different-content files flagged for keep both / replace, missing files reported but never deleted, `.doc` refused with advice;
+  - *P5.T3* one reader over PDF / DOCX / images, Page rows with unrotated size and rotation, the disposable page-image cache, and a hash check that refuses a file changed since its scan;
+  - *P5.T4* a **router run** per document classifies every page (`embedded-text`, `docx-text`, `needs-ocr`, `handwritten` → `awaiting-htr`, `already-has-text`) using a configurable text-quality check;
+  - *P5.T5* `pdf-text`, `docx-text` and `tesseract` runs write text layers on the whole-page region with raw output, normalised text, word boxes in 0–1 (I4), confidence and versions; self-hosted OCR assets;
+  - *P5.T6* the status view: documents with pages read, Read / Read again / Read N unread, progress with Cancel, recent runs with failed pages and **Re-run page** (one-page batch), cache size and Clear cache.
+- **IndexedDB version / stores added:** none (still 5). `evPageCache` from v3 is used for the first time.
+- **New dependencies:** `pdfjs-dist` 6.5.438 (Apache-2.0), `mammoth` 1.13.0 (BSD-2), `tesseract.js` 7.0.0 (Apache-2.0), `@tesseract.js-data/ron` 1.0.0 (MIT). Main bundle unchanged (334 kB). Loaded only on first use: pdf.js 501 kB + its worker 1,272 kB, mammoth 305 kB, the panel 34 kB. **Deploy size grows by about 13.5 MB** for `dist/ocr/` (tesseract worker 111 kB, three WebAssembly cores of 3.9 MB each, of which the browser downloads one, and `ron` data 1.7 MB): a user who OCRs downloads about 5.7 MB once.
+- **Deviations:** see the log: no Meridian worker (the libraries bring their own); "handwritten" lives on the source; tesseract.js load-failure workaround.
+- **Invariants:** I1/I3 text layers append-only with a run (re-reading adds a new layer, the old one stays; tested). I4 PDF word boxes and OCR boxes converted to 0–1 on the unrotated page, degenerate OCR boxes dropped (tested). I5 `src/ingest` imports only `evidence`/`storage` (architecture test). I6 ingestion only records what it read; the architecture test blocks it from any user-decision function. I8 no schema change; all earlier tests unchanged. I9 the folder handle lives only in `settings`; bundles are unchanged.
+- **Tests:** 330 -> **380**. New: scanner (16), documents with the real pdf.js and mammoth on fixture files (9), pipeline (13), OCR wrapper (6), Documents section component (6). `npm test -- --run` and `npm run build` pass.
+- **Real-browser checks (headless Chromium 153, dev server, real libraries; scripts not committed):**
+  - Add four files through the panel and read them: the text PDF via `pdf-text` (2 pages, word boxes), the DOCX via `docx-text`, the PNG and the scanned PDF via real tesseract OCR. The PNG came out word-perfect apart from "Ioan" read as "loan" and "ani" as "an" (confidence 0.94); the scanned PDF read "nascut" for "născut". Versions and model recorded on the runs.
+  - Same-name file with different content flagged → **Keep both**; **Set source** on an Inbox document.
+  - OCR language data blocked (simulating offline): 3 pages failed in under 3 s with a clear error, each offered **Re-run page**; after unblocking, **Re-run page** read the page (about 1.4 s including loading the engine). Before the fix this hung forever.
+  - Folder path with a real directory handle (an OPFS folder used directly): scan registered the new image, recognised a PDF already added (same bytes) and linked it to its sidecar's source, skipped `.doc`; a moved file was relocated on re-scan; OCR of the folder file read "Elena Băltăceanu, născută la Buzău / în anul 1856…" in 0.3 s; a file changed after scanning was refused.
+  - **Clear cache** removed the cached images; no requests left the site while reading (the only other host was Google Fonts, used by the app since before this phase). No page errors.
+  - **Not verifiable here:** remembering a linked folder across a reload. In this sandbox's headless Chromium, reading any stored folder handle back from IndexedDB crashes the browser, even in a scratch database the app never uses. Storing handles in IndexedDB is the documented Chrome way to remember a folder; please check it in a normal Chrome window (step 2 below).
+  - Speed: OCR took 0.3–1.4 s per page on these small clean images; real register scans will be slower (larger, noisier).
+- **How to verify:** `npm install -g npm@latest` (or `npx -y npm@latest ci`), `npm ci`, `npm test -- --run`, `npm run build` (check `dist/ocr/` has 5 files), then `npm run dev` and open `http://localhost:5173/meridian/?evidence=1` in **Chrome or Edge**, click **Evidence**:
+  1. **Add files…** with 5–10 real documents, including an **Arcanum PDF export** and a **scanned register page**, plus one DOCX. Click **Read N unread**. Note seconds per page and judge the text quality: open devtools → Application → IndexedDB → `meridian-v1` → `evTextLayers`.
+  2. **Link documents folder**, choose a folder with a few documents, **Scan folder**. Reload the page, click **Evidence** again: the folder name should still be shown; **Scan folder** may ask for permission again. Move or rename a file and scan again: the summary should say "moved", not "new".
+  3. Put a sidecar next to one file (example in the user guide), scan, and check the document now shows "Source: …".
+  4. Disconnect from the network, read an image: the page should fail quickly with an error; reconnect and use **Re-run page**.
+- **Backup reminder:** no database or project-format change in this phase; a bundle backup is still good practice.
+- **Known limitations:** (1) PDF word boxes are approximate: a text run's box is split between its words by length. (2) Only Romanian OCR data is shipped; other languages need their data added to the build. (3) TIFF is registered but Chromium cannot decode it ("convert" message). (4) OCR is not tested with the real engine in CI (tesseract.js does not load under Node). (5) Remembering the folder across sessions could not be checked here (see above). (6) The text is stored but not yet used anywhere; extraction is Phase 6. (7) The Inbox's **Set source** only creates or matches a source by title; editing the source's details needs the later review UI. (8) Very large PDFs are read page by page in one batch; there is no per-document page limit yet. (9) The deploy grows by 13.5 MB of OCR assets.
+- **Questions for the reviewer:** (a) After trying real documents (step 1): is in-browser OCR quality and speed good enough, or should the **local ingest companion** (Backlog) be planned? (b) Is "handwritten" as a property of the source (set by sidecar) the right place, or do you want to mark individual documents or pages? (c) Is the text-quality threshold (60% plausible words) right for Arcanum exports, or do some of them get sent to OCR unnecessarily? The router run records the score per page, so you can see it. (d) Is the extra 13.5 MB deploy size acceptable, or should only one WebAssembly core (about 3.9 MB) be shipped, at the cost of slower OCR on some machines?
+
+**Review**
+- Approved: no
+- Reviewer notes:
 
 ### Phase 4 report
 - **Built:**
@@ -450,6 +488,7 @@ Template for each phase:
 | 2026-11-06 | P2.T1-P2.T7 | see git log | Phase 2 complete (172 tests), awaiting review; PR opened. |
 | 2026-11-08 | Phase 2 review | see git log | Phase 2 approved by merge; Phase 3 started. |
 | 2026-11-08 | P3.T1-P3.T7 | see git log | Phase 3 complete (246 tests), awaiting review; PR opened. |
+| 2026-11-10 | P5.T1-P5.T6 | see git log | Phase 5 complete (380 tests), awaiting review; PR opened. |
 | 2026-11-09 | P4 review follow-up | see git log | Reviewer answers a-e applied (330 tests): candidate links + per-person accept, applyFactEdit, date/place split, ADR-0006. |
 | 2026-11-09 | Documentation | see git log | At the reviewer's request: README rewritten; user guide, development guide, architecture and docs index added (describe the app as of Phase 4). No code changes. |
 | 2026-11-09 | P4.T1-P4.T7 | see git log | Phase 4 complete (321 tests), awaiting review; PR opened. |
