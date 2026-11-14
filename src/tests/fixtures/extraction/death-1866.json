@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1",
+  "records": [
+    {
+      "kind": "death",
+      "box": { "x0": 0.05, "y0": 0.08, "x1": 0.97, "y1": 0.72 },
+      "eventDate": { "asWritten": "la douădieci și șase ale lunii Martie [1866], la unsprezece ore noaptea", "year": 1866, "month": 3, "day": 26 },
+      "eventPlace": "Craiova, în casa D. Drăgoiescu, Mahalaua [Brândușa?]",
+      "personas": [
+        { "key": "d", "nameAsWritten": "Șfatu Loti", "role": "deceased", "sex": "female", "age": { "asWritten": "șaizeci și doi ani", "value": 62 }, "residence": "Craiova", "religion": "Catolică" },
+        { "key": "a", "nameAsWritten": "Alecsandru Drăgoiescu", "role": "informant", "sex": "male", "occupation": "profesoru", "residence": "Craiova" },
+        { "key": "c", "nameAsWritten": "Constandin Cristescu", "role": "informant", "sex": "male", "age": { "asWritten": "treidieci și doi ani", "value": 32 }, "occupation": "profesoru", "residence": "Craiova" }
+      ],
+      "relations": [
+        { "subject": "a", "property": "informantFor", "object": "d", "asWritten": "nepotu mortei" },
+        { "subject": "c", "property": "informantFor", "object": "d", "asWritten": "vecin cu morta" }
+      ],
+      "confidence": 0.7
+    }
+  ],
+  "notes": "The age of Alecsandru Drăgoiescu is hard to read."
+}

@@ -4,10 +4,10 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 5 — Ingestion v1
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 5 (review follow-up P5.T7 added to PR #10).
-- **Last updated:** 2026-11-14 (P5.T7 review follow-up: text review page)
+- **Current phase:** 6 — Extraction contract and review
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** P6.T2: region drawing and manual record entry.
+- **Last updated:** 2026-11-14 (P6.T1)
 
 ## Phase overview
 
@@ -18,8 +18,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 2 Library sources and text | approved | evidence/p2 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-08 |
 | 3 Evidence, places, names, dates | approved | evidence/p3 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
 | 4 Conclusions, legacy facts, bundle v2 | approved | evidence/p4 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
-| 5 Ingestion v1 | awaiting review | evidence/p5 | |
-| 6 Extraction and review | not started | evidence/p6 | |
+| 5 Ingestion v1 | approved | evidence/p5 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-14 |
+| 6 Extraction and review | in progress | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | |
 | 7 Search | not started | evidence/p7 | |
 | 8 Graph projection | not started | evidence/p8 | |
 | 9 Entity resolution | not started | evidence/p9 | |
@@ -96,11 +96,12 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 6
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P6.T1 | todo | | |
+| P6.T1 | done | src/extract/contract/extraction-v1.schema.json, src/extract/contract.js, src/tests/extractionContract.test.js, src/tests/fixtures/extraction/death-1866.json, src/tests/archRules.js, package.json (ajv) | Extraction contract v1 (JSON Schema draft-07) with enums equal to the library's record kinds, roles and relation properties (tested). `validateExtraction`: Ajv + semantic checks (unique persona keys, relation keys exist and differ, box x0<x1/y0<y1, real calendar dates, plausible years, day needs month). `toEvidence`: record (kind, optional box, FuzzyDate event), personas, and one assertion per stated fact (event date/place, name, role, sex, age, occupation, residence, house number, x-religion, birth/death date and place, relations with object keys); Julian default before 1919. Fixture: the 1866 Craiova death act (Șfatu Loti). New `src/extract/` module registered in the architecture rules as automated (may import evidence, ingest, storage; may not call user actions). 20 tests. |
 | P6.T2 | todo | | |
 | P6.T3 | todo | | |
 | P6.T4 | todo | | |
 | P6.T5 | todo | | |
+| P6.T6 | todo | | |
 
 ### Phase 7
 | ID | Status | Files touched | Notes |
@@ -261,6 +262,8 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | --- | --- | --- | --- | --- |
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
+| 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-14 | P6.T1 | Contract validated with **Ajv 8** (new dependency, loaded only with extraction) plus semantic checks. Persona facts are fields in the contract (name, role, sex, age, occupation, residence, house number, religion, birth/death date and place) and relations are a list; `toEvidence` turns each stated fact into one assertion, rather than the extractor writing assertions itself. Dates without a stated calendar default to Julian before 1919 (Romania adopted the Gregorian calendar in 1919). A date without a year is kept as written under `x-<property>-unparsed`; religion uses `x-religion` | Fewer ways for a model to produce inconsistent output (a persona field and an assertion saying different things); one place to map to the store | Free-form assertion list in the contract; a hand-written validator |
 | 2026-11-14 | P5 review answers | (a) in-browser OCR is good enough, no local companion; OCR text needs a review page: the machine transcription stays as read, the user corrects a modern reading with a source link per correction (new task P5.T7 on PR #10); (b) "handwritten" stays on the source; (c) 60% threshold kept (Arcanum exports carry good text layers); (d) 13.5 MB deploy size accepted | Reviewer answers after trying real documents, including a handwritten 1866 Craiova death register page | Review page as a Phase 6 task; per-page handwritten flag; one WebAssembly core |
 | 2026-11-14 | P5.T7 | The modern reading is a TextLayer of `kind: "reading"` on the same region, in its own supersede chain, rather than a new store; corrections are annotations carried on each reading version (offsets shift with later edits; overwritten ones are kept marked `replacedBy`). No IndexedDB change; bundles carry readings unchanged. Source link = optional http(s) URL + note (reviewer's choice), not a LibrarySource | Smallest change that keeps I1 (append-only) and keeps the transcription untouched | A separate `evReadings` store (schema v6); readings superseding transcriptions (would hide the machine text); a LibrarySource per correction |
 | 2026-11-14 | P5.T7 | "Needs review" uses OCR confidence (< 0.6) plus the router's word check. The plan's "tint low-confidence words" was not done: per-word confidence is not stored on text layers | Measured on the 1866 page: OCR noise passed the word check (97% "plausible" tokens) at 34% confidence, so confidence is the useful signal | Storing per-word confidence (layer format change) |
@@ -283,7 +286,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 
 <!-- Numbered; mark answered ones with the answer and date. -->
 1. **Answered 2026-11-02: approved; ADR-0005 is now Accepted.** Approve ADR-0005 (client-side evidence layer)? It is still `Proposed`; I did not change its status.
-2. **Answered 2026-11-02: deferred.** Phase 6 task P6.T3 cannot start until decided; Phases 1-5 are not affected. Which LLM provider and model for extraction (Phase 6)? It must allow direct browser calls. Preflight results are in "Browser and platform findings"; Anthropic and OpenAI allow it, Google undetermined.
+2. **Answered 2026-11-14: both providers, selectable** (Anthropic Claude and OpenAI; the user's own key per provider, kept on the device; the LLM gets the page image plus the current text). Earlier (2026-11-02): deferred. Phase 6 task P6.T3 cannot start until decided; Phases 1-5 are not affected. Which LLM provider and model for extraction (Phase 6)? It must allow direct browser calls. Preflight results are in "Browser and platform findings"; Anthropic and OpenAI allow it, Google undetermined.
 3. **Answered 2026-11-02: self-host** (copied from `node_modules` at build time, not committed). Plan P5.T3 updated. OCR and PDF assets (WASM core ≈ 3-5 MB, `ron` data 1.7 MB, pdf.js worker 1.3 MB): **self-host** with the Pages build (offline, no third party, larger deploy) or load from a CDN by default (smaller deploy, third-party dependency)? I recommend self-hosting, copied from `node_modules` at build time rather than committed.
 4. **Answered 2026-11-02: one-time user step** (legacy `verified` facts start proposed; the user confirms them in one click). Plan P4.T4 updated; risk R2 resolved. Legacy `verified` facts become `confirmed` automatically in P4.T4 (risk R2). Accept, or require a one-time "confirm legacy verified facts" step by the user?
 5. **Answered 2026-11-02: yes.** Plan P1.T6 updated. Add a "last bundle export" indicator to the Phase 1 status line (risk R4)?
@@ -343,7 +346,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
   - *Limitations:* per-word confidence is not stored, so words are not tinted; a reading covers the whole page (region readings later); no rotation for sideways scans (Backlog).
 
 **Review**
-- Approved: no
+- Approved: yes (PR #10 merged 2026-11-14)
 - Reviewer notes: 2026-11-14 answers: (a) in-browser OCR quality and speed are good enough; corrections and missing text call for a review page (machine transcription kept, modern reading annotated with sources) → P5.T7; (b) keep "handwritten" on the source; (c) Arcanum exports have good text layers, threshold kept; (d) deploy size acceptable.
 
 ### Phase 4 report

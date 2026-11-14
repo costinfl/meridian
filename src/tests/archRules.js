@@ -9,10 +9,11 @@ export const ALLOWED = {
   evidence: ["storage"],
   conclusions: ["evidence", "models", "storage"],
   ingest: ["evidence", "storage"],
+  extract: ["evidence", "ingest", "storage"],
   search: ["evidence"],
   graph: ["evidence"],
   storage: [],
-  workers: ["evidence", "conclusions", "ingest", "search", "graph", "models", "storage"],
+  workers: ["evidence", "conclusions", "ingest", "extract", "search", "graph", "models", "storage"],
   // models, ui, and top-level modules (share.js, gedcom.js, theme.js, sampleData.js) are unrestricted
 };
 
@@ -71,7 +72,7 @@ export function checkDbMethodUse(files) {
 
 // I6: automated modules must never confirm/reject assertions or enter claims as the user.
 const USER_ACTION = /\b(confirmAssertion|rejectAssertion|enterAsUser|supersedeAsUser|decideLink|convertLegacyFacts|confirmLegacyVerified|setFactVerified|applyFactEdit|startReading|correctReading|rewriteReading)\s*\(/;
-const AUTOMATED = ["ingest/", "search/", "graph/", "workers/"];
+const AUTOMATED = ["ingest/", "extract/", "search/", "graph/", "workers/"];
 export function checkUserActionOnly(files) {
   const violations = [];
   for (const [file, source] of Object.entries(files)) {
