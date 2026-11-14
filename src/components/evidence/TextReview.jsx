@@ -2,11 +2,15 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { C, btnStyle } from "../../theme.js";
 import { uncertainSpans, activeAnnotations } from "../../evidence/domain/reading.js";
 import { needsReview } from "../../ingest/pipeline.js";
+import { currentRegionsOf } from "../../evidence/index.js";
+import RegionOverlay from "./RegionOverlay.jsx";
+import PageRecords from "./PageRecords.jsx";
 
 // Review text (P5.T7): the page image beside its text. The transcription is what the machine read and is never
 // changed. The modern reading is the researcher's own text: fragments in [brackets] are uncertain; selecting a
 // fragment lets you write the correct text and cite where you know it from (a link and a note). Every save is a
 // new version; earlier versions stay in the history.
+// Records (P6.T2, P6.T4): draw regions on the image, type a record by hand, extract records, review proposals.
 
 const small = { font: "400 11.5px Archivo, sans-serif", color: C.inkSoft, lineHeight: 1.5 };
 const mono = { font: "400 10.5px 'IBM Plex Mono', monospace", color: C.inkSoft };
@@ -72,6 +76,9 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
   const [busy, setBusy] = useState(false);
   const [image, setImage] = useState({ url: null, state: "idle" });
   const [zoom, setZoom] = useState(1);
+  const [regions, setRegions] = useState([]);
+  const [selectedRegionId, setSelectedRegionId] = useState(null);
+  const [drawing, setDrawing] = useState(false);
   const textRef = useRef(null);
   const page = pages[idx] ?? null;
   // side by side on wide screens; image above text on narrow ones (each pane scrolls on its own when side by side)
@@ -96,6 +103,17 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
   }, [library, page]);
 
   useEffect(() => { setSelection(null); setRewrite(null); setMessage(""); load().catch((e) => setMessage(`Failed: ${e.message}`)); }, [load]);
+
+  const loadRegions = useCallback(async () => { if (page) setRegions(await currentRegionsOf(library, page.id)); }, [library, page]);
+  useEffect(() => { setSelectedRegionId(null); setDrawing(false); loadRegions().catch(() => {}); }, [loadRegions]);
+  const drawRegion = async (box) => {
+    try {
+      const whole = regions.find((r) => r.kind === "page");
+      const region = await library.pages.addRegion({ pageId: page.id, parentRegionId: whole?.id ?? null, box, kind: "block", label: `Region ${regions.length}` });
+      await loadRegions();
+      setSelectedRegionId(region.id); setDrawing(false);
+    } catch (e) { setMessage(`Not saved: ${e.message}`); }
+  };
 
   useEffect(() => {
     if (!page || !loadImage) return undefined;
@@ -185,7 +203,12 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
               <button style={mini} onClick={() => setZoom((z) => Math.min(4, z + 0.25))} aria-label="Zoom in">+</button>
             </div>
             <div style={{ flex: 1, overflow: "auto", background: C.paper, padding: 8 }}>
-              {image.state === "ready" && <img src={image.url} alt={`Page ${idx + 1} of ${copy.fileName}`} style={{ width: `${zoom * 100}%`, display: "block" }} />}
+              {image.state === "ready" && (
+                <div style={{ position: "relative", width: `${zoom * 100}%` }}>
+                  <img src={image.url} alt={`Page ${idx + 1} of ${copy.fileName}`} style={{ width: "100%", display: "block", userSelect: "none" }} draggable={false} />
+                  {tab === "records" && <RegionOverlay regions={regions} selectedId={selectedRegionId} drawing={drawing} onDraw={drawRegion} onSelect={setSelectedRegionId} />}
+                </div>
+              )}
               {image.state === "loading" && <div style={small}>Loading the page image…</div>}
               {image.state === "none" && <div style={small}>This document has no page image (for example a DOCX).</div>}
               {image.state.startsWith("error") && <div style={{ ...small, color: C.focus }}>The page image could not be shown ({image.state.slice(7)}).</div>}
@@ -197,9 +220,13 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }} role="tablist">
               <button role="tab" aria-selected={tab === "reading"} style={tabStyle(tab === "reading")} onClick={() => setTab("reading")}>Modern reading</button>
               <button role="tab" aria-selected={tab === "transcription"} style={tabStyle(tab === "transcription")} onClick={() => setTab("transcription")}>Transcription (as read)</button>
+              <button role="tab" aria-selected={tab === "records"} style={tabStyle(tab === "records")} onClick={() => setTab("records")}>Records</button>
             </div>
 
-            {!data ? <div style={small}>Loading…</div> : !data.region ? <div style={small}>This page has no text region yet. Read the document first.</div> : tab === "transcription" ? (
+            {!data ? <div style={small}>Loading…</div> : !data.region ? <div style={small}>This page has no text region yet. Read the document first.</div> : tab === "records" ? (
+              <PageRecords library={library} page={page} regions={regions} selectedRegionId={selectedRegionId} onSelectRegion={setSelectedRegionId}
+                drawing={drawing} onDrawing={setDrawing} imageUrl={image.state === "ready" ? image.url : null} />
+            ) : tab === "transcription" ? (
               <div data-testid="transcription-tab">
                 <div style={{ ...mono, marginBottom: 6 }}>
                   {data.transcription

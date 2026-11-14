@@ -1,6 +1,6 @@
 import Ajv from "ajv";
-import schema from "./contract/extraction-v1.schema.json";
-import { fuzzyDate } from "../evidence/domain/fuzzyDate.js";
+import schema from "./extraction-v1.schema.json";
+import { fuzzyDate } from "../domain/fuzzyDate.js";
 
 // Extraction contract v1 (P6.T1): what an extractor returns for one page or region, how it is checked, and how
 // a valid result becomes store inputs (a record, its personas, and proposed assertions). Pure: nothing is stored here.

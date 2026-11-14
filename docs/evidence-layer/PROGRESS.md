@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 6 — Extraction contract and review
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P6.T2: region drawing and manual record entry.
-- **Last updated:** 2026-11-14 (P6.T1)
+- **Next action:** P6.T3: LLM extractor (Anthropic and OpenAI).
+- **Last updated:** 2026-11-14 (P6.T2)
 
 ## Phase overview
 
@@ -97,7 +97,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
 | P6.T1 | done | src/extract/contract/extraction-v1.schema.json, src/extract/contract.js, src/tests/extractionContract.test.js, src/tests/fixtures/extraction/death-1866.json, src/tests/archRules.js, package.json (ajv) | Extraction contract v1 (JSON Schema draft-07) with enums equal to the library's record kinds, roles and relation properties (tested). `validateExtraction`: Ajv + semantic checks (unique persona keys, relation keys exist and differ, box x0<x1/y0<y1, real calendar dates, plausible years, day needs month). `toEvidence`: record (kind, optional box, FuzzyDate event), personas, and one assertion per stated fact (event date/place, name, role, sex, age, occupation, residence, house number, x-religion, birth/death date and place, relations with object keys); Julian default before 1919. Fixture: the 1866 Craiova death act (Șfatu Loti). New `src/extract/` module registered in the architecture rules as automated (may import evidence, ingest, storage; may not call user actions). 20 tests. |
-| P6.T2 | todo | | |
+| P6.T2 | done | src/evidence/contract/{writeRecords,manualEntry,pageRecords}.js (contract moved here from src/extract), src/evidence/index.js, src/components/evidence/{RegionOverlay,ManualRecordForm,RecordsTab,PageRecords,TextReview}.jsx, src/tests/{manualEntry.test.js,pageRecords.test.jsx}, src/tests/archRules.js | The contract moved to `src/evidence/contract/` (it is the evidence layer's input format; manual entry, in evidence, needs it). Review text gains a **Records** tab: **Draw region** (drag on the image; boxes are 0-1 on the unrotated image, I4; at least 1% each way; a child region of the whole page), click a region to select it, **New record…** on the selected region or the whole page. The form (kind, date as written + day/month/year + calendar, place, people rows: name, role, sex, age as written + number, occupation, residence) becomes contract output (`buildManualRecord`) and is validated like an extractor's; relations are suggested from roles (child→father/mother, godparent→child, groom→bride, informant→deceased) and saved only when ticked, with optional words as written. `saveManualRecord` (user action, added to the I6 list): a `manual` run, the record and personas, and every value **confirmed** via `enterAsUser`, cited to the region. `writeRecords` is shared with the extractor (caller passes propose or enterAsUser; a boxed record gets a child region; a skip hook). `recordsOfPage` lists records with people, current assertions and counts. Ajv now ships in the Evidence panel chunk (186 kB, loaded only when the panel opens; main bundle unchanged). 9 new tests. |
 | P6.T3 | todo | | |
 | P6.T4 | todo | | |
 | P6.T5 | todo | | |

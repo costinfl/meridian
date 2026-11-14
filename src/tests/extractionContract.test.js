@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { validateExtraction, toEvidence, EXTRACTION_SCHEMA, defaultCalendar } from "../extract/contract.js";
+import { validateExtraction, toEvidence, EXTRACTION_SCHEMA, defaultCalendar } from "../evidence/contract/contract.js";
 import { RECORD_KINDS, ROLES } from "../evidence/repositories/recordStore.js";
 import { RELATION_PROPERTIES } from "../evidence/repositories/assertionStore.js";
 
