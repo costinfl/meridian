@@ -164,14 +164,38 @@ export async function ingestCopy({ library, storage, copyId, folderHandle, engin
   }
 }
 
-/** Per copy: how many pages exist and how many have text. { [copyId]: { pages, withText } } */
+/** OCR text below this confidence (0-1) is flagged for review. */
+export const REVIEW_CONFIDENCE = 0.6;
+
+/**
+ * Does a transcription look doubtful enough that a person should check it? Only OCR-like layers (with a
+ * confidence) are judged: low confidence, or text that fails the same word check the router uses.
+ */
+export function needsReview(layer, { minConfidence = REVIEW_CONFIDENCE, quality = {} } = {}) {
+  if (!layer || layer.confidence == null) return false;
+  if (layer.confidence < minConfidence) return true;
+  return !assessText(layer.originalText, { ...quality, minChars: 1 }).ok;
+}
+
+/**
+ * Per copy: { pages, withText, needsReview, withReading }. `needsReview` counts pages whose current transcription
+ * looks doubtful and that have no reading yet; `withReading` counts pages with a modern reading.
+ */
 export async function textStatusOf({ library, copyIds }) {
   const out = {};
   for (const id of copyIds) {
     const pages = await library.pages.listPages(id);
-    let withText = 0;
-    for (const p of pages) { const whole = await library.pages.wholePageRegion(p.id); if (whole && (await library.textLayers.current(whole.id))) withText++; }
-    out[id] = { pages: pages.length, withText };
+    let withText = 0, review = 0, withReading = 0;
+    for (const p of pages) {
+      const whole = await library.pages.wholePageRegion(p.id);
+      if (!whole) continue;
+      const layer = await library.textLayers.current(whole.id);
+      const reading = await library.textLayers.current(whole.id, "reading");
+      if (layer) withText++;
+      if (reading) withReading++;
+      else if (needsReview(layer)) review++;
+    }
+    out[id] = { pages: pages.length, withText, needsReview: review, withReading };
   }
   return out;
 }

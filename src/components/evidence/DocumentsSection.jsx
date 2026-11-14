@@ -5,6 +5,8 @@ import {
   isFolderAccessSupported, linkFolder, getLinkedFolder, unlinkFolder, folderPermission, walkFolder,
   scanEntries, importFiles, assignSource, ingestCopy, listRunsWithItems, rerunTargetOf, textStatusOf,
 } from "../../ingest/index.js";
+import { getPageImage, loadCopyBytes, openDocument } from "../../ingest/documents.js";
+import TextReview from "./TextReview.jsx";
 
 // Documents (Phase 5): link a folder or add files, scan them into the library, read their text (embedded text
 // or OCR), and see every processing run with its failures. Heavy libraries load only when "Read" is used.
@@ -41,6 +43,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
   const [busy, setBusy] = useState(null);              // { label, progress }
   const [message, setMessage] = useState("");
   const [titles, setTitles] = useState({});            // copyId -> source title being typed
+  const [reviewing, setReviewing] = useState(null);    // the copy open in Review text
   const abortRef = useRef(null);
   const svcRef = useRef(null);
   const fileRef = useRef(null);
@@ -125,6 +128,17 @@ export default function DocumentsSection({ storage, library, services = defaultS
   });
   const clearCache = () => run("Clearing", async () => `Removed ${await library.pageCache.clear()} cached page images. They are rebuilt when needed.`);
 
+  // page image for Review text: the image OCR used (cached), else render it now and cache it
+  const loadImage = useCallback(async (page) => {
+    for (const variant of ["max2000", "max1600"]) { const hit = await library.pageCache.get(page.id, variant); if (hit) return hit; }
+    const copy = await library.copies.get(page.copyId);
+    const svc = await getServices();
+    const folderHandle = copy.storage.mode === "folder" ? await handleFor() : null;
+    const doc = await openDocument({ fileName: copy.fileName, bytes: await loadCopyBytes({ storage, copy, folderHandle }), engines: svc.engines });
+    try { return await getPageImage({ library, page, doc, maxSide: 2000 }); } finally { await doc.close().catch(() => {}); }
+  }, [library, storage, folder]); // getServices and handleFor read refs and the folder
+  const closeReview = useCallback(() => { setReviewing(null); refresh().catch(() => {}); }, [refresh]);
+
   const unread = useMemo(() => copies.filter((c) => { const s = status[c.id]; return !s || s.pages === 0 || s.withText < s.pages; }), [copies, status]);
   const pageName = useCallback((pageId) => pageId.slice(0, 8), []);
 
@@ -171,6 +185,9 @@ export default function DocumentsSection({ storage, library, services = defaultS
                   <span style={{ font: "600 12px Archivo, sans-serif", color: C.ink, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={c.storage.path ?? c.fileName}>{c.fileName}{c.label ? ` · ${c.label}` : ""}</span>
                   <span style={{ display: "flex", gap: 6, alignItems: "center", flexShrink: 0 }}>
                     <span style={mono}>{s.pages ? `${s.withText}/${s.pages} pages read` : "not read"}</span>
+                    {s.needsReview > 0 && <span data-testid="needs-review" title="OCR confidence is low or the text does not look like words" style={{ ...mono, color: C.focus }}>{s.needsReview === s.pages ? "needs review" : `${s.needsReview} need review`}</span>}
+                    {s.withReading > 0 && <span style={mono}>{s.withReading} reviewed</span>}
+                    {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => setReviewing(c)} aria-label={`Review text of ${c.fileName}`}>Review text</button>}
                     <button style={mini} disabled={!!busy} onClick={() => readCopies([c], s.pages && s.withText === s.pages ? { force: true } : {})} aria-label={`Read ${c.fileName}`}>{s.pages && s.withText === s.pages ? "Read again" : "Read"}</button>
                   </span>
                 </div>
@@ -214,6 +231,8 @@ export default function DocumentsSection({ storage, library, services = defaultS
           </ul>
         </details>
       )}
+
+      {reviewing && <TextReview library={library} copy={reviewing} loadImage={loadImage} onClose={closeReview} />}
 
       {cache.entries > 0 && (
         <div style={{ ...small, marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>

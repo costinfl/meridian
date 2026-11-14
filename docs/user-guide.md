@@ -254,6 +254,16 @@ A document already read is not read again unless you click **Read again**. **Can
 
 **Page image cache.** Pages are drawn into images for OCR and kept to save time. **Clear cache** frees the space; the images are made again when needed.
 
+**Review text.** OCR is not perfect, and on handwriting it mostly fails. A document marked **needs review** has pages where the OCR confidence is low or the text does not look like words. Click **Review text** to see the page image next to its text:
+
+- **Transcription (as read)** is exactly what the machine read. It is never changed.
+- **Modern reading** is your own text for the page. Click **Start reading from transcription** to begin with a copy of the machine text (a page without text starts empty). Write uncertain parts in [square brackets]; they are highlighted.
+- To correct a fragment, click a [bracketed] part or select any text with the mouse. Type the correct text, and if you know it from another source (an archive index, another record), paste its web link and an optional note. **Save correction**. The corrected text is underlined with a ↗ link to the source, and the **Corrections** list shows what it was before.
+- **Edit whole text** lets you type freely (for example a full transcription of a handwritten page); typed changes have no source link.
+- Every save is kept as a version; **History** shows them all. Use **+** and **−** to zoom the page image, and **‹ ›** to move between pages.
+
+A page with a reading counts as **reviewed** in the document list.
+
 The text read from documents is stored as evidence, but nothing uses it on the timeline yet. Extracting people and events from it is the next phase.
 
 ## Limits you should know about
