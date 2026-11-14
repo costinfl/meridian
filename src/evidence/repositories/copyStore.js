@@ -4,7 +4,7 @@ import { EvidenceError, invalid, notFound, pick, requireOneOf } from "../domain/
 
 const STORE = "evCopies";
 export const STORAGE_MODES = ["blob", "folder"];
-const EDITABLE = ["sourceId", "fileName", "label", "mimeType", "pageCount", "accessedViaRepositoryId", "accessUrl", "accessedAt"];
+const EDITABLE = ["sourceId", "fileName", "label", "mimeType", "pageCount", "accessedViaRepositoryId", "accessUrl", "accessedAt", "pageLabelHint"];
 export const DUPLICATE_ACTIONS = ["keep-both", "replace"];
 const lc = (v) => String(v ?? "").trim().toLowerCase();
 
@@ -47,6 +47,7 @@ export function createCopyStore(storage) {
       accessedViaRepositoryId: meta.accessedViaRepositoryId ?? null,
       accessUrl: meta.accessUrl ?? "",
       accessedAt: meta.accessedAt ?? null,
+      pageLabelHint: meta.pageLabelHint ?? "", // printed folio/page label of the first page, from a sidecar file
       label: meta.label ?? "", // distinguishes editions / scans of the same work ("1962 reprint", "better scan")
       possibleDuplicateOf: [], duplicateResolution: null, supersededByCopyId: null,
       createdAt: now, updatedAt: now,

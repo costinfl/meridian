@@ -92,6 +92,10 @@ describe("architecture: import boundaries (I5)", () => {
       "ingest/ok.js": "addLink(project, { personId, personaId })",
       "ingest/edit.js": "await applyFactEdit({ library, kind, personId, before, after })",
       "workers/sup.js": "library.assertions.supersedeAsUser(input)",
-    })).toHaveLength(9);
+      "ingest/fix.js": "await library.textLayers.correctReading({ readingId, start, end, after })",
+      "workers/r.js": "textLayers.startReading({ regionId })",
+      "search/w.js": "textLayers.rewriteReading({ readingId, text })",
+      "components/evidence/TextReview.jsx": "library.textLayers.correctReading(input)",
+    })).toHaveLength(12);
   });
 });

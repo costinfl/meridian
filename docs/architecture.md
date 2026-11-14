@@ -82,7 +82,8 @@ src/
     upgrades/              database schema steps v1…v5
     persistence.js         persistent-storage request and status
 
-  ingest/ search/ graph/ workers/     placeholders for later phases
+  ingest/                  documents: folder, scanner, reader, router, text extraction, OCR (see Ingestion)
+  search/ graph/ workers/  placeholders for later phases
   tests/                   the test suite
 ```
 
@@ -228,13 +229,40 @@ Import gives the project a new id and "(imported)" name, saves the media, and me
 | Source | `SOUR` record with `TITL`, `PUBL`, `TEXT`, cited when fact and source are verified | Read |
 | Brackets, eras, media pins, colours | Not exported | — |
 
+## Ingestion
+
+`src/ingest/` reads documents into the evidence library. It may import only `evidence` and `storage`, and it never confirms or decides anything.
+
+| Module | Does |
+| --- | --- |
+| `folder.js` | Links a folder with `showDirectoryPicker`; keeps the handle in the device-local `settings` store (never exported); permission; walks and reads files |
+| `fileTypes.js`, `sidecar.js` | Supported types by extension; the optional `<file>.meta.json` sidecar |
+| `scanner.js` | `scanEntries` (folder) and `importFiles` (picked or dropped files, stored as blobs) register DigitalCopies by content hash; Inbox; sidecar → LibrarySource; moved files, duplicates, missing files |
+| `documents.js` | `openDocument` gives one interface over PDF, DOCX and images (pages, unrotated size, embedded text with word boxes, page image); `loadCopyBytes` refuses a file whose hash changed; `ensurePages`; `getPageImage` uses the page cache |
+| `quality.js` | Decides whether embedded PDF text is good enough or the page needs OCR |
+| `pipeline.js` | `processCopy` / `ingestCopy`: a **router** run classifies each page, then `pdf-text`, `docx-text` and `tesseract` runs write text layers with their raw output |
+| `engines.browser.js`, `ocrEngine.browser.js` | The real libraries, loaded lazily: pdf.js (with its own worker), mammoth, tesseract.js (its own worker; self-hosted assets) |
+
+```
+folder / picked files ──scan──▶ DigitalCopy (hash) ──Read──▶ open document ──▶ Pages + whole-page regions
+                                   │ Inbox until a source is set                    │
+                                   ▼                                               ▼
+                             LibrarySource                       router run: per page → embedded-text | docx-text
+                                                                               | needs-ocr | handwritten | already-has-text
+                                                                                    │
+                                                    pdf-text / docx-text / tesseract run → TextLayer + RawOutput
+```
+
+Each run has one item per page with its status (`succeeded`, `failed`, `skipped`, `awaiting-htr`) and error. A failed page can be re-run alone. Rendered page images live in `evPageCache` and can be cleared at any time.
+
+OCR assets (tesseract worker, WebAssembly cores, Romanian `ron` data) are copied from `node_modules` into `dist/ocr/` at build time by a plugin in `vite.config.js`, so nothing is fetched from a CDN.
+
 ## What is not built yet
 
-`src/ingest`, `src/search`, `src/graph` and `src/workers` are empty placeholders. Planned phases:
+`src/search`, `src/graph` and `src/workers` are empty placeholders. Planned phases:
 
 | Phase | Adds |
 | --- | --- |
-| 5 | Linking a documents folder, PDF and DOCX text, OCR |
 | 6 | Extraction of records and people, and a review interface |
 | 7 | Search |
 | 8 | Relationship graph queries |

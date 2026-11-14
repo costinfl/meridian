@@ -75,7 +75,8 @@ export function createRunStore(storage) {
       return out;
     },
     getItem: (id) => storage.dbGet(ITEMS, id).then((r) => r ?? null),
-    listItems: (runId) => storage.dbGetAllByIndex(ITEMS, "byRun", runId),
+    /** Items of a run in the order they were added. */
+    listItems: async (runId) => (await storage.dbGetAllByIndex(ITEMS, "byRun", runId)).sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0)),
     itemsForPage: (pageId) => storage.dbGetAllByIndex(ITEMS, "byPage", pageId),
 
     /** Raw processor output, kept verbatim (insert-only). Returns the metadata row; use getRawOutput for the bytes. */

@@ -47,11 +47,12 @@ Meridian is a **client-only** React 18 / Vite 5 app, deployed as static files to
 | ProcessingRun (`evRuns`) | One execution of a processor over a batch | processor (router, pdf-text, docx-text, tesseract, llm-extraction, entity-resolution, manual, import), processor version, model id, parameters, schema version, started/finished at, overall status |
 | ProcessingRunItem (`evRunItems`) | The outcome of a run for one page | runId, pageId, status, error, units billed, rawOutputId |
 | RawOutput (`evRawOutputs`) | Processor output kept verbatim | media type, schema version, SHA-256, blob |
-| TextLayer (`evTextLayers`) | Text for one page or region from one run | regionId, runId, original text, normalised text, language, script, confidence, words (optional: text + box), supersedesId |
+| TextLayer (`evTextLayers`) | Text for one page or region from one run | kind (`transcription` = what a processor read, the default; `reading` = the researcher's modern reading), regionId, runId, original text, normalised text, language, script, confidence, words (optional: text + box), supersedesId; a reading also has annotations (start, end, before, after, optional http(s) link, note, replacedBy) and startedFromLayerId |
 
 - The router is a run too: its output is the page classification (embedded text good, needs OCR, handwritten → awaiting HTR) and the processor chosen.
 - Normalised text folds diacritic variants (ş/ș, ţ/ț), removes accents for matching, and (later) transliterates Cyrillic or transitional-alphabet text into modern Romanian.
 - Several text layers per region is normal; the current one is the newest that is not superseded.
+- Transcriptions and readings are two separate chains on a region: a reading never supersedes a transcription or the reverse, so the machine's text stays exactly as read. A reading starts as a copy of the current transcription (or empty) and is written only by user actions (`startReading`, `correctReading`, `rewriteReading`, each with its own `manual` run); every save is a new layer that supersedes the previous reading. A correction replaces one fragment and records the old fragment, the new text, and optionally the link where the right text is known from. Uncertain parts of a reading are written in [square brackets].
 - One run per batch; re-running one page is a one-page batch.
 - Rendered page images are a **disposable cache** (`evPageCache`), always regenerable from the copy.
 

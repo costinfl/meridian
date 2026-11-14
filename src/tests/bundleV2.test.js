@@ -51,6 +51,9 @@ async function scenario(store) {
   const run = await lib.runs.startRun({ processor: "tesseract" });
   await lib.runs.addRawOutput({ data: "raw ocr output", mediaType: "text/plain" });
   await lib.textLayers.add({ regionId: fixed.id, runId: run.id, originalText: "Ştefan Hariton, născut 1850" });
+  // the researcher's modern reading of that region, with a sourced correction (P5.T7)
+  const reading = await lib.textLayers.startReading({ regionId: fixed.id });
+  await lib.textLayers.correctReading({ readingId: reading.id, start: 0, end: 6, after: "Ștefan", url: "https://example.org/act/32", note: "parish register" });
   const parent = await lib.places.createPlace({ kind: "county" }); await lib.places.addName({ placeId: parent.id, name: "Județul Prahova" });
   const place = await lib.places.createPlace(); await lib.places.addName({ placeId: place.id, name: "Ploiești" });
   await lib.places.addParent({ childId: place.id, parentId: parent.id, validFrom: "1925" });
@@ -103,6 +106,10 @@ describe("bundle v2: evidence.json (P4.T6)", () => {
     expect((await B.library.assertions.get(s.assertion.id)).decidedBy).toBe("researcher");
     expect((await B.library.pages.currentRegion(s.row.id)).id).toBe(s.fixed.id);
     expect((await B.library.textLayers.current(s.fixed.id)).originalText).toBe("Ştefan Hariton, născut 1850");
+    const reading = await B.library.textLayers.current(s.fixed.id, "reading");
+    expect(reading.originalText).toBe("Ștefan Hariton, născut 1850");
+    expect(reading.annotations).toEqual([expect.objectContaining({ before: "Ştefan", after: "Ștefan", url: "https://example.org/act/32", note: "parish register" })]);
+    expect(await B.library.textLayers.listByRegion(s.fixed.id, "reading")).toHaveLength(2);
     expect((await B.library.places.ancestorsAt((await B.library.places.findByName("Ploiești"))[0].id, "1930")).map((p) => p.kind)).toEqual(["county"]);
     expect(await B.library.nameVariants.expand("Ioan")).toEqual(["ioan", "ion"]);
     // files of copies travelled

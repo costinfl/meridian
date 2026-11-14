@@ -56,6 +56,7 @@ export class IndexedDBAdapter {
         get: (s, k) => req(tx.objectStore(s).get(k)),
         put: (s, v) => req(tx.objectStore(s).put(v)),
         add: (s, v) => req(tx.objectStore(s).add(v)),
+        delete: (s, k) => req(tx.objectStore(s).delete(k)), // only for disposable data (page cache)
         getAll: (s) => req(tx.objectStore(s).getAll()),
         getAllByIndex: (s, i, q) => req(tx.objectStore(s).index(i).getAll(q)),
         getByIndex: (s, i, q) => req(tx.objectStore(s).index(i).get(q)),

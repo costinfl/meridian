@@ -165,6 +165,7 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 | P5.T4 | Router run: use pdf.js embedded text (with word boxes) if it passes a quality check (share of plausible words, configurable); otherwise queue OCR; sources flagged handwritten → "awaiting HTR". | Classification stored per run item. |
 | P5.T5 | OCR with tesseract.js in a worker (`ron` default, languages configurable, language data loaded lazily); word boxes converted to normalised coordinates; raw output stored; versions on the run. | Fixture tests: text PDF, scanned PDF page, DOCX. |
 | P5.T6 | Evidence panel (behind the flag): runs and items with status, failed-item re-run as a one-page batch, progress and cancel. | Manual test steps in the phase report. |
+| P5.T7 | *(review follow-up)* Review text: page image beside its text; the transcription is shown unchanged; a modern **reading** (separate text-layer chain, user actions only) with [bracketed] uncertain parts, fragment corrections citing an optional link and note, free editing, version history; doubtful OCR pages flagged "needs review". | Helper, store (I1, I3), architecture (I6), bundle round-trip (I8) and component tests; real-browser check. |
 
 **Reviewer checks:** run on 5–10 real documents, including an Arcanum PDF export and a scanned register; judge text quality and speed (seconds per page). Decide here whether the local companion (Backlog) is needed.
 
