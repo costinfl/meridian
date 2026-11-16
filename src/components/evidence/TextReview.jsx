@@ -64,7 +64,7 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : "");
 /**
  * @param {{ library, copy, loadImage: (page) => Promise<{bytes, mimeType}|null>, onClose: () => void }} props
  */
-export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, initialPageId = null, initialTab = "reading" }) {
+export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, runReading, initialPageId = null, initialTab = "reading" }) {
   const [pages, setPages] = useState([]);
   const [idx, setIdx] = useState(0);
   const [data, setData] = useState(null);        // { region, transcription, transcriptionRun, reading, history }
@@ -80,6 +80,8 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
   const [selectedRegionId, setSelectedRegionId] = useState(null);
   const [drawing, setDrawing] = useState(false);
   const [extracting, setExtracting] = useState(null);   // AbortController while an extraction runs
+  const [shownLayerId, setShownLayerId] = useState(null); // transcription shown in the Transcription tab (null = current)
+  const [aiReading, setAiReading] = useState(null);       // AbortController while "Read with AI" runs
   const textRef = useRef(null);
   const page = pages[idx] ?? null;
   // side by side on wide screens; image above text on narrow ones (each pane scrolls on its own when side by side)
@@ -103,7 +105,9 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
     const transcriptionRun = transcription ? await library.runs.getRun(transcription.runId) : null;
     const reading = await library.textLayers.current(region.id, "reading");
     const history = await library.textLayers.listByRegion(region.id, "reading");
-    setData({ region, transcription, transcriptionRun, reading, history });
+    const transcriptions = [];
+    for (const l of (await library.textLayers.listByRegion(region.id, "transcription")).reverse()) transcriptions.push({ layer: l, run: await library.runs.getRun(l.runId) });
+    setData({ region, transcription, transcriptionRun, reading, history, transcriptions });
   }, [library, page]);
 
   useEffect(() => { setSelection(null); setRewrite(null); setMessage(""); load().catch((e) => setMessage(`Failed: ${e.message}`)); }, [load]);
@@ -176,8 +180,32 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
     if (ok) setRewrite(null);
   };
 
-  const doubtful = needsReview(data?.transcription);
-  const run = data?.transcriptionRun;
+  const shown = data?.transcriptions?.find((t) => t.layer.id === shownLayerId) ?? (data?.transcription ? { layer: data.transcription, run: data.transcriptionRun } : null);
+  const doubtful = needsReview(shown?.layer);
+  const run = shown?.run;
+  // the newest AI transcription's proposed modern reading, if it differs from the researcher's reading
+  const proposal = data?.transcriptions?.find((t) => typeof t.layer.proposedReading === "string") ?? null;
+  const offerProposal = proposal && proposal.layer.proposedReading !== (reading?.originalText ?? null) ? proposal : null;
+  const adopt = () => act(() => library.textLayers.adoptProposedReading({ regionId: data.region.id, fromLayerId: offerProposal.layer.id }),
+    reading ? "The AI reading is saved as a new version of your reading; earlier versions stay in the history." : "Reading started from the AI's modern reading.");
+  const readWithAi = async () => {
+    const ctl = new AbortController(); setAiReading(ctl); setMessage("Sending the page image to the AI provider…");
+    try { const r = await runReading({ copy, pageIds: [page.id], force: true, signal: ctl.signal }); await load(); setShownLayerId(null); setMessage(r.message); }
+    catch (e) { setMessage(`Failed: ${e.message}`); }
+    finally { setAiReading(null); }
+  };
+  const aiButton = runReading ? (aiReading
+    ? <button style={mini} onClick={() => aiReading.abort()}>Cancel AI reading</button>
+    : <button style={mini} onClick={readWithAi} title="The AI provider chosen in AI settings transcribes this page image and proposes a modern reading">Read with AI</button>) : null;
+  const proposalPanel = offerProposal ? (
+    <div data-testid="ai-proposal" style={{ border: `1px solid ${C.rel[1]}`, borderRadius: 3, padding: 8, margin: "8px 0", background: "#fff" }}>
+      <div style={{ ...small, color: C.ink, marginBottom: 4 }}>
+        <strong>AI proposes a modern reading</strong> ({offerProposal.run?.modelId?.replace(/^\w+:/, "") || "AI"}, {when(offerProposal.layer.createdAt)}). Check it against the image before using it.
+      </div>
+      <div style={{ ...textBox, minHeight: 0, maxHeight: 200, overflow: "auto", fontSize: 13 }} data-testid="ai-proposal-text">{offerProposal.layer.proposedReading}</div>
+      <button style={{ ...primary, marginTop: 6 }} disabled={busy} onClick={adopt}>{reading ? "Use AI reading (new version of my reading)" : "Use AI reading"}</button>
+    </div>
+  ) : null;
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(25,32,28,.55)", zIndex: 260, display: "flex", alignItems: "stretch", justifyContent: "center", padding: "2vh 1vw" }}
@@ -251,13 +279,21 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
                 } : undefined} />
             ) : tab === "transcription" ? (
               <div data-testid="transcription-tab">
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+                  {data.transcriptions?.length > 1 && (
+                    <select aria-label="Transcription shown" value={shown?.layer.id ?? ""} onChange={(e) => setShownLayerId(e.target.value)} style={{ ...field, width: "auto" }}>
+                      {data.transcriptions.map((t, i) => <option key={t.layer.id} value={t.layer.id}>{t.run?.processor ?? "?"}{t.run?.modelId ? ` (${t.run.modelId.replace(/^\w+:/, "")})` : ""} · {when(t.layer.createdAt)}{i === 0 ? " · current" : ""}</option>)}
+                    </select>
+                  )}
+                  {aiButton}
+                </div>
                 <div style={{ ...mono, marginBottom: 6 }}>
-                  {data.transcription
-                    ? <>{run ? `${run.processor}${run.processorVersion ? ` ${run.processorVersion}` : ""}` : "unknown run"} · {when(data.transcription.createdAt)} · confidence {pct(data.transcription.confidence)}</>
+                  {shown
+                    ? <>{run ? `${run.processor}${run.processorVersion ? ` ${run.processorVersion}` : ""}` : "unknown run"} · {when(shown.layer.createdAt)} · confidence {pct(shown.layer.confidence)}</>
                     : "No transcription: this page has not been read (or waits for handwriting recognition)."}
                 </div>
                 {doubtful && <div style={{ ...small, color: C.focus, marginBottom: 6 }}>Needs review: the OCR confidence is low or the text does not look like words. Handwriting is not read well by OCR.</div>}
-                <div style={{ ...textBox, background: C.paper }} data-testid="transcription-text">{data.transcription?.originalText || <span style={small}>(empty)</span>}</div>
+                <div style={{ ...textBox, background: C.paper }} data-testid="transcription-text">{shown?.layer.originalText || <span style={small}>(empty)</span>}</div>
                 <div style={{ ...small, marginTop: 6 }}>This is exactly what the machine read. It is never changed; corrections go into the modern reading.</div>
               </div>
             ) : !reading ? (
@@ -268,7 +304,11 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
                   Write uncertain parts in [square brackets].
                 </div>
                 {doubtful && <div style={{ ...small, color: C.focus, marginTop: 6 }}>The transcription of this page looks doubtful (confidence {pct(data.transcription?.confidence)}).</div>}
-                <button style={{ ...primary, marginTop: 8 }} disabled={busy} onClick={start}>Start reading from transcription</button>
+                <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
+                  <button style={primary} disabled={busy} onClick={start}>Start reading from transcription</button>
+                  {aiButton}
+                </div>
+                {proposalPanel}
               </div>
             ) : rewrite != null ? (
               <div>
@@ -281,6 +321,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
               </div>
             ) : (
               <div data-testid="reading-tab">
+                {proposalPanel}
                 <div style={{ ...small, marginBottom: 6 }}>
                   Select a fragment (or click a <span style={{ background: UNCERTAIN_BG }}>[bracketed]</span> one) to correct it and cite where you know it from.
                   <span style={{ background: ANNOTATED_BG, marginLeft: 6 }}>Corrected</span> text shows its source on hover.

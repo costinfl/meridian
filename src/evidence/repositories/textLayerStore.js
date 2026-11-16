@@ -109,6 +109,11 @@ export function createTextLayerStore(storage) {
         supersedesId: input.supersedesId ?? null,
         createdAt: nowIso(),
       };
+      // P6.T6: an AI reading proposes a modern reading next to its transcription; it is applied only by a user action
+      if (input.proposedReading != null) {
+        if (typeof input.proposedReading !== "string") throw invalid("proposedReading must be a string");
+        layer.proposedReading = input.proposedReading;
+      }
       await storage.dbTransact([LAYERS, "evRegions", "evRuns"], "readwrite", (o) => insert(o, layer));
       return layer;
     },
@@ -147,6 +152,35 @@ export function createTextLayerStore(storage) {
       const id = newId();
       const r = applyCorrection({ text: prev.originalText, annotations: prev.annotations ?? [], start, end, after, url, note, id, createdAt: nowIso() });
       return saveReading(prev, r.text, r.annotations, { action: "correct", annotationId: id });
+    },
+    /**
+     * USER ACTION: use the modern reading an AI transcription proposes (`proposedReading` of layer `fromLayerId`).
+     * Starts the reading from it, or, if a reading exists, saves it as a new version of that reading (earlier
+     * versions and their corrections stay in the history).
+     */
+    async adoptProposedReading({ regionId, fromLayerId } = {}) {
+      const from = await storage.dbGet(LAYERS, requireString(fromLayerId, "fromLayerId"));
+      if (!from || from.regionId !== regionId || typeof from.proposedReading !== "string") throw notFound("Proposed reading", fromLayerId);
+      const prev = pickCurrent(await storage.dbGetAllByIndex(LAYERS, "byRegion", regionId), "reading");
+      if (prev) {
+        if (prev.originalText === from.proposedReading) return prev;
+        const marker = newId();
+        const r = applyRewrite({ text: prev.originalText, annotations: prev.annotations ?? [], newText: from.proposedReading, marker });
+        return saveReading(prev, r.text, r.annotations, { action: "adopt-ai-reading", fromLayerId, marker });
+      }
+      const run = manualRun({ action: "adopt-ai-reading", fromLayerId });
+      const layer = {
+        id: newId(), kind: "reading", regionId, runId: run.id,
+        originalText: from.proposedReading, normalizedText: normalizeText(from.proposedReading),
+        language: from.language ?? "", script: from.script ?? "", confidence: null, words: null,
+        annotations: [], startedFromLayerId: from.id, supersedesId: null, createdAt: nowIso(),
+      };
+      await storage.dbTransact([LAYERS, "evRegions", "evRuns"], "readwrite", async (o) => {
+        if (pickCurrent(await o.getAllByIndex(LAYERS, "byRegion", regionId), "reading")) throw new EvidenceError("conflict", "this region already has a reading");
+        await o.add("evRuns", run);
+        await insert(o, layer);
+      });
+      return layer;
     },
     /** USER ACTION: replace the whole reading text (free typing). Annotations on changed text are kept as replaced. */
     async rewriteReading({ readingId, text } = {}) {
