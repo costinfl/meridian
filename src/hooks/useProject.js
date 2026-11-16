@@ -222,7 +222,7 @@ export function useProject(storage) {
   const updateProject = useCallback((fn) => { mutate((prev) => fn(prev)); }, [mutate]);
 
   const setEvidenceUi = useCallback((on) => {
-    mutate((prev) => ({ ...prev, settings: { ...prev.settings, evidenceUi: !!on } }));
+    mutate((prev) => ({ ...prev, settings: { ...prev.settings, evidenceOff: !on } }));   // on by default; this switches it off per project
   }, [mutate]);
 
   return {

@@ -1,2 +1,2 @@
-// Evidence UI (behind the evidenceUi flag, loaded lazily). See EvidencePanel.jsx.
+// Evidence UI (its own page, loaded lazily). See EvidencePage.jsx.
 export {};

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import React, { useState } from "react";
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { freshStorage } from "./evidenceHelpers.js";
-import EvidencePanel from "../components/evidence/EvidencePanel.jsx";
+import EvidencePanel from "../components/evidence/EvidencePage.jsx";
 import { createProject, normalizeProject } from "../models/project.js";
 import { SAMPLE_PEOPLE } from "../sampleData.js";
 
@@ -12,7 +12,7 @@ beforeEach(() => { storage = freshStorage(); cleanup(); });
 
 function Host({ initial }) {
   const [project, setProject] = useState(initial);
-  return <EvidencePanel storage={storage} project={project} onProjectChange={(fn) => setProject((p) => fn(p))} onClose={() => {}} />;
+  return <EvidencePanel storage={storage} project={project} onProjectChange={(fn) => setProject((p) => fn(p))} onClose={() => {}} initialSection="legacy" />;
 }
 
 describe("Evidence panel: legacy facts (P4.T3, P4.T4 UI)", () => {
@@ -54,7 +54,7 @@ describe("Evidence panel: legacy facts (P4.T3, P4.T4 UI)", () => {
     const { unmount } = render(<Host initial={odd} />);
     expect(screen.getByText(/anomalies noticed/)).toBeTruthy();
     unmount();
-    render(<EvidencePanel storage={storage} project={null} onClose={() => {}} />);
+    render(<EvidencePanel storage={storage} project={null} onClose={() => {}} initialSection="legacy" />);
     expect(screen.queryByTestId("legacy-section")).toBeNull();
   });
 });

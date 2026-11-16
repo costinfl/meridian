@@ -14,7 +14,7 @@ import { isEvidenceEnabled } from "./evidenceFlag.js";
 import { requestPersistence } from "./storage/persistence.js";
 
 // Evidence UI is code-split: nothing is downloaded unless the flag is on and the panel is opened.
-const EvidencePanel = lazy(() => import("./components/evidence/EvidencePanel.jsx"));
+const EvidencePage = lazy(() => import("./components/evidence/EvidencePage.jsx"));
 
 /* Stop a click on an interactive timeline item from starting a board pan/drag. */
 const stopPD = (e) => e.stopPropagation();
@@ -285,7 +285,19 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [projectManagerOpen, setProjectManagerOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  // the Evidence page is its own page beside the timeline, mirrored in the URL hash (#evidence) so reload and Back work
+  const [page, setPage] = useState(() => (typeof window !== "undefined" && window.location.hash === "#evidence" ? "evidence" : "timeline"));
+  useEffect(() => {
+    const onHash = () => setPage(window.location.hash === "#evidence" ? "evidence" : "timeline");
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  const goTo = (next) => {
+    if (next === page) return;
+    if (next === "evidence") window.location.hash = "evidence";
+    else window.history.pushState(null, "", window.location.pathname + window.location.search);
+    setPage(next);
+  };
   const evidenceOn = isEvidenceEnabled(project);
   useEffect(() => { if (evidenceOn) requestPersistence(); }, [evidenceOn]);
 
@@ -681,7 +693,8 @@ export default function App() {
           Sources{sources.length > 0 ? ` (${sources.length})` : ""}
         </button>
         {evidenceOn && (
-          <button style={btnStyle(evidenceOpen)} onClick={() => setEvidenceOpen((o) => !o)} title="Evidence layer (preview)">
+          <button style={btnStyle(page === "evidence")} onClick={() => goTo(page === "evidence" ? "timeline" : "evidence")} aria-pressed={page === "evidence"}
+            title={page === "evidence" ? "Back to the timeline" : "Evidence: documents, their text, records and facts"}>
             Evidence
           </button>
         )}
@@ -693,7 +706,15 @@ export default function App() {
         <button style={btnStyle(false)} onClick={fitAll}>All</button>
       </div>
 
+      {/* ------- evidence page (replaces the board while shown; the timeline keeps its state) ------- */}
+      {evidenceOn && page === "evidence" && (
+        <Suspense fallback={<div style={{ flex: 1, padding: 20, font: "500 12px Archivo, sans-serif", color: C.inkSoft }}>Loading…</div>}>
+          <EvidencePage storage={storage} project={project} onProjectChange={updateProject} onClose={() => goTo("timeline")} />
+        </Suspense>
+      )}
+
       {/* ------- board ------- */}
+      {!(evidenceOn && page === "evidence") && <>
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
         <div ref={contentRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
           onPointerLeave={() => { setCrosshair(null); }}
@@ -834,6 +855,7 @@ export default function App() {
           ))}
         </label>
       </div>
+      </>}
 
       {/* tooltip */}
       {tooltip && (
@@ -917,7 +939,7 @@ export default function App() {
           projectList={projectList}
           currentProjectId={project?.id}
           onClose={() => setProjectManagerOpen(false)}
-          evidenceUi={project?.settings?.evidenceUi === true}
+          evidenceUi={project?.settings?.evidenceOff !== true}
           onToggleEvidenceUi={setEvidenceUi}
           onCreate={async (name) => { await createProject(name); setProjectManagerOpen(false); initRef.current = false; }}
           onOpen={(id) => { openProject(id); initRef.current = false; }}
@@ -939,12 +961,6 @@ export default function App() {
         />
       )}
 
-      {/* evidence layer (behind the evidenceUi flag, lazy-loaded) */}
-      {evidenceOn && evidenceOpen && (
-        <Suspense fallback={null}>
-          <EvidencePanel storage={storage} project={project} onProjectChange={updateProject} onClose={() => setEvidenceOpen(false)} />
-        </Suspense>
-      )}
 
       {/* toast */}
       {toast && (

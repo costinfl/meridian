@@ -65,7 +65,7 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : "");
 /**
  * @param {{ library, copy, loadImage: (page) => Promise<{bytes, mimeType}|null>, onClose: () => void }} props
  */
-export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, runReading, initialPageId = null, initialTab = "reading" }) {
+export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, runReading, initialPageId = null, initialTab = "reading", inline = false }) {
   const [pages, setPages] = useState([]);
   const [idx, setIdx] = useState(0);
   const [data, setData] = useState(null);        // { region, transcription, transcriptionRun, reading, history }
@@ -247,10 +247,12 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
   ) : null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(25,32,28,.55)", zIndex: 260, display: "flex", alignItems: "stretch", justifyContent: "center", padding: "2vh 1vw" }}
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-label={`Review text: ${copy.fileName}`} data-testid="text-review" onMouseDown={(e) => e.stopPropagation()}
-        style={{ background: C.paperHi, border: `1px solid ${C.ink}`, borderRadius: 4, width: 1280, maxWidth: "100%", display: "flex", flexDirection: "column", boxShadow: "0 12px 40px rgba(0,0,0,.3)", overflow: "hidden" }}>
+    <div style={inline
+      ? { display: "flex", height: "calc(100vh - 120px)", minHeight: 420 }
+      : { position: "fixed", inset: 0, background: "rgba(25,32,28,.55)", zIndex: 260, display: "flex", alignItems: "stretch", justifyContent: "center", padding: "2vh 1vw" }}
+      onMouseDown={(e) => !inline && e.target === e.currentTarget && onClose()}>
+      <div role={inline ? "region" : "dialog"} aria-label={`Review text: ${copy.fileName}`} data-testid="text-review" onMouseDown={(e) => e.stopPropagation()}
+        style={{ background: C.paperHi, border: `1px solid ${inline ? C.rule : C.ink}`, borderRadius: 4, width: inline ? "100%" : 1280, maxWidth: "100%", display: "flex", flexDirection: "column", boxShadow: inline ? "none" : "0 12px 40px rgba(0,0,0,.3)", overflow: "hidden" }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.rule}`, flexWrap: "wrap" }}>
           <div style={{ font: "700 15px Fraunces, Georgia, serif", color: C.ink, flex: "1 1 200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Review text — {copy.fileName}</div>
@@ -261,7 +263,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
               <button style={mini} disabled={idx >= pages.length - 1} onClick={() => setIdx(idx + 1)} aria-label="Next page">›</button>
             </span>
           )}
-          <button style={mini} onClick={onClose}>Close</button>
+          <button style={mini} onClick={onClose} aria-label="Close">{inline ? "← Documents" : "Close"}</button>
         </div>
 
         <div style={{ display: "flex", flex: 1, minHeight: 0, flexDirection: narrow ? "column" : "row", overflowY: narrow ? "auto" : "hidden" }}>

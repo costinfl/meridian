@@ -8,9 +8,10 @@ import { displayName } from "../../models/project.js";
 import DocumentsSection from "./DocumentsSection.jsx";
 import AiSettings from "./AiSettings.jsx";
 
-// Evidence layer entry point (behind the evidenceUi flag, loaded lazily from App.jsx).
-// Phase 4: record existing timeline facts as evidence, in two deliberate steps.
-export default function EvidencePanel({ onClose, storage, project, onProjectChange }) {
+// The Evidence page (its own page beside the timeline; loaded lazily from App.jsx; on unless the project turns it off).
+// Sections: Documents (with the page workspace and the review queue), AI settings, Legacy facts (Phase 4).
+export default function EvidencePage({ onClose, storage, project, onProjectChange, initialSection = "documents" }) {
+  const [section, setSection] = useState(initialSection);
   const [line, setLine] = useState("Checking storage…");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -65,25 +66,33 @@ export default function EvidencePanel({ onClose, storage, project, onProjectChan
     return `Confirmed ${r.confirmed} verified facts${r.skipped ? ` (${r.skipped} skipped)` : ""}.`;
   });
 
-  const box = { marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.rule}` };
   const small = { font: "400 11.5px Archivo, sans-serif", color: C.inkSoft, lineHeight: 1.5 };
+  const navItem = (id, label, extra = null) => (
+    <button key={id} onClick={() => setSection(id)} aria-current={section === id ? "page" : undefined}
+      style={{ ...btnStyle(section === id), display: "flex", justifyContent: "space-between", width: "100%", textAlign: "left", marginBottom: 6 }}>
+      <span>{label}</span>{extra}
+    </button>
+  );
 
   return (
-    <div
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
-      style={{ position: "fixed", inset: 0, background: "rgba(25,32,28,.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" }}
-    >
-      <div
-        onMouseDown={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-label="Evidence"
-        style={{ background: C.paperHi, border: `1px solid ${C.ink}`, borderRadius: 4, padding: 18, width: 560, maxWidth: "94vw", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 12px 40px rgba(0,0,0,.3)" }}
-      >
-        <div style={{ font: "700 15px Fraunces, Georgia, serif", color: C.ink, marginBottom: 8 }}>Evidence (preview)</div>
-        <div style={small}>The evidence layer is under construction. Your timeline is not changed by anything below.</div>
-
+    <div data-testid="evidence-page" role="main" aria-label="Evidence" style={{ flex: 1, minHeight: 0, display: "flex", background: C.paperHi }}>
+      <nav aria-label="Evidence sections" style={{ width: 210, flexShrink: 0, borderRight: `1px solid ${C.rule}`, padding: 14, display: "flex", flexDirection: "column", overflowY: "auto" }}>
+        <div style={{ font: "700 15px Fraunces, Georgia, serif", color: C.ink, marginBottom: 4 }}>Evidence</div>
+        <div style={{ ...small, marginBottom: 12 }}>Documents, their text, and the records and facts read from them. Your timeline changes only when you attach evidence to a fact.</div>
+        {navItem("documents", "Documents")}
+        {navItem("ai", "AI settings")}
+        {report && navItem("legacy", "Legacy facts", pending > 0 || candidates.length > 0 ? <span aria-label="needs attention">•</span> : null)}
+        <span style={{ flex: 1 }} />
+        <div data-testid="storage-status" style={{ marginTop: 14, font: "400 10.5px 'IBM Plex Mono', monospace", color: C.inkSoft, lineHeight: 1.5 }}>{line}</div>
+        {onClose && <button onClick={onClose} style={{ ...btnStyle(false), marginTop: 10 }}>← Timeline</button>}
+      </nav>
+      <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: "14px 18px" }}>
+        {section === "documents" && library && <DocumentsSection storage={storage} library={library} inlineWorkspace />}
+        {section === "ai" && library && storage?.getSetting && <AiSettings storage={storage} />}
+        {section === "legacy" && (
+          <>
         {report && (
-          <div style={box} data-testid="legacy-section">
+          <div data-testid="legacy-section">
             <div style={{ font: "700 12.5px Archivo, sans-serif", color: C.ink, marginBottom: 4 }}>Legacy facts</div>
             <div style={small}>
               Each fact on your timeline can be recorded as evidence: <em>proposed</em> assertions (a birth or death gives one for
@@ -134,13 +143,8 @@ export default function EvidencePanel({ onClose, storage, project, onProjectChan
           </div>
         )}
 
-        {library && <DocumentsSection storage={storage} library={library} />}
-        {library && storage?.getSetting && <AiSettings storage={storage} />}
-
-        <div data-testid="storage-status" style={{ marginTop: 14, font: "400 11px 'IBM Plex Mono', monospace", color: C.inkSoft, lineHeight: 1.5 }}>{line}</div>
-        <div style={{ marginTop: 14, textAlign: "right" }}>
-          <button onClick={onClose} style={btnStyle(false)}>Close</button>
-        </div>
+          </>
+        )}
       </div>
     </div>
   );

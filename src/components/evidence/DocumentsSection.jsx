@@ -63,7 +63,7 @@ function summarize(r) {
 }
 
 /** @param {{ storage, library, services?: () => Promise<{engines, ocr}>, picker?: Function }} props  (services/picker injectable for tests) */
-export default function DocumentsSection({ storage, library, services = defaultServices, aiServices = defaultAiServices, picker }) {
+export default function DocumentsSection({ storage, library, services = defaultServices, aiServices = defaultAiServices, picker, inlineWorkspace = false }) {
   const [folder, setFolder] = useState(null);          // { handle, name } or null
   const [copies, setCopies] = useState([]);
   const [sources, setSources] = useState({});
@@ -205,9 +205,16 @@ export default function DocumentsSection({ storage, library, services = defaultS
 
   const closeReview = useCallback(() => { setReviewing(null); refresh().catch(() => {}); }, [refresh]);
 
+  const workspace = reviewing ? (
+    <TextReview library={library} copy={reviewing.copy} initialPageId={reviewing.pageId} initialTab={reviewing.tab} loadImage={loadImage} onClose={closeReview}
+      runExtraction={runExtraction} describeExtraction={describeExtraction} runReading={runReading} inline={inlineWorkspace} />
+  ) : null;
+
   const totalProposed = useMemo(() => Object.values(status).reduce((n, s) => n + (s.proposed ?? 0), 0), [status]);
   const unread = useMemo(() => copies.filter((c) => { const s = status[c.id]; return !s || s.pages === 0 || s.withText < s.pages; }), [copies, status]);
   const pageName = useCallback((pageId) => pageId.slice(0, 8), []);
+
+  if (inlineWorkspace && workspace) return workspace;   // on the Evidence page the workspace takes the whole area
 
   return (
     <div data-testid="documents-section" style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.rule}` }}
@@ -301,7 +308,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
         </details>
       )}
 
-      {reviewing && <TextReview library={library} copy={reviewing.copy} initialPageId={reviewing.pageId} initialTab={reviewing.tab} loadImage={loadImage} onClose={closeReview} runExtraction={runExtraction} describeExtraction={describeExtraction} runReading={runReading} />}
+      {!inlineWorkspace && workspace}
 
       {cache.entries > 0 && (
         <div style={{ ...small, marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>

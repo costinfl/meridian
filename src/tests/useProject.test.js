@@ -213,21 +213,21 @@ describe("useProject – data mutations", () => {
     expect(result.current.project?.sources[0].id).toBe("s2");
   });
 });
-describe("useProject – evidenceUi flag", () => {
+describe("useProject – evidence switch", () => {
   beforeEach(() => vi.useFakeTimers());
   afterEach(() => vi.useRealTimers());
 
-  it("setEvidenceUi toggles the project setting and marks the project dirty", async () => {
+  it("setEvidenceUi switches the layer off and on (settings.evidenceOff) and marks the project dirty", async () => {
     const storage = makeFakeStorage([createProject("Flag test")]);
     const { result } = renderHook(() => useProject(storage));
     await flushAsync();
-    expect(result.current.project.settings.evidenceUi).not.toBe(true);
-
-    act(() => result.current.setEvidenceUi(true));
-    expect(result.current.project.settings.evidenceUi).toBe(true);
-    expect(result.current.isDirty).toBe(true);
+    expect(result.current.project.settings.evidenceOff).not.toBe(true);             // on by default
 
     act(() => result.current.setEvidenceUi(false));
-    expect(result.current.project.settings.evidenceUi).toBe(false);
+    expect(result.current.project.settings.evidenceOff).toBe(true);
+    expect(result.current.isDirty).toBe(true);
+
+    act(() => result.current.setEvidenceUi(true));
+    expect(result.current.project.settings.evidenceOff).toBe(false);
   });
 });

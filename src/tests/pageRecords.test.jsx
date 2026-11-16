@@ -102,3 +102,22 @@ describe("Records tab: draw a region and enter a record by hand (P6.T2)", () => 
     expect(await library.records.recordsByKind("death")).toEqual([]);
   });
 });
+
+describe("the workspace inside the Evidence page", () => {
+  it("replaces the document list and returns with ← Documents", async () => {
+    render(<DocumentsSection storage={storage} library={library} services={services()} inlineWorkspace />);
+    const input = screen.getByTestId("doc-files");
+    Object.defineProperty(input, "files", { value: [fakeFile("pag32.png", fixtureBytes("scan.png"))], configurable: true });
+    fireEvent.change(input);
+    await status(/Added: 1 new/);
+    fireEvent.click(screen.getByRole("button", { name: "Read pag32.png" }));
+    await status(/^Read 1 pages\.$/);
+    fireEvent.click(screen.getByRole("button", { name: "Review text of pag32.png" }));
+    const ws = await screen.findByTestId("text-review");
+    expect(ws.getAttribute("role")).toBe("region");                                // not a modal dialog
+    expect(screen.queryByTestId("copy-list")).toBeNull();
+    expect(within(ws).getByRole("button", { name: "Close" }).textContent).toBe("← Documents");
+    fireEvent.click(within(ws).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.getByTestId("copy-list")).toBeTruthy());
+  });
+});
