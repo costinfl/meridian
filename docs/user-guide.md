@@ -12,7 +12,7 @@ This guide explains how to use Meridian. To install or run it on your own comput
 - [Projects](#projects)
 - [Saving, backup and sharing](#saving-backup-and-sharing)
 - [GEDCOM](#gedcom)
-- [Evidence layer (preview)](#evidence-layer-preview)
+- [Evidence layer](#evidence-layer)
 - [Limits you should know about](#limits-you-should-know-about)
 - [Questions and problems](#questions-and-problems)
 
@@ -155,7 +155,7 @@ Click the project name in the toolbar.
 
 - **+ New project** creates an empty project.
 - **Open** switches project. **✎** renames, **×** deletes (you are asked to confirm). Deleting cannot be undone, so export a bundle first if in doubt.
-- **Evidence layer (preview)** switches the unfinished evidence features on for the open project (see below).
+- **Evidence layer** (on by default) shows the Evidence page for the open project; untick it to hide the page (nothing is deleted; see below).
 
 The first time you open Meridian, it creates the sample project *Hariton Family* so you have something to explore.
 
@@ -192,13 +192,13 @@ Roles are written as occupations with a date range, events as generic events wit
 
 GEDCOM import does **not** read family links yet, so imported people have no parents or spouses in Meridian. Imported facts are always unverified, even from a file that Meridian exported: tick **Verified** again once you have checked them.
 
-## Evidence layer (preview)
+## Evidence layer
 
-The evidence layer is under construction. Its goal is to tie every fact to the exact place in a document where it was read, and to keep what a source says separate from what you conclude.
+The evidence layer ties every fact to the exact place in a document where it was read, and keeps what a source says separate from what you conclude.
 
-Switch it on for the open project in **Projects → Evidence layer (preview)**. An **Evidence** button appears in the toolbar. (Adding `?evidence=1` to the address also shows it, without changing the project.)
+It is on for every project. Click **Evidence** in the toolbar to open the **Evidence page**; it takes the place of the timeline (the address ends in `#evidence`, so reload and the browser's Back button work), and **← Timeline** or the **Evidence** button brings you back. To hide it for a project, untick **Projects → Evidence layer**; nothing is deleted. The page has three sections on the left: **Documents**, **AI settings** and **Legacy facts**, with the storage line below them.
 
-What the panel offers today:
+What it offers:
 
 1. **Legacy facts report.** A summary of the facts on your timeline: how many of each kind, how many have a source, how many are verified, and anything unusual (for example a verified fact with no source).
 2. **Convert … legacy items to evidence.** Records each fact as *proposed* statements, cited to the fact's own source or to a "Legacy Meridian data" source. A birth or death becomes two statements, one for the date and one for the place. This does not change your timeline, and it confirms and accepts nothing.
@@ -209,7 +209,7 @@ What the panel offers today:
 
 After conversion, the evidence follows your edits. Ticking or unticking **Verified** records that decision. Changing a fact's year, place, label or dates records the new value as replacing the old one; the old value is kept in the history, never deleted. Nothing else in the app behaves differently yet. Extracting people and facts from documents, search, and matching people across records arrive in later phases; see the [plan](evidence-layer/IMPLEMENTATION_PLAN.md).
 
-Export a bundle before trying the preview on a project you care about.
+Export a bundle regularly; it is your backup.
 
 ### Documents
 
@@ -266,17 +266,19 @@ A page with a reading counts as **reviewed** in the document list.
 
 ### AI settings
 
-**Read with AI** and **Extract** use an AI provider: **Anthropic Claude** or **OpenAI**, with your own API key (you pay the provider for what you use). In the Evidence panel, under **AI settings**:
+AI is a **last resort, used on demand**: it costs money, and handwriting tools such as Transkribus are trained for this work (importing Transkribus results is planned). There is no button that sends a whole document; every AI call is for one page or one box, and you see the estimate before anything is sent.
+
+**Read with AI** and **Extract with AI** use an AI provider: **Anthropic Claude** or **OpenAI**, with your own API key (you pay the provider for what you use). In the Evidence panel, under **AI settings**:
 
 - choose the **Provider** and the **Model** (Claude models are suggested; for OpenAI type the model name);
 - paste your **API key** and click **Save key**. It is kept only in this browser on this device: it is never put in a project, a backup or an export, and it is shown masked. **Remove key** deletes it;
 - **Pages per batch** limits how many pages one click may send (default 10).
 
-What is sent: the page image (reduced to at most 1568 pixels on the long side) and the page's text. Nothing is sent until you click one of the AI buttons, and **Dry run** shows what would be sent (pages, image size, an estimate of the input tokens) without sending anything.
+What is sent: the page image, or the box you drew (reduced to at most 1568 pixels on the long side), and the page's text. Clicking an AI button first shows **"About N input tokens and a K kB image will be sent to …"** with **Send** and **Cancel**; nothing leaves the browser before **Send**.
 
 ### Reading a page with AI
 
-OCR fails on handwriting. **Read with AI** (in the document list, or **Transcription (as read)** in Review text) asks the AI to transcribe the page image: a diplomatic transcription in the original spelling, with [?] for uncertain words and […] for illegible parts, and a modern Romanian reading.
+OCR fails on handwriting. When a page has no text, OCR flagged it **needs review**, or its source is marked handwritten, Review text offers **Read with AI (when OCR fails)** (on other pages it is a small **Read with AI anyway…** link). It asks the AI to transcribe the page image: a diplomatic transcription in the original spelling, with [?] for uncertain words and […] for illegible parts, and a modern Romanian reading.
 
 - The AI transcription is added next to the OCR text; the **Transcription** tab has a list to switch between them.
 - The modern reading is only a proposal. The **Modern reading** tab shows **AI proposes a modern reading**; check it against the image and click **Use AI reading**. If you already have a reading, it becomes a new version; your earlier versions and corrections stay in **History**.
@@ -285,9 +287,9 @@ OCR fails on handwriting. **Read with AI** (in the document list, or **Transcrip
 
 Open **Review text** and the **Records** tab.
 
-- **Draw region**, then drag a box around one entry on the image. Click a box to select it; **Use whole page** goes back to the page.
+- **Draw entry box**, then drag a box around one entry on the image. **Draw stamp / margin note** does the same for a stamp or a note in the margin: registers, especially birth registers, often carry later events there (a marriage, an adoption, a death, a divorce), added by another office. Click a box to select it; **Use whole page** goes back to the page.
 - **New record…** types a record by hand: kind, date as written (and day, month, year), place, and the people in it with their role, age, occupation and residence. Relations the record states (child of, informant for, …) are suggested from the roles; tick the ones the record really says. Everything you save this way is confirmed, because you stated it.
-- **Extract with AI** sends the selected region (or the page) to the AI, which lists the records it reads, with every value as written. **Extract** in the document list does the same for all pages (up to the page limit; **Extract again** for pages done before).
+- **Extract with AI** is for entries that are very hard to read yourself. It reads **only the selected box** (draw one first) and lists the records in it, with every value as written. For a stamp or margin note, the AI is told it records a later event and reads its kind (marriage, adoption, death, divorce), date, place and issuing office. Extracting a box again proposes everything it reads again (a new reading may bring new information); only values you rejected are not proposed again.
 
 Values found by the AI are **proposed**. Each record shows a crop of the image it was read from. For each value choose **Confirm**, **Reject** (it is remembered and not proposed again when the page is extracted again) or **Correct** (type the right value; the correction is confirmed and the proposal is kept in the history). **Confirm all** confirms the rest of a record. The document list shows how many proposed values wait for review; **N to review** opens the first page that has some.
 

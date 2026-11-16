@@ -70,9 +70,10 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 | 5 | Ingestion v1: linked folder, PDF/DOCX text, OCR, router | End to end on real documents |
 | 6 | Extraction contract, LLM extractor, review UI | Proposal quality, review speed |
 | 7 | Search | Results on real data |
+| 7b | Transkribus import (scheduled by the reviewer, 2026-11-16) | Handwritten registers read by a trained HTR tool |
 | 8 | Graph projection | FAN and kinship queries |
 | 9 | Entity resolution | Candidate quality, review flow |
-| Backlog | Transkribus, Arcanum, local companion, embeddings, gazetteer | Prioritised by the reviewer |
+| Backlog | Arcanum, local companion, embeddings, gazetteer | Prioritised by the reviewer |
 
 ---
 
@@ -199,6 +200,15 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 
 ---
 
+## Phase 7b — Transkribus import (scheduled after Phase 7 by the reviewer, 2026-11-16)
+
+AI reading is a costly last resort; Transkribus (and similar HTR tools) are trained for handwritten registers. Tasks are detailed when the phase starts. Scope:
+- Import a Transkribus **PAGE XML** export (file import first; the Transkribus API, which needs an account and a key, later): text regions and lines become regions with boxes (I4) and a `transcription` text layer from a `transkribus` processor run (model and version recorded, I3).
+- Match the export to registered pages (file name, page number, image size); unmatched pages are reported, never guessed.
+- The imported transcription appears in Review text beside OCR and AI transcriptions; the modern reading and corrections work as today.
+
+---
+
 ## Phase 8 — Graph projection
 
 | ID | Task | Acceptance |
@@ -230,7 +240,6 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 ## Backlog (not scheduled; the reviewer prioritises)
 
 - **Local ingest companion (separate repo)** — only if Phase 5/6 show in-browser OCR, HTR or external APIs are impractical. A small local program (Java is fine) that watches the documents folder, runs Tesseract/Transkribus/Arcanum, and writes bundle-format `evidence.json` for Meridian to import. Requires a new ADR.
-- Transkribus processor for handwritten registers (PAGE XML → regions and text layers).
 - Arcanum Newspaper Segmentation processor (rotated coordinates → normalised boxes).
 - Julian → Gregorian conversion helpers.
 - Cyrillic and transitional-alphabet transliteration.

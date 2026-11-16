@@ -699,11 +699,13 @@ export default function App() {
           </button>
         )}
 
+        {!(evidenceOn && page === "evidence") && <>
         <span style={{ width: 1, height: 22, background: C.rule }} />
         <button style={btnStyle(false)} onClick={() => zoomAt(trackW / 2, 1.45)}>+</button>
         <button style={btnStyle(false)} onClick={() => zoomAt(trackW / 2, 1 / 1.45)}>−</button>
         <button style={btnStyle(false)} onClick={fitFocus}>Fit life</button>
         <button style={btnStyle(false)} onClick={fitAll}>All</button>
+        </>}
       </div>
 
       {/* ------- evidence page (replaces the board while shown; the timeline keeps its state) ------- */}
