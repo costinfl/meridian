@@ -264,7 +264,38 @@ A document already read is not read again unless you click **Read again**. **Can
 
 A page with a reading counts as **reviewed** in the document list.
 
-The text read from documents is stored as evidence, but nothing uses it on the timeline yet. Extracting people and events from it is the next phase.
+### AI settings
+
+**Read with AI** and **Extract** use an AI provider: **Anthropic Claude** or **OpenAI**, with your own API key (you pay the provider for what you use). In the Evidence panel, under **AI settings**:
+
+- choose the **Provider** and the **Model** (Claude models are suggested; for OpenAI type the model name);
+- paste your **API key** and click **Save key**. It is kept only in this browser on this device: it is never put in a project, a backup or an export, and it is shown masked. **Remove key** deletes it;
+- **Pages per batch** limits how many pages one click may send (default 10).
+
+What is sent: the page image (reduced to at most 1568 pixels on the long side) and the page's text. Nothing is sent until you click one of the AI buttons, and **Dry run** shows what would be sent (pages, image size, an estimate of the input tokens) without sending anything.
+
+### Reading a page with AI
+
+OCR fails on handwriting. **Read with AI** (in the document list, or **Transcription (as read)** in Review text) asks the AI to transcribe the page image: a diplomatic transcription in the original spelling, with [?] for uncertain words and […] for illegible parts, and a modern Romanian reading.
+
+- The AI transcription is added next to the OCR text; the **Transcription** tab has a list to switch between them.
+- The modern reading is only a proposal. The **Modern reading** tab shows **AI proposes a modern reading**; check it against the image and click **Use AI reading**. If you already have a reading, it becomes a new version; your earlier versions and corrections stay in **History**.
+
+### Records: reading people and facts from a page
+
+Open **Review text** and the **Records** tab.
+
+- **Draw region**, then drag a box around one entry on the image. Click a box to select it; **Use whole page** goes back to the page.
+- **New record…** types a record by hand: kind, date as written (and day, month, year), place, and the people in it with their role, age, occupation and residence. Relations the record states (child of, informant for, …) are suggested from the roles; tick the ones the record really says. Everything you save this way is confirmed, because you stated it.
+- **Extract with AI** sends the selected region (or the page) to the AI, which lists the records it reads, with every value as written. **Extract** in the document list does the same for all pages (up to the page limit; **Extract again** for pages done before).
+
+Values found by the AI are **proposed**. Each record shows a crop of the image it was read from. For each value choose **Confirm**, **Reject** (it is remembered and not proposed again when the page is extracted again) or **Correct** (type the right value; the correction is confirmed and the proposal is kept in the history). **Confirm all** confirms the rest of a record. The document list shows how many proposed values wait for review; **N to review** opens the first page that has some.
+
+Dates before 1919 are read as Julian-calendar dates (Romania's civil and church calendar until 1919), unless the record says otherwise.
+
+### Evidence on the timeline
+
+With the evidence layer on, the editor of a birth, death, event, role or group shows an **Evidence** section: the evidence attached to that fact, where it was read, and a crop of the page. In research mode, **Attach evidence…** searches confirmed values by a person's name as written (for example "Loti") and attaches the one that supports the fact. Attaching does not change the fact itself.
 
 ## Limits you should know about
 

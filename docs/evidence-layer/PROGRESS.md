@@ -5,9 +5,9 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 ## Current status
 
 - **Current phase:** 6 — Extraction contract and review
-- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Phase 6 report, documentation, pull request.
-- **Last updated:** 2026-11-16 (P6.T6)
+- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** Wait for review of Phase 6.
+- **Last updated:** 2026-11-16 (Phase 6 complete)
 
 ## Phase overview
 
@@ -19,7 +19,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 3 Evidence, places, names, dates | approved | evidence/p3 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
 | 4 Conclusions, legacy facts, bundle v2 | approved | evidence/p4 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
 | 5 Ingestion v1 | approved | evidence/p5 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-14 |
-| 6 Extraction and review | in progress | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | |
+| 6 Extraction and review | awaiting review | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | |
 | 7 Search | not started | evidence/p7 | |
 | 8 Graph projection | not started | evidence/p8 | |
 | 9 Entity resolution | not started | evidence/p9 | |
@@ -307,6 +307,34 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 
 ## Phase reports
 
+### Phase 6 report
+- **Built:** extraction of records, people and facts from pages, by hand or with an AI provider, their review, and the link to the timeline (all behind the evidence flag):
+  - *P6.T1* extraction contract v1 (JSON Schema, Ajv validator plus semantic checks, `toEvidence` mapping; Julian default before 1919), in `src/evidence/contract/`;
+  - *P6.T2* the Review text dialog becomes the page workspace: **Records** tab, **Draw region** on the image, **New record…** typed by hand (confirmed on save, `manual` run), relations suggested from roles and saved only when ticked;
+  - *P6.T3* **AI settings** (Anthropic Claude or OpenAI, model, own key, page limit; device only) and the extractor: image + current text, structured outputs, one `llm-extraction` run per batch, raw answers kept, invalid answers fail their page, proposals only, rejected values not proposed again, page limit, cancel, re-run, **Dry run**;
+  - *P6.T4* review: crops of the cited region, **Confirm / Reject / Correct**, **Confirm all**, "N proposed values waiting" and **N to review** in the document list;
+  - *P6.T5* **Evidence** section in the item editor: evidence attached to a fact with provenance and crop; **Attach evidence…** by name, confirmed evidence only (`attachAssertionToFact`, also writes `conclusionEvidence`);
+  - *P6.T6 (added at the start of the phase)* **Read with AI**: an AI transcription layer (`llm-reading`) next to the OCR, with a proposed modern reading applied only by **Use AI reading**.
+- **IndexedDB version / stores added:** none (still 5). New fields only: `kind`, `annotations`, `proposedReading` on text layers (already since P5.T7 for the first two). New processor value `llm-reading`.
+- **New dependencies:** `ajv` 8.20.0 (MIT) and `@anthropic-ai/sdk` 1.8.0 (MIT). Main bundle 335 kB (+1 kB). Loaded on demand: the Evidence panel chunks (80 kB + 189 kB with Ajv), the Anthropic SDK (391 kB, only when an AI button is used), the fact Evidence section (4.5 kB). OpenAI is called with plain `fetch` (no SDK).
+- **Deviations:** see the log (2026-11-14 and 2026-11-16): contract under `src/evidence/contract/`; persona fields instead of a free assertion list in the contract; structured outputs instead of a forced tool call; the official SDK in the browser (`dangerouslyAllowBrowser`, own key); refusal fallbacks and effort `high`; "not re-proposed" per page; images re-encoded to JPEG at most 1568 px.
+- **Invariants:** I1 corrections, readings and AI readings are new rows (tested). I2/I3 every record and assertion cites a region and a run (`manual`, `llm-extraction`, `llm-reading`). I6 automated code (`src/extract`) only proposes; the user actions `saveManualRecord`, `correctAssertion`, `attachAssertionToFact`, `adoptProposedReading` (and confirm/reject) are blocked for automated modules by the architecture test; nothing is confirmed without a click (tested end to end). I8 no schema change; bundles carry the new fields. I9 API keys live only in the device `settings` store; a bundle export never contains them (tested).
+- **Tests:** 396 → **455**. `npm test -- --run` and `npm run build` pass. No test calls a real API: providers are stubbed, and the Anthropic SDK is exercised over a stubbed network.
+- **Real-browser check (headless Chromium, dev server, real OCR, provider replaced by a local stand-in, nothing sent outside):** the 1866 page: key saved (masked); OCR read; **Dry run** "1 page (images 322 kB, about 3,675 input tokens), nothing was sent"; **Read with AI** → proposal → **Use AI reading** (reading shows [brackets]); region drawn by mouse; **Extract with AI** on it → 1 record, 21 proposed values, crop shown; Reject the place, Correct an age, Confirm all → 20 confirmed, 1 rejected. Requests carried the browser-access header, the key, model `claude-opus-5-5`, effort `high`, fallbacks `default` and a JPEG image. No page errors.
+- **How to verify:** `npm ci`, `npm test -- --run`, `npm run build`, `npm run dev`, open `http://localhost:5173/meridian/?evidence=1` (Chrome or Edge), **Evidence**:
+  1. **AI settings**: choose the provider, model and paste your key; **Save key**.
+  2. Add a few real pages (a handwritten register page, a printed one), **Read**; then **Dry run** and **Read with AI** on one. Open **Review text**, compare the AI transcription with the image, **Use AI reading**, correct a fragment.
+  3. **Records** tab: **Draw region** around one entry, **Extract with AI**; review the values (Confirm / Reject / Correct / Confirm all). Note seconds per page and the cost shown by your provider.
+  4. Type one record by hand with **New record…**.
+  5. Research mode → open a person's death or an event → **Evidence** → **Attach evidence…** with the name → **Attach**.
+- **Backup reminder:** no database or project-format change; exporting a bundle backup before merging is still good practice.
+- **Known limitations:** (1) Real provider quality, speed and cost could not be measured here (no key in this sandbox); that is the reviewer check. (2) Extracting a page again creates new records next to the old ones (only rejected values are skipped); confirmed values are not merged. (3) Places are kept as written (no place matching yet). (4) A record's own region is the box the model gave; a wrong box is corrected through the region correction (no UI yet). (5) The fact Evidence section can attach but not detach. (6) OpenAI is untested against the real service; its model name must be typed. (7) The extraction contract has no Cyrillic or transitional-alphabet transliteration (Backlog).
+- **Questions for the reviewer:** (a) After trying real pages: is the AI reading of handwriting good enough to make it the usual first step for registers, and which model and effort give acceptable cost? (b) Should extraction then read **only the region you draw** by default (cheaper, more precise), or the whole page? (c) When a page is extracted again, should confirmed values from the earlier run be hidden from the new proposals, rather than shown as new records? (d) May the evidence flag be turned on by default, or does it stay a preview?
+
+**Review**
+- Approved: no
+- Reviewer notes:
+
 ### Phase 5 report
 - **Built:** document ingestion in the Evidence panel's new **Documents** section (behind the flag):
   - *P5.T1* link a documents folder (Chromium; the handle is kept in the device-local `settings` store only, never exported) or add/drop files (any browser; stored as blobs);
@@ -509,6 +537,7 @@ Template for each phase:
 | 2026-11-08 | Phase 2 review | see git log | Phase 2 approved by merge; Phase 3 started. |
 | 2026-11-08 | P3.T1-P3.T7 | see git log | Phase 3 complete (246 tests), awaiting review; PR opened. |
 | 2026-11-10 | P5.T1-P5.T6 | see git log | Phase 5 complete (380 tests), awaiting review; PR opened. |
+| 2026-11-16 | P6.T1-P6.T6 | see git log | Phase 6 complete (455 tests), awaiting review; PR opened. |
 | 2026-11-14 | P5.T7 | see git log | Review answers recorded; text review page with modern reading and sourced corrections (396 tests); awaiting review. |
 | 2026-11-09 | P4 review follow-up | see git log | Reviewer answers a-e applied (330 tests): candidate links + per-person accept, applyFactEdit, date/place split, ADR-0006. |
 | 2026-11-09 | Documentation | see git log | At the reviewer's request: README rewritten; user guide, development guide, architecture and docs index added (describe the app as of Phase 4). No code changes. |

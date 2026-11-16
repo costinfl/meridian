@@ -853,7 +853,7 @@ export default function App() {
           onSave={saveItem}
           onDelete={deleteItem}
           onClose={() => setItemModal(null)}
-          evidence={project?.settings?.evidenceUi === true ? { onAttach: attachEvidence, defaultQuery: people.find((p) => p.id === itemModal.laneId)?.name ?? "" } : null}
+          evidence={evidenceOn ? { onAttach: attachEvidence, defaultQuery: people.find((p) => p.id === itemModal.laneId)?.name ?? "" } : null}
         />
       )}
 
