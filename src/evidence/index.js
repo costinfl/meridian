@@ -25,6 +25,11 @@ export { RECORD_KINDS, ROLES } from "./repositories/recordStore.js";
 export { VALUE_PROPERTIES, RELATION_PROPERTIES, STATUSES } from "./repositories/assertionStore.js";
 export { fuzzyDate, fuzzyDateFromIso, fromStatedAge, overlaps } from "./domain/fuzzyDate.js";
 export { normalizeText, searchKey, dmCodesOfName } from "./domain/normalize.js";
+export { validateExtraction, toEvidence, SCHEMA_VERSION, EXTRACTION_SCHEMA, defaultCalendar } from "./contract/contract.js";
+export { writeRecords, boxInParent } from "./contract/writeRecords.js";
+export { buildManualRecord, saveManualRecord, suggestRelations, RELATION_RULES } from "./contract/manualEntry.js";
+export { recordsOfPage, currentRegionsOf } from "./contract/pageRecords.js";
+export { correctAssertion, normalizedCorrection, proposalsByPage } from "./contract/review.js";
 
 /** The evidence library bound to a storage service (StorageService or an IndexedDBAdapter). */
 export function createEvidenceLibrary(storage) {

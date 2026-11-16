@@ -7,6 +7,7 @@ import {
 } from "../../ingest/index.js";
 import { getPageImage, loadCopyBytes, openDocument } from "../../ingest/documents.js";
 import TextReview from "./TextReview.jsx";
+import { proposalsByPage, recordsOfPage } from "../../evidence/index.js";
 
 // Documents (Phase 5): link a folder or add files, scan them into the library, read their text (embedded text
 // or OCR), and see every processing run with its failures. Heavy libraries load only when "Read" is used.
@@ -15,6 +16,35 @@ const small = { font: "400 11.5px Archivo, sans-serif", color: C.inkSoft, lineHe
 const mono = { font: "400 10.5px 'IBM Plex Mono', monospace", color: C.inkSoft };
 const mini = { ...btnStyle(false), padding: "2px 8px", fontSize: 11 };
 const field = { font: "500 11.5px Archivo, sans-serif", color: C.ink, background: "#fff", border: `1px solid ${C.rule}`, borderRadius: 3, padding: "2px 6px", width: 150 };
+
+/** AI extraction services, loaded on first use (the SDK and the image code stay out of the panel's first load). */
+async function defaultAiServices() {
+  const [ex, img] = await Promise.all([import("../../extract/index.js"), import("../../extract/image.browser.js")]);
+  return { ...ex, prepareImage: img.prepareImageForLlm };
+}
+
+/** Where an AI call would go: "Anthropic Claude claude-opus-5-5". */
+const sendToOf = (ai, settings) => `${ai.PROVIDERS[settings.provider].label}${settings.models[settings.provider] ? ` ${settings.models[settings.provider]}` : ""}`;
+
+/** One line about an extraction or a dry run. */
+export function describeExtraction(s) {
+  const extra = [];
+  if (s.alreadyExtracted) extra.push(`${s.alreadyExtracted} already extracted (use Extract again)`);
+  if (s.overLimit) extra.push(`${s.overLimit} over the page limit, run again for the rest`);
+  const tail = extra.length ? ` ${extra.join("; ")}.` : "";
+  if (s.dryRun) {
+    if (!s.pages.length) return `Dry run: nothing to send.${tail}`;
+    const tokens = s.pages.reduce((n, p) => n + p.estimatedInputTokens, 0);
+    const kb = Math.round(s.pages.reduce((n, p) => n + (p.image?.bytes ?? 0), 0) / 1024);
+    return `Dry run: would send ${s.pages.length} page${s.pages.length === 1 ? "" : "s"} (images ${kb} kB, about ${tokens.toLocaleString("en")} input tokens). Nothing was sent.${tail}`;
+  }
+  const ok = s.pages.filter((p) => p.status === "succeeded"), bad = s.pages.filter((p) => p.status === "failed");
+  const recs = ok.reduce((n, p) => n + p.records, 0), claims = ok.reduce((n, p) => n + p.assertions, 0), skipped = ok.reduce((n, p) => n + p.skippedRejected, 0);
+  let msg = `Extracted ${recs} record${recs === 1 ? "" : "s"} with ${claims} proposed values from ${ok.length} page${ok.length === 1 ? "" : "s"}`;
+  if (skipped) msg += ` (${skipped} you rejected before were not proposed again)`;
+  if (bad.length) msg += `; ${bad.length} failed: ${bad[0].error}`;
+  return `${msg}${s.cancelled ? ". Stopped" : ""}.${tail}`;
+}
 
 async function defaultServices() {
   const [{ browserEngines }, { createBrowserOcr }] = await Promise.all([import("../../ingest/engines.browser.js"), import("../../ingest/ocrEngine.browser.js")]);
@@ -33,7 +63,7 @@ function summarize(r) {
 }
 
 /** @param {{ storage, library, services?: () => Promise<{engines, ocr}>, picker?: Function }} props  (services/picker injectable for tests) */
-export default function DocumentsSection({ storage, library, services = defaultServices, picker }) {
+export default function DocumentsSection({ storage, library, services = defaultServices, aiServices = defaultAiServices, picker, inlineWorkspace = false }) {
   const [folder, setFolder] = useState(null);          // { handle, name } or null
   const [copies, setCopies] = useState([]);
   const [sources, setSources] = useState({});
@@ -43,7 +73,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
   const [busy, setBusy] = useState(null);              // { label, progress }
   const [message, setMessage] = useState("");
   const [titles, setTitles] = useState({});            // copyId -> source title being typed
-  const [reviewing, setReviewing] = useState(null);    // the copy open in Review text
+  const [reviewing, setReviewing] = useState(null);    // { copy, pageId?, tab? } open in the page workspace
   const abortRef = useRef(null);
   const svcRef = useRef(null);
   const fileRef = useRef(null);
@@ -53,7 +83,13 @@ export default function DocumentsSection({ storage, library, services = defaultS
     const all = (await library.copies.listCurrent()).sort((a, b) => a.fileName.localeCompare(b.fileName));
     const src = Object.fromEntries((await library.sources.list()).map((s) => [s.id, s]));
     setCopies(all); setSources(src);
-    setStatus(await textStatusOf({ library, copyIds: all.map((c) => c.id) }));
+    const st = await textStatusOf({ library, copyIds: all.map((c) => c.id) });
+    for (const c of all) {
+      const waiting = await proposalsByPage(library, c.id, recordsOfPage);
+      st[c.id].proposed = waiting.reduce((m, w) => m + w.proposed, 0);
+      st[c.id].firstProposalPageId = waiting[0]?.page.id ?? null;
+    }
+    setStatus(st);
     setRuns(await listRunsWithItems({ library, limit: 8 }));
     setCache(await library.pageCache.stats());
   }, [library]);
@@ -109,6 +145,15 @@ export default function DocumentsSection({ storage, library, services = defaultS
   });
   const rerun = (itemId) => run("Re-running page", async (signal, progress) => {
     const t = await rerunTargetOf({ library, itemId });
+    if (t.processor === "llm-reading") {
+      return (await runReading({ copy: await library.copies.get(t.copyId), pageIds: [t.pageId], force: true, signal })).message;
+    }
+    if (t.processor === "llm-extraction") {
+      const regionId = (await library.runs.getRun((await library.runs.getItem(itemId)).runId))?.parameters?.regionId ?? null;
+      if (!regionId) throw new Error("This extraction was not made on a region; draw a box on the page and use Extract with AI");
+      const s = await runExtraction({ copy: await library.copies.get(t.copyId), regionId, force: true, signal, onProgress: (p) => progress(`${p.done}/${p.total}`) });
+      return describeExtraction(s);
+    }
     const svc = await getServices();
     const copy = await library.copies.get(t.copyId);
     const folderHandle = copy.storage.mode === "folder" ? await handleFor() : null;
@@ -137,10 +182,39 @@ export default function DocumentsSection({ storage, library, services = defaultS
     const doc = await openDocument({ fileName: copy.fileName, bytes: await loadCopyBytes({ storage, copy, folderHandle }), engines: svc.engines });
     try { return await getPageImage({ library, page, doc, maxSide: 2000 }); } finally { await doc.close().catch(() => {}); }
   }, [library, storage, folder]); // getServices and handleFor read refs and the folder
+  // AI extraction (P6.T3): the provider, model, key and page limit come from AI settings (device only)
+  const runExtraction = useCallback(async ({ copy, regionId = null, pageIds, force = false, dryRun = false, onProgress, signal }) => {
+    const ai = await aiServices();
+    const settings = await ai.getAiSettings(storage);
+    const missing = ai.missingSetup(settings);
+    if (!dryRun && missing) throw new Error(missing);
+    const client = dryRun ? null : ai.clientFor(settings);
+    // AI extraction reads only a box the researcher drew (review answer b)
+    const s = await ai.extractCopy({ library, copy, client, loadImage, prepareImage: ai.prepareImage, regionId, pageIds, force, dryRun, requireRegion: true, maxPages: settings.maxPages, onProgress, signal });
+    return { ...s, sendTo: sendToOf(ai, settings), missing };
+  }, [aiServices, storage, library, loadImage]);
+  const runReading = useCallback(async ({ copy, pageIds, force = false, dryRun = false, onProgress, signal }) => {
+    const ai = await aiServices();
+    const settings = await ai.getAiSettings(storage);
+    const missing = ai.missingSetup(settings);
+    if (!dryRun && missing) throw new Error(missing);
+    const client = dryRun ? null : ai.clientFor(settings);
+    const s = await ai.readPagesWithAi({ library, copy, client, loadImage, prepareImage: ai.prepareImage, pageIds, force, dryRun, maxPages: settings.maxPages, onProgress, signal });
+    return { summary: { ...s, sendTo: sendToOf(ai, settings), missing }, message: ai.describeReading(s) };
+  }, [aiServices, storage, library, loadImage]);
+
   const closeReview = useCallback(() => { setReviewing(null); refresh().catch(() => {}); }, [refresh]);
 
+  const workspace = reviewing ? (
+    <TextReview library={library} copy={reviewing.copy} initialPageId={reviewing.pageId} initialTab={reviewing.tab} loadImage={loadImage} onClose={closeReview}
+      runExtraction={runExtraction} describeExtraction={describeExtraction} runReading={runReading} inline={inlineWorkspace} />
+  ) : null;
+
+  const totalProposed = useMemo(() => Object.values(status).reduce((n, s) => n + (s.proposed ?? 0), 0), [status]);
   const unread = useMemo(() => copies.filter((c) => { const s = status[c.id]; return !s || s.pages === 0 || s.withText < s.pages; }), [copies, status]);
   const pageName = useCallback((pageId) => pageId.slice(0, 8), []);
+
+  if (inlineWorkspace && workspace) return workspace;   // on the Evidence page the workspace takes the whole area
 
   return (
     <div data-testid="documents-section" style={{ marginTop: 14, paddingTop: 12, borderTop: `1px solid ${C.rule}` }}
@@ -163,6 +237,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
         <button style={mini} disabled={!!busy} onClick={() => fileRef.current?.click()}>Add files…</button>
         <input ref={fileRef} data-testid="doc-files" type="file" multiple accept=".pdf,.docx,.jpg,.jpeg,.png,.tif,.tiff" style={{ display: "none" }}
           onChange={(e) => { if (e.target.files?.length) addFiles(e.target.files); e.target.value = ""; }} />
+        {totalProposed > 0 && <span data-testid="proposals-waiting" style={{ ...small, color: C.rel[1] }}>{totalProposed} proposed values waiting for review</span>}
         {unread.length > 0 && <button style={{ ...mini, ...btnStyle(true), padding: "2px 8px", fontSize: 11 }} disabled={!!busy} onClick={() => readCopies(unread)}>Read {unread.length} unread</button>}
       </div>
 
@@ -187,7 +262,8 @@ export default function DocumentsSection({ storage, library, services = defaultS
                     <span style={mono}>{s.pages ? `${s.withText}/${s.pages} pages read` : "not read"}</span>
                     {s.needsReview > 0 && <span data-testid="needs-review" title="OCR confidence is low or the text does not look like words" style={{ ...mono, color: C.focus }}>{s.needsReview === s.pages ? "needs review" : `${s.needsReview} need review`}</span>}
                     {s.withReading > 0 && <span style={mono}>{s.withReading} reviewed</span>}
-                    {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => setReviewing(c)} aria-label={`Review text of ${c.fileName}`}>Review text</button>}
+                    {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => setReviewing({ copy: c })} aria-label={`Review text of ${c.fileName}`}>Review text</button>}
+                    {s.proposed > 0 && <button style={{ ...mini, borderColor: C.rel[1], color: C.rel[1] }} disabled={!!busy} onClick={() => setReviewing({ copy: c, pageId: s.firstProposalPageId, tab: "records" })} aria-label={`Review ${s.proposed} proposals in ${c.fileName}`}>{s.proposed} to review</button>}
                     <button style={mini} disabled={!!busy} onClick={() => readCopies([c], s.pages && s.withText === s.pages ? { force: true } : {})} aria-label={`Read ${c.fileName}`}>{s.pages && s.withText === s.pages ? "Read again" : "Read"}</button>
                   </span>
                 </div>
@@ -232,7 +308,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
         </details>
       )}
 
-      {reviewing && <TextReview library={library} copy={reviewing} loadImage={loadImage} onClose={closeReview} />}
+      {!inlineWorkspace && workspace}
 
       {cache.entries > 0 && (
         <div style={{ ...small, marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>

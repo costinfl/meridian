@@ -2,11 +2,16 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { C, btnStyle } from "../../theme.js";
 import { uncertainSpans, activeAnnotations } from "../../evidence/domain/reading.js";
 import { needsReview } from "../../ingest/pipeline.js";
+import { currentRegionsOf } from "../../evidence/index.js";
+import RegionOverlay from "./RegionOverlay.jsx";
+import { ANNOTATION_LABEL } from "../../extract/extractor.js";
+import PageRecords from "./PageRecords.jsx";
 
 // Review text (P5.T7): the page image beside its text. The transcription is what the machine read and is never
 // changed. The modern reading is the researcher's own text: fragments in [brackets] are uncertain; selecting a
 // fragment lets you write the correct text and cite where you know it from (a link and a note). Every save is a
 // new version; earlier versions stay in the history.
+// Records (P6.T2, P6.T4): draw regions on the image, type a record by hand, extract records, review proposals.
 
 const small = { font: "400 11.5px Archivo, sans-serif", color: C.inkSoft, lineHeight: 1.5 };
 const mono = { font: "400 10.5px 'IBM Plex Mono', monospace", color: C.inkSoft };
@@ -60,11 +65,11 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : "");
 /**
  * @param {{ library, copy, loadImage: (page) => Promise<{bytes, mimeType}|null>, onClose: () => void }} props
  */
-export default function TextReview({ library, copy, loadImage, onClose }) {
+export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, runReading, initialPageId = null, initialTab = "reading", inline = false }) {
   const [pages, setPages] = useState([]);
   const [idx, setIdx] = useState(0);
   const [data, setData] = useState(null);        // { region, transcription, transcriptionRun, reading, history }
-  const [tab, setTab] = useState("reading");
+  const [tab, setTab] = useState(initialTab);
   const [selection, setSelection] = useState(null); // { start, end }
   const [form, setForm] = useState({ after: "", url: "", note: "" });
   const [rewrite, setRewrite] = useState(null);  // text being typed in "Edit whole text", or null
@@ -72,6 +77,15 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
   const [busy, setBusy] = useState(false);
   const [image, setImage] = useState({ url: null, state: "idle" });
   const [zoom, setZoom] = useState(1);
+  const [regions, setRegions] = useState([]);
+  const [selectedRegionId, setSelectedRegionId] = useState(null);
+  const [drawing, setDrawing] = useState(false);
+  const [extracting, setExtracting] = useState(null);   // AbortController while an extraction runs
+  const [shownLayerId, setShownLayerId] = useState(null); // transcription shown in the Transcription tab (null = current)
+  const [aiReading, setAiReading] = useState(null);       // AbortController while "Read with AI" runs
+  const [confirmAi, setConfirmAi] = useState(null);       // { title, lines, missing, send } before anything is sent
+  const [source, setSource] = useState(null);
+  useEffect(() => { if (copy.sourceId) library.sources.get(copy.sourceId).then(setSource).catch(() => {}); }, [library, copy.sourceId]);
   const textRef = useRef(null);
   const page = pages[idx] ?? null;
   // side by side on wide screens; image above text on narrow ones (each pane scrolls on its own when side by side)
@@ -82,7 +96,10 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  useEffect(() => { library.pages.listPages(copy.id).then(setPages).catch((e) => setMessage(`Failed: ${e.message}`)); }, [library, copy.id]);
+  useEffect(() => {
+    library.pages.listPages(copy.id).then((ps) => { setPages(ps); const i = ps.findIndex((p) => p.id === initialPageId); if (i > 0) setIdx(i); })
+      .catch((e) => setMessage(`Failed: ${e.message}`));
+  }, [library, copy.id, initialPageId]);
 
   const load = useCallback(async () => {
     if (!page) return;
@@ -92,10 +109,26 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
     const transcriptionRun = transcription ? await library.runs.getRun(transcription.runId) : null;
     const reading = await library.textLayers.current(region.id, "reading");
     const history = await library.textLayers.listByRegion(region.id, "reading");
-    setData({ region, transcription, transcriptionRun, reading, history });
+    const transcriptions = [];
+    for (const l of (await library.textLayers.listByRegion(region.id, "transcription")).reverse()) transcriptions.push({ layer: l, run: await library.runs.getRun(l.runId) });
+    setData({ region, transcription, transcriptionRun, reading, history, transcriptions });
   }, [library, page]);
 
   useEffect(() => { setSelection(null); setRewrite(null); setMessage(""); load().catch((e) => setMessage(`Failed: ${e.message}`)); }, [load]);
+
+  const loadRegions = useCallback(async () => { if (page) setRegions(await currentRegionsOf(library, page.id)); }, [library, page]);
+  useEffect(() => { setSelectedRegionId(null); setDrawing(false); loadRegions().catch(() => {}); }, [loadRegions]);
+  const drawRegion = async (box) => {
+    try {
+      const whole = regions.find((r) => r.kind === "page");
+      const n = regions.filter((r) => r.kind !== "page").length + 1;
+      const region = await library.pages.addRegion(drawing === "annotation"
+        ? { pageId: page.id, parentRegionId: whole?.id ?? null, box, kind: "other", label: `${ANNOTATION_LABEL} ${n}` }
+        : { pageId: page.id, parentRegionId: whole?.id ?? null, box, kind: "block", label: `Entry ${n}` });
+      await loadRegions();
+      setSelectedRegionId(region.id); setDrawing(false);
+    } catch (e) { setMessage(`Not saved: ${e.message}`); }
+  };
 
   useEffect(() => {
     if (!page || !loadImage) return undefined;
@@ -154,14 +187,72 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
     if (ok) setRewrite(null);
   };
 
-  const doubtful = needsReview(data?.transcription);
-  const run = data?.transcriptionRun;
+  const shown = data?.transcriptions?.find((t) => t.layer.id === shownLayerId) ?? (data?.transcription ? { layer: data.transcription, run: data.transcriptionRun } : null);
+  const doubtful = needsReview(shown?.layer);
+  const run = shown?.run;
+  // the newest AI transcription's proposed modern reading, if it differs from the researcher's reading
+  const proposal = data?.transcriptions?.find((t) => typeof t.layer.proposedReading === "string") ?? null;
+  const offerProposal = proposal && proposal.layer.proposedReading !== (reading?.originalText ?? null) ? proposal : null;
+  const adopt = () => act(() => library.textLayers.adoptProposedReading({ regionId: data.region.id, fromLayerId: offerProposal.layer.id }),
+    reading ? "The AI reading is saved as a new version of your reading; earlier versions stay in the history." : "Reading started from the AI's modern reading.");
+  // AI is used on demand only, as a last resort, and nothing is sent before the researcher confirms an estimate.
+  const estimateText = (s) => {
+    const p = s.pages[0];
+    if (!p) return "Nothing to send.";
+    return `About ${p.estimatedInputTokens.toLocaleString("en")} input tokens${p.image ? ` and a ${Math.round(p.image.bytes / 1024)} kB image (${p.image.width}×${p.image.height})` : ""} will be sent to ${s.sendTo}.`;
+  };
+  const askAi = async ({ title, dry, send }) => {
+    setMessage("");
+    try {
+      const est = await dry();
+      setConfirmAi({ title, text: estimateText(est), missing: est.missing ?? "", send });
+    } catch (e) { setMessage(`Failed: ${e.message}`); }
+  };
+  const readWithAi = () => askAi({
+    title: "Read this page with AI?",
+    dry: async () => (await runReading({ copy, pageIds: [page.id], force: true, dryRun: true })).summary,
+    send: async () => {
+      const ctl = new AbortController(); setAiReading(ctl); setMessage("Sending the page image to the AI provider…");
+      try { const r = await runReading({ copy, pageIds: [page.id], force: true, signal: ctl.signal }); await load(); setShownLayerId(null); setMessage(r.message); }
+      catch (e) { setMessage(`Failed: ${e.message}`); }
+      finally { setAiReading(null); }
+    },
+  });
+  // prominent only when the earlier steps gave poor text: no text, OCR flagged, or a handwritten source
+  const lowQuality = !data?.transcription || needsReview(data?.transcription) || source?.script === "handwritten";
+  const aiButton = runReading ? (aiReading
+    ? <button style={mini} onClick={() => aiReading.abort()}>Cancel AI reading</button>
+    : lowQuality
+      ? <button style={mini} onClick={readWithAi} title="Last resort when OCR fails: the AI provider chosen in AI settings transcribes this page image and proposes a modern reading. You see the cost estimate first.">Read with AI (when OCR fails)</button>
+      : <button style={{ ...mini, border: "none", background: "none", textDecoration: "underline", color: C.inkSoft }} onClick={readWithAi}>Read with AI anyway…</button>) : null;
+  const confirmPanel = confirmAi ? (
+    <div data-testid="ai-confirm" role="alertdialog" aria-label={confirmAi.title} style={{ border: `1px solid ${C.focus}`, borderRadius: 3, padding: 8, margin: "0 0 8px", background: "#fff" }}>
+      <div style={{ font: "700 12px Archivo, sans-serif", color: C.ink }}>{confirmAi.title}</div>
+      <div style={{ ...small, color: C.ink }}>{confirmAi.text} Your provider charges for it.</div>
+      {confirmAi.missing && <div style={{ ...small, color: C.focus }}>{confirmAi.missing}</div>}
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        <button style={primary} disabled={!!confirmAi.missing} onClick={() => { const go = confirmAi.send; setConfirmAi(null); go(); }}>Send</button>
+        <button style={mini} onClick={() => setConfirmAi(null)}>Cancel</button>
+      </div>
+    </div>
+  ) : null;
+  const proposalPanel = offerProposal ? (
+    <div data-testid="ai-proposal" style={{ border: `1px solid ${C.rel[1]}`, borderRadius: 3, padding: 8, margin: "8px 0", background: "#fff" }}>
+      <div style={{ ...small, color: C.ink, marginBottom: 4 }}>
+        <strong>AI proposes a modern reading</strong> ({offerProposal.run?.modelId?.replace(/^\w+:/, "") || "AI"}, {when(offerProposal.layer.createdAt)}). Check it against the image before using it.
+      </div>
+      <div style={{ ...textBox, minHeight: 0, maxHeight: 200, overflow: "auto", fontSize: 13 }} data-testid="ai-proposal-text">{offerProposal.layer.proposedReading}</div>
+      <button style={{ ...primary, marginTop: 6 }} disabled={busy} onClick={adopt}>{reading ? "Use AI reading (new version of my reading)" : "Use AI reading"}</button>
+    </div>
+  ) : null;
 
   return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(25,32,28,.55)", zIndex: 260, display: "flex", alignItems: "stretch", justifyContent: "center", padding: "2vh 1vw" }}
-      onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div role="dialog" aria-label={`Review text: ${copy.fileName}`} data-testid="text-review" onMouseDown={(e) => e.stopPropagation()}
-        style={{ background: C.paperHi, border: `1px solid ${C.ink}`, borderRadius: 4, width: 1280, maxWidth: "100%", display: "flex", flexDirection: "column", boxShadow: "0 12px 40px rgba(0,0,0,.3)", overflow: "hidden" }}>
+    <div style={inline
+      ? { display: "flex", height: "calc(100vh - 120px)", minHeight: 420 }
+      : { position: "fixed", inset: 0, background: "rgba(25,32,28,.55)", zIndex: 260, display: "flex", alignItems: "stretch", justifyContent: "center", padding: "2vh 1vw" }}
+      onMouseDown={(e) => !inline && e.target === e.currentTarget && onClose()}>
+      <div role={inline ? "region" : "dialog"} aria-label={`Review text: ${copy.fileName}`} data-testid="text-review" onMouseDown={(e) => e.stopPropagation()}
+        style={{ background: C.paperHi, border: `1px solid ${inline ? C.rule : C.ink}`, borderRadius: 4, width: inline ? "100%" : 1280, maxWidth: "100%", display: "flex", flexDirection: "column", boxShadow: inline ? "none" : "0 12px 40px rgba(0,0,0,.3)", overflow: "hidden" }}>
 
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 14px", borderBottom: `1px solid ${C.rule}`, flexWrap: "wrap" }}>
           <div style={{ font: "700 15px Fraunces, Georgia, serif", color: C.ink, flex: "1 1 200px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>Review text — {copy.fileName}</div>
@@ -172,7 +263,7 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
               <button style={mini} disabled={idx >= pages.length - 1} onClick={() => setIdx(idx + 1)} aria-label="Next page">›</button>
             </span>
           )}
-          <button style={mini} onClick={onClose}>Close</button>
+          <button style={mini} onClick={onClose} aria-label="Close">{inline ? "← Documents" : "Close"}</button>
         </div>
 
         <div style={{ display: "flex", flex: 1, minHeight: 0, flexDirection: narrow ? "column" : "row", overflowY: narrow ? "auto" : "hidden" }}>
@@ -185,7 +276,12 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
               <button style={mini} onClick={() => setZoom((z) => Math.min(4, z + 0.25))} aria-label="Zoom in">+</button>
             </div>
             <div style={{ flex: 1, overflow: "auto", background: C.paper, padding: 8 }}>
-              {image.state === "ready" && <img src={image.url} alt={`Page ${idx + 1} of ${copy.fileName}`} style={{ width: `${zoom * 100}%`, display: "block" }} />}
+              {image.state === "ready" && (
+                <div style={{ position: "relative", width: `${zoom * 100}%` }}>
+                  <img src={image.url} alt={`Page ${idx + 1} of ${copy.fileName}`} style={{ width: "100%", display: "block", userSelect: "none" }} draggable={false} />
+                  {tab === "records" && <RegionOverlay regions={regions} selectedId={selectedRegionId} drawing={drawing} onDraw={drawRegion} onSelect={setSelectedRegionId} />}
+                </div>
+              )}
               {image.state === "loading" && <div style={small}>Loading the page image…</div>}
               {image.state === "none" && <div style={small}>This document has no page image (for example a DOCX).</div>}
               {image.state.startsWith("error") && <div style={{ ...small, color: C.focus }}>The page image could not be shown ({image.state.slice(7)}).</div>}
@@ -197,17 +293,52 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }} role="tablist">
               <button role="tab" aria-selected={tab === "reading"} style={tabStyle(tab === "reading")} onClick={() => setTab("reading")}>Modern reading</button>
               <button role="tab" aria-selected={tab === "transcription"} style={tabStyle(tab === "transcription")} onClick={() => setTab("transcription")}>Transcription (as read)</button>
+              <button role="tab" aria-selected={tab === "records"} style={tabStyle(tab === "records")} onClick={() => setTab("records")}>Records</button>
             </div>
 
-            {!data ? <div style={small}>Loading…</div> : !data.region ? <div style={small}>This page has no text region yet. Read the document first.</div> : tab === "transcription" ? (
+            {confirmPanel}
+            {!data ? <div style={small}>Loading…</div> : !data.region ? <div style={small}>This page has no text region yet. Read the document first.</div> : tab === "records" ? (
+              <PageRecords library={library} page={page} regions={regions} selectedRegionId={selectedRegionId} onSelectRegion={setSelectedRegionId}
+                drawing={drawing} onDrawing={setDrawing} imageUrl={image.state === "ready" ? image.url : null}
+                extra={runExtraction ? ({ target, reload, setMessage: say }) => {
+                  const boxed = target && target.kind !== "page";
+                  const extract = () => askAi({
+                    title: `Extract "${target.label || "this box"}" with AI?`,
+                    dry: () => runExtraction({ copy, regionId: target.id, force: true, dryRun: true }),
+                    send: async () => {
+                      const ctl = new AbortController(); setExtracting(ctl); say("Sending the box to the AI provider…");
+                      try {
+                        const s = await runExtraction({ copy, regionId: target.id, force: true, signal: ctl.signal });
+                        await loadRegions(); await reload();
+                        say(describeExtraction(s));
+                      } catch (e) { say(`Failed: ${e.message}`); }
+                      finally { setExtracting(null); }
+                    },
+                  });
+                  return extracting ? (
+                    <button style={mini} onClick={() => extracting.abort()}>Cancel extraction</button>
+                  ) : (
+                    <button style={mini} disabled={!boxed} onClick={extract}
+                      title={boxed ? "When an entry is very hard to read: the AI provider reads this box. You see the cost estimate first." : "Draw a box around the entry, stamp or margin note first"}>Extract with AI</button>
+                  );
+                } : undefined} />
+            ) : tab === "transcription" ? (
               <div data-testid="transcription-tab">
+                <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", marginBottom: 6 }}>
+                  {data.transcriptions?.length > 1 && (
+                    <select aria-label="Transcription shown" value={shown?.layer.id ?? ""} onChange={(e) => setShownLayerId(e.target.value)} style={{ ...field, width: "auto" }}>
+                      {data.transcriptions.map((t, i) => <option key={t.layer.id} value={t.layer.id}>{t.run?.processor ?? "?"}{t.run?.modelId ? ` (${t.run.modelId.replace(/^\w+:/, "")})` : ""} · {when(t.layer.createdAt)}{i === 0 ? " · current" : ""}</option>)}
+                    </select>
+                  )}
+                  {aiButton}
+                </div>
                 <div style={{ ...mono, marginBottom: 6 }}>
-                  {data.transcription
-                    ? <>{run ? `${run.processor}${run.processorVersion ? ` ${run.processorVersion}` : ""}` : "unknown run"} · {when(data.transcription.createdAt)} · confidence {pct(data.transcription.confidence)}</>
+                  {shown
+                    ? <>{run ? `${run.processor}${run.processorVersion ? ` ${run.processorVersion}` : ""}` : "unknown run"} · {when(shown.layer.createdAt)} · confidence {pct(shown.layer.confidence)}</>
                     : "No transcription: this page has not been read (or waits for handwriting recognition)."}
                 </div>
                 {doubtful && <div style={{ ...small, color: C.focus, marginBottom: 6 }}>Needs review: the OCR confidence is low or the text does not look like words. Handwriting is not read well by OCR.</div>}
-                <div style={{ ...textBox, background: C.paper }} data-testid="transcription-text">{data.transcription?.originalText || <span style={small}>(empty)</span>}</div>
+                <div style={{ ...textBox, background: C.paper }} data-testid="transcription-text">{shown?.layer.originalText || <span style={small}>(empty)</span>}</div>
                 <div style={{ ...small, marginTop: 6 }}>This is exactly what the machine read. It is never changed; corrections go into the modern reading.</div>
               </div>
             ) : !reading ? (
@@ -218,7 +349,11 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
                   Write uncertain parts in [square brackets].
                 </div>
                 {doubtful && <div style={{ ...small, color: C.focus, marginTop: 6 }}>The transcription of this page looks doubtful (confidence {pct(data.transcription?.confidence)}).</div>}
-                <button style={{ ...primary, marginTop: 8 }} disabled={busy} onClick={start}>Start reading from transcription</button>
+                <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
+                  <button style={primary} disabled={busy} onClick={start}>Start reading from transcription</button>
+                  {aiButton}
+                </div>
+                {proposalPanel}
               </div>
             ) : rewrite != null ? (
               <div>
@@ -231,6 +366,7 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
               </div>
             ) : (
               <div data-testid="reading-tab">
+                {proposalPanel}
                 <div style={{ ...small, marginBottom: 6 }}>
                   Select a fragment (or click a <span style={{ background: UNCERTAIN_BG }}>[bracketed]</span> one) to correct it and cite where you know it from.
                   <span style={{ background: ANNOTATED_BG, marginLeft: 6 }}>Corrected</span> text shows its source on hover.

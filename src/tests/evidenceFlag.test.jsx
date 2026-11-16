@@ -5,74 +5,69 @@ import { IDBFactory } from "fake-indexeddb";
 import { isEvidenceEnabled } from "../evidenceFlag.js";
 import { createProject } from "../models/project.js";
 
-describe("isEvidenceEnabled", () => {
-  it("is off by default", () => {
-    expect(isEvidenceEnabled(createProject("P"), "")).toBe(false);
-    expect(isEvidenceEnabled(null, "")).toBe(false);
-    expect(isEvidenceEnabled({ people: [] }, "")).toBe(false); // older project without the setting
+describe("isEvidenceEnabled (on by default since the Phase 6 review)", () => {
+  it("is on by default, also for older projects that saved the old preview setting as off", () => {
+    expect(isEvidenceEnabled(createProject("P"), "")).toBe(true);
+    expect(isEvidenceEnabled(null, "")).toBe(true);
+    expect(isEvidenceEnabled({ people: [], settings: { evidenceUi: false } }, "")).toBe(true);
   });
-  it("is on with the project setting", () => {
-    expect(isEvidenceEnabled(createProject("P", { settings: { evidenceUi: true } }), "")).toBe(true);
+  it("is off when the project switches it off", () => {
+    expect(isEvidenceEnabled(createProject("P", { settings: { evidenceOff: true } }), "")).toBe(false);
   });
-  it("is on with ?evidence=1 only", () => {
-    const p = createProject("P");
-    expect(isEvidenceEnabled(p, "?evidence=1")).toBe(true);
-    expect(isEvidenceEnabled(p, "?x=2&evidence=1")).toBe(true);
-    expect(isEvidenceEnabled(p, "?evidence=0")).toBe(false);
-    expect(isEvidenceEnabled(p, "?evidence=true")).toBe(false);
+  it("the URL can force it for testing", () => {
+    const off = createProject("P", { settings: { evidenceOff: true } });
+    expect(isEvidenceEnabled(off, "?evidence=1")).toBe(true);
+    expect(isEvidenceEnabled(createProject("P"), "?x=2&evidence=0")).toBe(false);
+    expect(isEvidenceEnabled(createProject("P"), "?evidence=true")).toBe(true);    // anything else: the project decides
   });
-  it("new projects carry evidenceUi: false", () => {
-    expect(createProject("P").settings.evidenceUi).toBe(false);
+  it("new projects no longer write the old evidenceUi setting", () => {
+    expect("evidenceUi" in createProject("P").settings).toBe(false);
   });
 });
 
-describe("App entry point", () => {
+describe("Evidence page", () => {
   beforeEach(() => {
     global.indexedDB = new IDBFactory();
     global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
   });
   afterEach(() => { cleanup(); window.history.pushState({}, "", "/"); });
 
-  it("hides the Evidence button by default", async () => {
-    const { default: App } = await import("../App.jsx");
-    render(<App />);
-    await screen.findByText(/Sources/);
-    expect(screen.queryByRole("button", { name: /^Evidence$/ })).toBeNull();
-  });
-
-  it("shows the Evidence button with ?evidence=1 and opens the lazy panel", async () => {
-    window.history.pushState({}, "", "/?evidence=1");
+  it("the Evidence button opens its own page (#evidence) in place of the timeline, and goes back", async () => {
     const { default: App } = await import("../App.jsx");
     render(<App />);
     const btn = await screen.findByRole("button", { name: /^Evidence$/ });
+    expect(screen.queryByTestId("evidence-page")).toBeNull();
     fireEvent.click(btn);
-    await waitFor(() => expect(screen.getByRole("dialog", { name: "Evidence" })).toBeInTheDocument());
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Evidence" })).toBeNull());
+    await waitFor(() => expect(screen.getByTestId("evidence-page")).toBeInTheDocument());
+    expect(window.location.hash).toBe("#evidence");
+    expect(screen.queryByText(/scroll · zoom/)).toBeNull();                         // the timeline board is not shown
+    expect(screen.getByRole("navigation", { name: "Evidence sections" }).textContent).toMatch(/Documents.*AI settings/);
+    fireEvent.click(screen.getByRole("button", { name: "← Timeline" }));
+    await waitFor(() => expect(screen.queryByTestId("evidence-page")).toBeNull());
+    expect(window.location.hash).toBe("");
+    expect(screen.getByText(/scroll · zoom/)).toBeInTheDocument();
   });
-});
 
-describe("evidenceUi toggle in the Projects dialog", () => {
-  beforeEach(() => {
-    global.indexedDB = new IDBFactory();
-    global.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
-  });
-  afterEach(() => { cleanup(); window.history.pushState({}, "", "/"); });
-
-  it("turns the Evidence button on and off for the open project, without a URL flag", async () => {
+  it("opens directly on #evidence (reload) and follows the Back button", async () => {
+    window.history.pushState({}, "", "/#evidence");
     const { default: App } = await import("../App.jsx");
     render(<App />);
-    await screen.findByText(/Sources/);
-    expect(screen.queryByRole("button", { name: /^Evidence$/ })).toBeNull();
+    await waitFor(() => expect(screen.getByTestId("evidence-page")).toBeInTheDocument());
+    window.history.pushState({}, "", "/");
+    window.dispatchEvent(new HashChangeEvent("hashchange"));
+    await waitFor(() => expect(screen.queryByTestId("evidence-page")).toBeNull());
+  });
 
+  it("the Projects checkbox switches the layer off and on for the open project", async () => {
+    const { default: App } = await import("../App.jsx");
+    render(<App />);
+    await screen.findByRole("button", { name: /^Evidence$/ });
     fireEvent.click(screen.getByTitle(/projects/i));
-    const box = await screen.findByRole("checkbox", { name: /Evidence layer \(preview\)/ });
-    expect(box).not.toBeChecked();
+    const box = await screen.findByRole("checkbox", { name: /Evidence layer/ });
+    expect(box).toBeChecked();
     fireEvent.click(box);
-    await waitFor(() => expect(screen.getByRole("button", { name: /^Evidence$/ })).toBeInTheDocument());
-    expect(screen.getByRole("checkbox", { name: /Evidence layer \(preview\)/ })).toBeChecked();
-
-    fireEvent.click(screen.getByRole("checkbox", { name: /Evidence layer \(preview\)/ }));
     await waitFor(() => expect(screen.queryByRole("button", { name: /^Evidence$/ })).toBeNull());
+    fireEvent.click(screen.getByRole("checkbox", { name: /Evidence layer/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /^Evidence$/ })).toBeInTheDocument());
   });
 });

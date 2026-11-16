@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import React from "react";
 import { render, screen, waitFor, cleanup } from "@testing-library/react";
 import { requestPersistence, getStorageStatus, formatBytes, describeStorage } from "../storage/persistence.js";
-import EvidencePanel from "../components/evidence/EvidencePanel.jsx";
+import EvidencePanel from "../components/evidence/EvidencePage.jsx";
 
 function stubStorage(impl) {
   Object.defineProperty(globalThis.navigator, "storage", { value: impl, configurable: true });

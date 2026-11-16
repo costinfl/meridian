@@ -1,0 +1,100 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://costinfl.github.io/meridian/schemas/extraction-v1.json",
+  "title": "Meridian extraction contract v1",
+  "description": "What an extractor (an LLM, or any other program) returns for one page or region: the records it found, the people in each record as written, and the relations between them. Values are copied as written in the source; normalised values (dates, ages) are given separately. Nothing in it is a conclusion: Meridian stores every claim as a proposal for the researcher to confirm or reject.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "records"],
+  "properties": {
+    "schemaVersion": { "const": "1" },
+    "records": {
+      "type": "array",
+      "maxItems": 200,
+      "items": { "$ref": "#/definitions/record" }
+    },
+    "notes": { "type": "string", "maxLength": 4000, "description": "Anything the extractor wants the researcher to know (illegible parts, doubts). Not stored as evidence." }
+  },
+  "definitions": {
+    "box": {
+      "type": "object",
+      "description": "Where the record is on the page or region that was read: 0-1 coordinates, x to the right, y down, on the unrotated image.",
+      "additionalProperties": false,
+      "required": ["x0", "y0", "x1", "y1"],
+      "properties": {
+        "x0": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y0": { "type": "number", "minimum": 0, "maximum": 1 },
+        "x1": { "type": "number", "minimum": 0, "maximum": 1 },
+        "y1": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "date": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asWritten"],
+      "properties": {
+        "asWritten": { "type": "string", "maxLength": 300 },
+        "year": { "type": "integer" },
+        "month": { "type": "integer", "minimum": 1, "maximum": 12 },
+        "day": { "type": "integer", "minimum": 1, "maximum": 31 },
+        "calendar": { "enum": ["julian", "gregorian"] },
+        "modifier": { "enum": ["about", "before", "after"] }
+      }
+    },
+    "age": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["asWritten", "value"],
+      "properties": {
+        "asWritten": { "type": "string", "maxLength": 200 },
+        "value": { "type": "integer", "minimum": 0, "maximum": 130 },
+        "unit": { "enum": ["years", "months", "days"] }
+      }
+    },
+    "persona": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["key", "nameAsWritten", "role"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_-]{0,31}$", "description": "Short id used only inside this output, for relations (p1, p2...)." },
+        "nameAsWritten": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "role": { "enum": ["child", "father", "mother", "godparent", "witness", "groom", "bride", "deceased", "priest", "informant", "spouse", "head", "member", "subject", "other"] },
+        "sex": { "enum": ["male", "female", "unknown"] },
+        "age": { "$ref": "#/definitions/age" },
+        "occupation": { "type": "string", "maxLength": 300 },
+        "residence": { "type": "string", "maxLength": 300 },
+        "houseNumber": { "type": "string", "maxLength": 50 },
+        "religion": { "type": "string", "maxLength": 100 },
+        "birthDate": { "$ref": "#/definitions/date" },
+        "birthPlace": { "type": "string", "maxLength": 300 },
+        "deathDate": { "$ref": "#/definitions/date" },
+        "deathPlace": { "type": "string", "maxLength": 300 }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "property", "object"],
+      "properties": {
+        "subject": { "type": "string" },
+        "property": { "enum": ["childOf", "parentOf", "spouseOf", "godparentOf", "witnessFor", "informantFor"] },
+        "object": { "type": "string" },
+        "asWritten": { "type": "string", "maxLength": 300, "description": "The words that state the relation, e.g. \"nepotu mortei\"." }
+      }
+    },
+    "record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "personas"],
+      "properties": {
+        "kind": { "enum": ["baptism", "birth", "marriage", "death", "burial", "census", "notice", "deed", "adoption", "divorce", "other"] },
+        "box": { "$ref": "#/definitions/box" },
+        "eventDate": { "$ref": "#/definitions/date" },
+        "eventPlace": { "type": "string", "maxLength": 300 },
+        "personas": { "type": "array", "maxItems": 100, "items": { "$ref": "#/definitions/persona" } },
+        "relations": { "type": "array", "maxItems": 200, "items": { "$ref": "#/definitions/relation" } },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1, "description": "How sure the extractor is of this record overall." }
+      }
+    }
+  }
+}

@@ -70,9 +70,10 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 | 5 | Ingestion v1: linked folder, PDF/DOCX text, OCR, router | End to end on real documents |
 | 6 | Extraction contract, LLM extractor, review UI | Proposal quality, review speed |
 | 7 | Search | Results on real data |
+| 7b | Transkribus import (scheduled by the reviewer, 2026-11-16) | Handwritten registers read by a trained HTR tool |
 | 8 | Graph projection | FAN and kinship queries |
 | 9 | Entity resolution | Candidate quality, review flow |
-| Backlog | Transkribus, Arcanum, local companion, embeddings, gazetteer | Prioritised by the reviewer |
+| Backlog | Arcanum, local companion, embeddings, gazetteer | Prioritised by the reviewer |
 
 ---
 
@@ -180,6 +181,7 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 | P6.T3 | LLM extractor: provider/model/key in the `settings` store (key entry UI, never exported, **I9**); versioned prompt file; output validated; valid → proposed assertions, invalid → failed run item with the validation error; page limit per batch and dry-run mode. | Tests with a stubbed client; no real API calls in tests. |
 | P6.T4 | Review queue: proposed assertions with their region crop; confirm, reject, correct (a correction is a new assertion superseding the proposal); rejected proposals are not re-proposed for the same region and property. | **I6** tests. |
 | P6.T5 | Connect evidence to the timeline: from a person fact, see its assertions and their crops; attach a confirmed assertion to a fact. | Manual test steps. |
+| P6.T6 | *(added at the start of Phase 6)* LLM page reading: the chosen provider reads the page image and returns a diplomatic transcription (a new transcription layer, processor `llm-reading`) plus a proposed modern reading, which the user applies with a click on the Review text page. | Stubbed-client tests; the proposal is never applied without a user action. |
 
 **Reviewer checks:** extract a few real pages; judge quality and review speed; decide prompt changes and whether to turn the flag on by default.
 
@@ -195,6 +197,15 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 | P7.T4 | Search UI with result crops and a jump to the page. | Manual test steps; acceptable speed on the reviewer's data. |
 
 **Reviewer checks:** search quality and speed on real data.
+
+---
+
+## Phase 7b — Transkribus import (scheduled after Phase 7 by the reviewer, 2026-11-16)
+
+AI reading is a costly last resort; Transkribus (and similar HTR tools) are trained for handwritten registers. Tasks are detailed when the phase starts. Scope:
+- Import a Transkribus **PAGE XML** export (file import first; the Transkribus API, which needs an account and a key, later): text regions and lines become regions with boxes (I4) and a `transcription` text layer from a `transkribus` processor run (model and version recorded, I3).
+- Match the export to registered pages (file name, page number, image size); unmatched pages are reported, never guessed.
+- The imported transcription appears in Review text beside OCR and AI transcriptions; the modern reading and corrections work as today.
 
 ---
 
@@ -229,7 +240,6 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 ## Backlog (not scheduled; the reviewer prioritises)
 
 - **Local ingest companion (separate repo)** — only if Phase 5/6 show in-browser OCR, HTR or external APIs are impractical. A small local program (Java is fine) that watches the documents folder, runs Tesseract/Transkribus/Arcanum, and writes bundle-format `evidence.json` for Meridian to import. Requires a new ADR.
-- Transkribus processor for handwritten registers (PAGE XML → regions and text layers).
 - Arcanum Newspaper Segmentation processor (rotated coordinates → normalised boxes).
 - Julian → Gregorian conversion helpers.
 - Cyrillic and transitional-alphabet transliteration.

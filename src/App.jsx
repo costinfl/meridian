@@ -14,7 +14,7 @@ import { isEvidenceEnabled } from "./evidenceFlag.js";
 import { requestPersistence } from "./storage/persistence.js";
 
 // Evidence UI is code-split: nothing is downloaded unless the flag is on and the panel is opened.
-const EvidencePanel = lazy(() => import("./components/evidence/EvidencePanel.jsx"));
+const EvidencePage = lazy(() => import("./components/evidence/EvidencePage.jsx"));
 
 /* Stop a click on an interactive timeline item from starting a board pan/drag. */
 const stopPD = (e) => e.stopPropagation();
@@ -285,7 +285,19 @@ export default function App() {
   const [toast, setToast] = useState(null);
   const [projectManagerOpen, setProjectManagerOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
-  const [evidenceOpen, setEvidenceOpen] = useState(false);
+  // the Evidence page is its own page beside the timeline, mirrored in the URL hash (#evidence) so reload and Back work
+  const [page, setPage] = useState(() => (typeof window !== "undefined" && window.location.hash === "#evidence" ? "evidence" : "timeline"));
+  useEffect(() => {
+    const onHash = () => setPage(window.location.hash === "#evidence" ? "evidence" : "timeline");
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+  const goTo = (next) => {
+    if (next === page) return;
+    if (next === "evidence") window.location.hash = "evidence";
+    else window.history.pushState(null, "", window.location.pathname + window.location.search);
+    setPage(next);
+  };
   const evidenceOn = isEvidenceEnabled(project);
   useEffect(() => { if (evidenceOn) requestPersistence(); }, [evidenceOn]);
 
@@ -445,6 +457,14 @@ export default function App() {
       console.error("Meridian: could not update the evidence for a fact", err);
       flash("The fact was saved, but its evidence could not be updated — see console.");
     }
+  };
+
+  /* P6.T5: attach a confirmed assertion to a fact (a user action; the fact's own values do not change) */
+  const attachEvidence = async ({ kind, id, laneId, assertionId }) => {
+    const [{ createEvidenceLibrary }, { attachAssertionToFact, attachToProject }] = await Promise.all([import("./evidence/index.js"), import("./conclusions/factEvidence.js")]);
+    const target = { personId: laneId, kind, factId: kind === "birth" || kind === "death" ? null : id, assertionId };
+    await attachAssertionToFact({ library: createEvidenceLibrary(storage), project, ...target });   // checks: confirmed, fact exists
+    updateProject((prev) => attachToProject(prev, target));                                           // applied to the latest project
   };
 
   const saveItem = ({ kind, mode, id, laneKey, laneId, values }) => {
@@ -673,19 +693,30 @@ export default function App() {
           Sources{sources.length > 0 ? ` (${sources.length})` : ""}
         </button>
         {evidenceOn && (
-          <button style={btnStyle(evidenceOpen)} onClick={() => setEvidenceOpen((o) => !o)} title="Evidence layer (preview)">
+          <button style={btnStyle(page === "evidence")} onClick={() => goTo(page === "evidence" ? "timeline" : "evidence")} aria-pressed={page === "evidence"}
+            title={page === "evidence" ? "Back to the timeline" : "Evidence: documents, their text, records and facts"}>
             Evidence
           </button>
         )}
 
+        {!(evidenceOn && page === "evidence") && <>
         <span style={{ width: 1, height: 22, background: C.rule }} />
         <button style={btnStyle(false)} onClick={() => zoomAt(trackW / 2, 1.45)}>+</button>
         <button style={btnStyle(false)} onClick={() => zoomAt(trackW / 2, 1 / 1.45)}>−</button>
         <button style={btnStyle(false)} onClick={fitFocus}>Fit life</button>
         <button style={btnStyle(false)} onClick={fitAll}>All</button>
+        </>}
       </div>
 
+      {/* ------- evidence page (replaces the board while shown; the timeline keeps its state) ------- */}
+      {evidenceOn && page === "evidence" && (
+        <Suspense fallback={<div style={{ flex: 1, padding: 20, font: "500 12px Archivo, sans-serif", color: C.inkSoft }}>Loading…</div>}>
+          <EvidencePage storage={storage} project={project} onProjectChange={updateProject} onClose={() => goTo("timeline")} />
+        </Suspense>
+      )}
+
       {/* ------- board ------- */}
+      {!(evidenceOn && page === "evidence") && <>
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
         <div ref={contentRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
           onPointerLeave={() => { setCrosshair(null); }}
@@ -826,6 +857,7 @@ export default function App() {
           ))}
         </label>
       </div>
+      </>}
 
       {/* tooltip */}
       {tooltip && (
@@ -845,6 +877,7 @@ export default function App() {
           onSave={saveItem}
           onDelete={deleteItem}
           onClose={() => setItemModal(null)}
+          evidence={evidenceOn ? { onAttach: attachEvidence, defaultQuery: people.find((p) => p.id === itemModal.laneId)?.name ?? "" } : null}
         />
       )}
 
@@ -908,7 +941,7 @@ export default function App() {
           projectList={projectList}
           currentProjectId={project?.id}
           onClose={() => setProjectManagerOpen(false)}
-          evidenceUi={project?.settings?.evidenceUi === true}
+          evidenceUi={project?.settings?.evidenceOff !== true}
           onToggleEvidenceUi={setEvidenceUi}
           onCreate={async (name) => { await createProject(name); setProjectManagerOpen(false); initRef.current = false; }}
           onOpen={(id) => { openProject(id); initRef.current = false; }}
@@ -930,12 +963,6 @@ export default function App() {
         />
       )}
 
-      {/* evidence layer (behind the evidenceUi flag, lazy-loaded) */}
-      {evidenceOn && evidenceOpen && (
-        <Suspense fallback={null}>
-          <EvidencePanel storage={storage} project={project} onProjectChange={updateProject} onClose={() => setEvidenceOpen(false)} />
-        </Suspense>
-      )}
 
       {/* toast */}
       {toast && (
