@@ -29,6 +29,7 @@ export { validateExtraction, toEvidence, SCHEMA_VERSION, EXTRACTION_SCHEMA, defa
 export { writeRecords, boxInParent } from "./contract/writeRecords.js";
 export { buildManualRecord, saveManualRecord, suggestRelations, RELATION_RULES } from "./contract/manualEntry.js";
 export { recordsOfPage, currentRegionsOf } from "./contract/pageRecords.js";
+export { correctAssertion, normalizedCorrection, proposalsByPage } from "./contract/review.js";
 
 /** The evidence library bound to a storage service (StorageService or an IndexedDBAdapter). */
 export function createEvidenceLibrary(storage) {

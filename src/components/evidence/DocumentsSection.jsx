@@ -8,6 +8,7 @@ import {
 import { getPageImage, loadCopyBytes, openDocument } from "../../ingest/documents.js";
 import TextReview from "./TextReview.jsx";
 import { wasExtracted } from "../../extract/extractor.js";
+import { proposalsByPage, recordsOfPage } from "../../evidence/index.js";
 
 // Documents (Phase 5): link a folder or add files, scan them into the library, read their text (embedded text
 // or OCR), and see every processing run with its failures. Heavy libraries load only when "Read" is used.
@@ -70,7 +71,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
   const [busy, setBusy] = useState(null);              // { label, progress }
   const [message, setMessage] = useState("");
   const [titles, setTitles] = useState({});            // copyId -> source title being typed
-  const [reviewing, setReviewing] = useState(null);    // the copy open in Review text
+  const [reviewing, setReviewing] = useState(null);    // { copy, pageId?, tab? } open in the page workspace
   const abortRef = useRef(null);
   const svcRef = useRef(null);
   const fileRef = useRef(null);
@@ -85,6 +86,9 @@ export default function DocumentsSection({ storage, library, services = defaultS
       let n = 0;
       for (const pg of await library.pages.listPages(c.id)) if (await wasExtracted(library, pg.id)) n++;
       st[c.id].extracted = n;
+      const waiting = await proposalsByPage(library, c.id, recordsOfPage);
+      st[c.id].proposed = waiting.reduce((m, w) => m + w.proposed, 0);
+      st[c.id].firstProposalPageId = waiting[0]?.page.id ?? null;
     }
     setStatus(st);
     setRuns(await listRunsWithItems({ library, limit: 8 }));
@@ -191,6 +195,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
 
   const closeReview = useCallback(() => { setReviewing(null); refresh().catch(() => {}); }, [refresh]);
 
+  const totalProposed = useMemo(() => Object.values(status).reduce((n, s) => n + (s.proposed ?? 0), 0), [status]);
   const unread = useMemo(() => copies.filter((c) => { const s = status[c.id]; return !s || s.pages === 0 || s.withText < s.pages; }), [copies, status]);
   const pageName = useCallback((pageId) => pageId.slice(0, 8), []);
 
@@ -215,6 +220,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
         <button style={mini} disabled={!!busy} onClick={() => fileRef.current?.click()}>Add files…</button>
         <input ref={fileRef} data-testid="doc-files" type="file" multiple accept=".pdf,.docx,.jpg,.jpeg,.png,.tif,.tiff" style={{ display: "none" }}
           onChange={(e) => { if (e.target.files?.length) addFiles(e.target.files); e.target.value = ""; }} />
+        {totalProposed > 0 && <span data-testid="proposals-waiting" style={{ ...small, color: C.rel[1] }}>{totalProposed} proposed values waiting for review</span>}
         {unread.length > 0 && <button style={{ ...mini, ...btnStyle(true), padding: "2px 8px", fontSize: 11 }} disabled={!!busy} onClick={() => readCopies(unread)}>Read {unread.length} unread</button>}
       </div>
 
@@ -239,7 +245,8 @@ export default function DocumentsSection({ storage, library, services = defaultS
                     <span style={mono}>{s.pages ? `${s.withText}/${s.pages} pages read` : "not read"}</span>
                     {s.needsReview > 0 && <span data-testid="needs-review" title="OCR confidence is low or the text does not look like words" style={{ ...mono, color: C.focus }}>{s.needsReview === s.pages ? "needs review" : `${s.needsReview} need review`}</span>}
                     {s.withReading > 0 && <span style={mono}>{s.withReading} reviewed</span>}
-                    {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => setReviewing(c)} aria-label={`Review text of ${c.fileName}`}>Review text</button>}
+                    {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => setReviewing({ copy: c })} aria-label={`Review text of ${c.fileName}`}>Review text</button>}
+                    {s.proposed > 0 && <button style={{ ...mini, borderColor: C.rel[1], color: C.rel[1] }} disabled={!!busy} onClick={() => setReviewing({ copy: c, pageId: s.firstProposalPageId, tab: "records" })} aria-label={`Review ${s.proposed} proposals in ${c.fileName}`}>{s.proposed} to review</button>}
                     {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => extractDoc(c, s.extracted >= s.pages ? { force: true } : {})} aria-label={`Extract records from ${c.fileName}`} title="Send the pages to the AI provider chosen in AI settings">{s.extracted >= s.pages ? "Extract again" : "Extract"}</button>}
                     {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => extractDoc(c, { dryRun: true })} aria-label={`Dry run for ${c.fileName}`} title="Show what would be sent, without sending">Dry run</button>}
                     <button style={mini} disabled={!!busy} onClick={() => readCopies([c], s.pages && s.withText === s.pages ? { force: true } : {})} aria-label={`Read ${c.fileName}`}>{s.pages && s.withText === s.pages ? "Read again" : "Read"}</button>
@@ -286,7 +293,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
         </details>
       )}
 
-      {reviewing && <TextReview library={library} copy={reviewing} loadImage={loadImage} onClose={closeReview} runExtraction={runExtraction} describeExtraction={describeExtraction} />}
+      {reviewing && <TextReview library={library} copy={reviewing.copy} initialPageId={reviewing.pageId} initialTab={reviewing.tab} loadImage={loadImage} onClose={closeReview} runExtraction={runExtraction} describeExtraction={describeExtraction} />}
 
       {cache.entries > 0 && (
         <div style={{ ...small, marginTop: 6, display: "flex", gap: 8, alignItems: "center" }}>

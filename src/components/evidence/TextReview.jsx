@@ -64,11 +64,11 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : "");
 /**
  * @param {{ library, copy, loadImage: (page) => Promise<{bytes, mimeType}|null>, onClose: () => void }} props
  */
-export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction }) {
+export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, initialPageId = null, initialTab = "reading" }) {
   const [pages, setPages] = useState([]);
   const [idx, setIdx] = useState(0);
   const [data, setData] = useState(null);        // { region, transcription, transcriptionRun, reading, history }
-  const [tab, setTab] = useState("reading");
+  const [tab, setTab] = useState(initialTab);
   const [selection, setSelection] = useState(null); // { start, end }
   const [form, setForm] = useState({ after: "", url: "", note: "" });
   const [rewrite, setRewrite] = useState(null);  // text being typed in "Edit whole text", or null
@@ -90,7 +90,10 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  useEffect(() => { library.pages.listPages(copy.id).then(setPages).catch((e) => setMessage(`Failed: ${e.message}`)); }, [library, copy.id]);
+  useEffect(() => {
+    library.pages.listPages(copy.id).then((ps) => { setPages(ps); const i = ps.findIndex((p) => p.id === initialPageId); if (i > 0) setIdx(i); })
+      .catch((e) => setMessage(`Failed: ${e.message}`));
+  }, [library, copy.id, initialPageId]);
 
   const load = useCallback(async () => {
     if (!page) return;
