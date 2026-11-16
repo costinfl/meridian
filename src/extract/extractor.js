@@ -47,9 +47,14 @@ async function rejectedKeys(library, pageId) {
   return keys;
 }
 
-export function userTextOf({ text, from, region }) {
+/** Label prefix of a region the researcher drew around a stamp or margin note (see PageRecords / TextReview). */
+export const ANNOTATION_LABEL = "Margin note / stamp";
+export const isAnnotationRegion = (r) => !!r && typeof r.label === "string" && r.label.startsWith(ANNOTATION_LABEL);
+
+export function userTextOf({ text, from, region, annotation = false }) {
   const parts = [];
   if (region) parts.push("The image is ONE REGION of the page, cropped by the researcher. Read only what is inside it; boxes are fractions of this cropped image.");
+  if (annotation) parts.push("This region is a STAMP or MARGIN NOTE added to the register, often later and often by another office (a civil registry, a court, a parish). It usually records a later life event of the person in the main entry: a marriage, an adoption, a death or a divorce. Read it as its own record: the kind of event (use kind \"marriage\", \"adoption\", \"death\" or \"divorce\" when it says so, otherwise \"other\"), its date, the place and the issuing office (as eventPlace, as written), and every person named with their role. The person of the main entry is usually role \"subject\".");
   if (text.trim()) parts.push(`Text reading of the whole page (${from === "reading" ? "the researcher's modern reading" : "machine transcription, may contain errors"}):\n<page_text>\n${text}\n</page_text>`);
   else parts.push("There is no text reading of this page; read the image.");
   parts.push("List the records on the image as JSON matching the schema.");
@@ -69,11 +74,12 @@ export function userTextOf({ text, from, region }) {
  * @param {number} [a.maxPages=10]     page limit per batch
  * @param {boolean} [a.dryRun]
  */
-export async function extractCopy({ library, copy, client, loadImage, prepareImage = async (img) => img, pageIds, regionId = null, force = false, maxPages = 10, dryRun = false, onProgress, signal }) {
+export async function extractCopy({ library, copy, client, loadImage, prepareImage = async (img) => img, pageIds, regionId = null, requireRegion = false, force = false, maxPages = 10, dryRun = false, onProgress, signal }) {
   let pages = await library.pages.listPages(copy.id);
   if (pageIds) pages = pages.filter((p) => pageIds.includes(p.id));
   const region = regionId ? await library.pages.getRegion(regionId) : null;
   if (regionId && !region) throw new Error(`Region not found: ${regionId}`);
+  if (requireRegion && (!region || region.kind === "page")) throw new Error("Draw a box around the entry, stamp or margin note first: AI extraction reads only a box");
   if (region) pages = pages.filter((p) => p.id === region.pageId);
 
   const todo = [], skippedDone = [];
@@ -89,7 +95,7 @@ export async function extractCopy({ library, copy, client, loadImage, prepareIma
       const { text, from } = await pageTextOf(library, whole.id);
       const img = await loadImage(page);
       const prepared = img ? await prepareImage(img, { box: region && region.kind !== "page" ? region.box : null }) : null;
-      const promptChars = PROMPT.length + JSON.stringify(EXTRACTION_SCHEMA).length + userTextOf({ text, from, region: !!region }).length;
+      const promptChars = PROMPT.length + JSON.stringify(EXTRACTION_SCHEMA).length + userTextOf({ text, from, region: !!region, annotation: isAnnotationRegion(region) }).length;
       summary.pages.push({
         pageId: page.id, pageIndex: page.pageIndex, textFrom: from, textChars: text.length,
         image: prepared ? { width: prepared.width, height: prepared.height, bytes: prepared.bytes.length } : null,
@@ -118,7 +124,7 @@ export async function extractCopy({ library, copy, client, loadImage, prepareIma
       const img = await loadImage(page);
       const prepared = img ? await prepareImage(img, { box: target.kind !== "page" ? target.box : null }) : null;
       const answer = await client.complete({
-        system: PROMPT, text: userTextOf({ text, from, region: target.kind !== "page" }),
+        system: PROMPT, text: userTextOf({ text, from, region: target.kind !== "page", annotation: isAnnotationRegion(target) }),
         image: prepared ? { base64: toBase64(prepared.bytes), mediaType: prepared.mimeType } : null,
         schema: EXTRACTION_SCHEMA, schemaName: "meridian_extraction_v1", signal,
       });

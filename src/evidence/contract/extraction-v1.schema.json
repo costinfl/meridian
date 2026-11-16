@@ -87,7 +87,7 @@
       "additionalProperties": false,
       "required": ["kind", "personas"],
       "properties": {
-        "kind": { "enum": ["baptism", "birth", "marriage", "death", "burial", "census", "notice", "deed", "other"] },
+        "kind": { "enum": ["baptism", "birth", "marriage", "death", "burial", "census", "notice", "deed", "adoption", "divorce", "other"] },
         "box": { "$ref": "#/definitions/box" },
         "eventDate": { "$ref": "#/definitions/date" },
         "eventPlace": { "type": "string", "maxLength": 300 },

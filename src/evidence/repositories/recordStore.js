@@ -4,7 +4,7 @@ import { validateFuzzyDate } from "../domain/fuzzyDate.js";
 import { dayRangeOf } from "../domain/validity.js";
 import { dmCodesOfName, searchKey } from "../domain/normalize.js";
 
-export const RECORD_KINDS = ["baptism", "birth", "marriage", "death", "burial", "census", "notice", "deed", "other"];
+export const RECORD_KINDS = ["baptism", "birth", "marriage", "death", "burial", "census", "notice", "deed", "adoption", "divorce", "other"];
 export const ROLES = [
   "child", "father", "mother", "godparent", "witness", "groom", "bride", "deceased", "priest",
   "informant", "spouse", "head", "member", "subject", "other",

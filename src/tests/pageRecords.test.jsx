@@ -51,21 +51,21 @@ describe("Records tab: draw a region and enter a record by hand (P6.T2)", () => 
     expect(await within(dialog).findByText("No records on this page yet.")).toBeTruthy();
 
     // draw: the overlay is 1000 x 1400 px on screen
-    fireEvent.click(within(dialog).getByRole("button", { name: "Draw region" }));
+    fireEvent.click(within(dialog).getByRole("button", { name: "Draw entry box" }));
     const overlay = within(dialog).getByTestId("region-overlay");
     overlay.getBoundingClientRect = () => ({ left: 0, top: 0, width: 1000, height: 1400, right: 1000, bottom: 1400 });
     fireEvent.pointerDown(overlay, { clientX: 80, clientY: 182, pointerId: 1 });
     fireEvent.pointerMove(overlay, { clientX: 950, clientY: 1022, pointerId: 1 });
     fireEvent.pointerUp(overlay, { clientX: 950, clientY: 1022, pointerId: 1 });
     await waitFor(() => expect(within(dialog).getAllByTestId("region-box")).toHaveLength(1));
-    expect(within(dialog).getByText("Region 1")).toBeTruthy();
+    expect(within(dialog).getByText("Entry 1")).toBeTruthy();
     const page = (await library.pages.listPages((await library.copies.listCurrent())[0].id))[0];
     const drawn = (await library.pages.listRegions(page.id)).find((r) => r.kind === "block");
     expect(drawn.box).toEqual({ x0: 0.08, y0: 0.13, x1: 0.95, y1: 0.73 });
 
     fireEvent.click(await within(dialog).findByRole("button", { name: "New record…" }));
     const form = within(dialog).getByTestId("manual-record-form");
-    expect(within(form).getByText(/New record on Region 1/)).toBeTruthy();
+    expect(within(form).getByText(/New record on Entry 1/)).toBeTruthy();
     fireEvent.change(within(form).getByLabelText("Date as written"), { target: { value: "la douădieci și șase ale lunii Martie" } });
     fireEvent.change(within(form).getByLabelText("Day"), { target: { value: "26" } });
     fireEvent.change(within(form).getByLabelText("Month"), { target: { value: "3" } });

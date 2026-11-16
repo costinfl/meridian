@@ -7,7 +7,6 @@ import {
 } from "../../ingest/index.js";
 import { getPageImage, loadCopyBytes, openDocument } from "../../ingest/documents.js";
 import TextReview from "./TextReview.jsx";
-import { wasExtracted } from "../../extract/extractor.js";
 import { proposalsByPage, recordsOfPage } from "../../evidence/index.js";
 
 // Documents (Phase 5): link a folder or add files, scan them into the library, read their text (embedded text
@@ -23,6 +22,9 @@ async function defaultAiServices() {
   const [ex, img] = await Promise.all([import("../../extract/index.js"), import("../../extract/image.browser.js")]);
   return { ...ex, prepareImage: img.prepareImageForLlm };
 }
+
+/** Where an AI call would go: "Anthropic Claude claude-opus-5-5". */
+const sendToOf = (ai, settings) => `${ai.PROVIDERS[settings.provider].label}${settings.models[settings.provider] ? ` ${settings.models[settings.provider]}` : ""}`;
 
 /** One line about an extraction or a dry run. */
 export function describeExtraction(s) {
@@ -83,9 +85,6 @@ export default function DocumentsSection({ storage, library, services = defaultS
     setCopies(all); setSources(src);
     const st = await textStatusOf({ library, copyIds: all.map((c) => c.id) });
     for (const c of all) {
-      let n = 0;
-      for (const pg of await library.pages.listPages(c.id)) if (await wasExtracted(library, pg.id)) n++;
-      st[c.id].extracted = n;
       const waiting = await proposalsByPage(library, c.id, recordsOfPage);
       st[c.id].proposed = waiting.reduce((m, w) => m + w.proposed, 0);
       st[c.id].firstProposalPageId = waiting[0]?.page.id ?? null;
@@ -150,7 +149,9 @@ export default function DocumentsSection({ storage, library, services = defaultS
       return (await runReading({ copy: await library.copies.get(t.copyId), pageIds: [t.pageId], force: true, signal })).message;
     }
     if (t.processor === "llm-extraction") {
-      const s = await runExtraction({ copy: await library.copies.get(t.copyId), pageIds: [t.pageId], force: true, signal, onProgress: (p) => progress(`${p.done}/${p.total}`) });
+      const regionId = (await library.runs.getRun((await library.runs.getItem(itemId)).runId))?.parameters?.regionId ?? null;
+      if (!regionId) throw new Error("This extraction was not made on a region; draw a box on the page and use Extract with AI");
+      const s = await runExtraction({ copy: await library.copies.get(t.copyId), regionId, force: true, signal, onProgress: (p) => progress(`${p.done}/${p.total}`) });
       return describeExtraction(s);
     }
     const svc = await getServices();
@@ -185,30 +186,22 @@ export default function DocumentsSection({ storage, library, services = defaultS
   const runExtraction = useCallback(async ({ copy, regionId = null, pageIds, force = false, dryRun = false, onProgress, signal }) => {
     const ai = await aiServices();
     const settings = await ai.getAiSettings(storage);
-    let client = null;
-    if (!dryRun) {
-      const missing = ai.missingSetup(settings);
-      if (missing) throw new Error(missing);
-      client = ai.clientFor(settings);
-    }
-    return ai.extractCopy({ library, copy, client, loadImage, prepareImage: ai.prepareImage, regionId, pageIds, force, dryRun, maxPages: settings.maxPages, onProgress, signal });
+    const missing = ai.missingSetup(settings);
+    if (!dryRun && missing) throw new Error(missing);
+    const client = dryRun ? null : ai.clientFor(settings);
+    // AI extraction reads only a box the researcher drew (review answer b)
+    const s = await ai.extractCopy({ library, copy, client, loadImage, prepareImage: ai.prepareImage, regionId, pageIds, force, dryRun, requireRegion: true, maxPages: settings.maxPages, onProgress, signal });
+    return { ...s, sendTo: sendToOf(ai, settings), missing };
   }, [aiServices, storage, library, loadImage]);
   const runReading = useCallback(async ({ copy, pageIds, force = false, dryRun = false, onProgress, signal }) => {
     const ai = await aiServices();
     const settings = await ai.getAiSettings(storage);
-    let client = null;
-    if (!dryRun) {
-      const missing = ai.missingSetup(settings);
-      if (missing) throw new Error(missing);
-      client = ai.clientFor(settings);
-    }
+    const missing = ai.missingSetup(settings);
+    if (!dryRun && missing) throw new Error(missing);
+    const client = dryRun ? null : ai.clientFor(settings);
     const s = await ai.readPagesWithAi({ library, copy, client, loadImage, prepareImage: ai.prepareImage, pageIds, force, dryRun, maxPages: settings.maxPages, onProgress, signal });
-    return { summary: s, message: ai.describeReading(s) };
+    return { summary: { ...s, sendTo: sendToOf(ai, settings), missing }, message: ai.describeReading(s) };
   }, [aiServices, storage, library, loadImage]);
-  const readDocWithAi = (c) => run("Reading with AI", async (signal, progress) =>
-    (await runReading({ copy: c, signal, onProgress: (p) => progress(`${c.fileName}: page ${p.done}/${p.total}`) })).message);
-  const extractDoc = (c, options) => run(options.dryRun ? "Dry run" : "Extracting", async (signal, progress) =>
-    describeExtraction(await runExtraction({ copy: c, ...options, signal, onProgress: (p) => progress(`${c.fileName}: page ${p.done}/${p.total}`) })));
 
   const closeReview = useCallback(() => { setReviewing(null); refresh().catch(() => {}); }, [refresh]);
 
@@ -264,9 +257,6 @@ export default function DocumentsSection({ storage, library, services = defaultS
                     {s.withReading > 0 && <span style={mono}>{s.withReading} reviewed</span>}
                     {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => setReviewing({ copy: c })} aria-label={`Review text of ${c.fileName}`}>Review text</button>}
                     {s.proposed > 0 && <button style={{ ...mini, borderColor: C.rel[1], color: C.rel[1] }} disabled={!!busy} onClick={() => setReviewing({ copy: c, pageId: s.firstProposalPageId, tab: "records" })} aria-label={`Review ${s.proposed} proposals in ${c.fileName}`}>{s.proposed} to review</button>}
-                    {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => extractDoc(c, s.extracted >= s.pages ? { force: true } : {})} aria-label={`Extract records from ${c.fileName}`} title="Send the pages to the AI provider chosen in AI settings">{s.extracted >= s.pages ? "Extract again" : "Extract"}</button>}
-                    {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => readDocWithAi(c)} aria-label={`Read ${c.fileName} with AI`} title="The AI provider transcribes the page images and proposes a modern reading (handwriting too)">Read with AI</button>}
-                    {s.pages > 0 && <button style={mini} disabled={!!busy} onClick={() => extractDoc(c, { dryRun: true })} aria-label={`Dry run for ${c.fileName}`} title="Show what would be sent, without sending">Dry run</button>}
                     <button style={mini} disabled={!!busy} onClick={() => readCopies([c], s.pages && s.withText === s.pages ? { force: true } : {})} aria-label={`Read ${c.fileName}`}>{s.pages && s.withText === s.pages ? "Read again" : "Read"}</button>
                   </span>
                 </div>

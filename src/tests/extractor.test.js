@@ -137,6 +137,18 @@ describe("extractCopy (P6.T3)", () => {
     expect(cited.box).toEqual({ x0: 0.05, y0: 0.54, x1: 0.97, y1: 0.86 });
   });
 
+  it("with requireRegion (the app's setting) a whole-page call is refused; a margin-note box adds the annotation hint", async () => {
+    const client = stubClient(DEATH);
+    await expect(extractCopy({ library, copy, client, loadImage, requireRegion: true })).rejects.toThrow(/Draw a box/);
+    const whole = await library.pages.wholePageRegion(pages[0].id);
+    await expect(extractCopy({ library, copy, client, loadImage, requireRegion: true, regionId: whole.id })).rejects.toThrow(/Draw a box/);
+    const stamp = await library.pages.addRegion({ pageId: pages[0].id, parentRegionId: whole.id, box: { x0: 0.7, y0: 0, x1: 1, y1: 0.3 }, kind: "other", label: "Margin note / stamp 1" });
+    await extractCopy({ library, copy, client, loadImage, requireRegion: true, regionId: stamp.id });
+    expect(client.calls).toHaveLength(1);
+    expect(client.calls[0].text).toMatch(/STAMP or MARGIN NOTE/);
+    expect(await library.runs.listRuns()).toHaveLength(2);                          // OCR + one extraction; the refused calls wrote nothing
+  });
+
   it("a dry run calls nothing and writes nothing", async () => {
     const client = stubClient(DEATH);
     const s = await extractCopy({ library, copy, client, loadImage, dryRun: true });

@@ -10,6 +10,7 @@ import * as extract from "../extract/index.js";
 import DocumentsSection from "../components/evidence/DocumentsSection.jsx";
 import { cropStyle } from "../components/evidence/AssertionReview.jsx";
 import { checkUserActionOnly } from "./archRules.js";
+import { drawBox, confirmAndSend, openReview } from "./workspaceHelpers.js";
 
 const DEATH = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "extraction", "death-1866.json"), "utf8"));
 
@@ -83,8 +84,13 @@ describe("review queue in the panel (P6.T4)", () => {
     await status(/Added: 1 new/);
     fireEvent.click(screen.getByRole("button", { name: "Read pag32.png" }));
     await status(/^Read 1 pages/);
-    fireEvent.click(screen.getByRole("button", { name: "Extract records from pag32.png" }));
-    await status(/^Extracted 1 record/);
+    const ws = await openReview("pag32.png");
+    fireEvent.click(within(ws).getByRole("tab", { name: "Records" }));
+    await drawBox(ws);
+    await confirmAndSend(ws, "Extract with AI");
+    await recStatus(ws, /^Extracted 1 record/);
+    fireEvent.click(within(ws).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.getByTestId("proposals-waiting")).toBeTruthy());
     const total = (await library.assertions.listByStatus("proposed")).length;
     expect(screen.getByTestId("proposals-waiting").textContent).toBe(`${total} proposed values waiting for review`);
     expect(await library.assertions.listByStatus("confirmed")).toEqual([]);
@@ -116,8 +122,9 @@ describe("review queue in the panel (P6.T4)", () => {
     expect(within(dialog).queryByRole("button", { name: /Confirm all/ })).toBeNull();
     expect((await library.assertions.listByStatus("rejected")).map((a) => a.property)).toEqual(["event.place"]);
 
-    // extract the page again: the rejected place is not proposed again
-    fireEvent.click(within(dialog).getByRole("button", { name: "Extract with AI" }));
+    // extract the record's box again: the rejected place is not proposed again
+    fireEvent.click(within(dialog).getAllByRole("button", { name: "Show region" })[0]);
+    await confirmAndSend(dialog, "Extract with AI");
     await recStatus(dialog, /\(1 you rejected before were not proposed again\)/);
     expect(answers).toBe(2);
     expect((await library.assertions.listByStatus("proposed")).some((a) => a.property === "event.place")).toBe(false);

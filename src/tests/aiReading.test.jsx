@@ -7,6 +7,7 @@ import { createEvidenceLibrary } from "../evidence/index.js";
 import * as extract from "../extract/index.js";
 import DocumentsSection from "../components/evidence/DocumentsSection.jsx";
 import { checkUserActionOnly } from "./archRules.js";
+import { confirmAndSend, openReview } from "./workspaceHelpers.js";
 
 const AI = {
   transcription: "Actu de încetare din viață.\nAnulu una mie optu sute șaizeci și șase la douădieci și optu ale lunii\nMartie … D-ei [Lati? Sati?] [Ifapu?] Catolică",
@@ -91,11 +92,13 @@ describe("Read with AI in the panel (P6.T6)", () => {
     await waitFor(() => expect(screen.getByTestId("documents-status").textContent).toMatch(/Added: 1 new/));
     fireEvent.click(screen.getByRole("button", { name: "Read pag32.png" }));
     await waitFor(() => expect(screen.getByTestId("documents-status").textContent).toMatch(/^Read 1 pages/));
-    fireEvent.click(screen.getByRole("button", { name: "Read pag32.png with AI" }));
-    await waitFor(() => expect(screen.getByTestId("documents-status").textContent).toMatch(/^AI read 1 page\. Open Review text to use its modern reading\.$/));
+    expect(screen.queryByRole("button", { name: /with AI/ })).toBeNull();          // no bulk AI in the document list
 
-    fireEvent.click(screen.getByRole("button", { name: "Review text of pag32.png" }));
-    const dialog = await screen.findByTestId("text-review");
+    const dialog = await openReview("pag32.png");
+    // OCR was poor (34%), so Read with AI is offered as the last resort, with the cost shown first
+    const text = await confirmAndSend(dialog, "Read with AI (when OCR fails)");
+    expect(text).toMatch(/Read this page with AI\?About [\d,]+ input tokens and a \d+ kB image .* will be sent to Anthropic Claude claude-opus-5-5/);
+    await waitFor(() => expect(within(dialog).getByTestId("review-status").textContent).toMatch(/^AI read 1 page\./));
     const panel = await within(dialog).findByTestId("ai-proposal");
     expect(within(panel).getByTestId("ai-proposal-text").textContent).toBe(AI.modernReading);
     expect(within(dialog).queryByTestId("reading-text")).toBeNull();               // not applied yet

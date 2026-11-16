@@ -10,6 +10,7 @@ import { createEvidenceLibrary } from "../evidence/index.js";
 import * as extract from "../extract/index.js";
 import DocumentsSection, { describeExtraction } from "../components/evidence/DocumentsSection.jsx";
 import AiSettings from "../components/evidence/AiSettings.jsx";
+import { drawBox, confirmAndSend, openReview } from "./workspaceHelpers.js";
 import { createProject } from "../models/project.js";
 import { exportProjectZip } from "../share.js";
 
@@ -48,43 +49,50 @@ async function readOnePage() {
   await status(/^Read 1 pages\.$/);
 }
 
-describe("Extract records from the Documents list (P6.T3)", () => {
-  it("asks for a key first; a dry run sends nothing; Extract proposes values and becomes Extract again", async () => {
+describe("AI extraction on demand, on a box only (P6.T3, review follow-up)", () => {
+  it("the document list has no AI buttons; Extract with AI needs a box, shows the cost first, and needs a key", async () => {
     await readOnePage();
-    fireEvent.click(screen.getByRole("button", { name: "Extract records from pag32.png" }));
-    await status(/^Failed: Add your Anthropic Claude API key in AI settings\.$/);
-
-    fireEvent.click(screen.getByRole("button", { name: "Dry run for pag32.png" }));
-    await status(/^Dry run: would send 1 page \(images \d+ kB, about [\d,]+ input tokens\)\. Nothing was sent\.$/);
-    expect(calls).toEqual([]);
-
-    await extract.saveAiSettings(storage, { keys: { anthropic: "sk-ant-api03-test-key-0000" } });
-    fireEvent.click(screen.getByRole("button", { name: "Extract records from pag32.png" }));
-    await status(/^Extracted 1 record with \d+ proposed values from 1 page\.$/);
-    expect(calls).toHaveLength(1);
-    expect(calls[0].image.mediaType).toBe("image/png");
-    await waitFor(() => expect(screen.getByRole("button", { name: "Extract records from pag32.png" }).textContent).toBe("Extract again"));
-    expect((await library.assertions.listByStatus("proposed")).length).toBeGreaterThan(10);
-    expect(await library.assertions.listByStatus("confirmed")).toEqual([]);
-
-    // the run shows in the runs list with its processor
-    expect(screen.getByTestId("runs").textContent).toMatch(/llm-extraction extraction-v1 · succeeded · 1 page/);
-  });
-
-  it("the page workspace extracts the selected page and lists the proposals", async () => {
-    await extract.saveAiSettings(storage, { keys: { anthropic: "sk-ant-api03-test-key-0000" } });
-    await readOnePage();
-    fireEvent.click(screen.getByRole("button", { name: "Review text of pag32.png" }));
-    const dialog = await screen.findByTestId("text-review");
+    expect(screen.queryByRole("button", { name: /Extract records from|with AI|Dry run/ })).toBeNull();
+    const dialog = await openReview("pag32.png");
     fireEvent.click(within(dialog).getByRole("tab", { name: "Records" }));
-    fireEvent.click(await within(dialog).findByRole("button", { name: "Extract with AI" }));
-    await waitFor(() => expect(within(dialog).getByTestId("records-status").textContent).toMatch(/Extracted 1 record/));
+    const button = await within(dialog).findByRole("button", { name: "Extract with AI" });
+    expect(button.disabled).toBe(true);
+    expect(button.title).toMatch(/Draw a box/);
+
+    await drawBox(dialog);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Extract with AI" }));
+    const confirm = await within(dialog).findByTestId("ai-confirm");
+    expect(confirm.textContent).toMatch(/Extract "Entry 1" with AI\?About [\d,]+ input tokens and a \d+ kB image .* will be sent to Anthropic Claude claude-opus-5-5\. Your provider charges for it\./);
+    expect(confirm.textContent).toMatch(/Add your Anthropic Claude API key/);
+    expect(within(confirm).getByRole("button", { name: "Send" }).disabled).toBe(true);
+    fireEvent.click(within(confirm).getByRole("button", { name: "Cancel" }));
+    expect(calls).toEqual([]);                                                       // nothing sent
+
+    await extract.saveAiSettings(storage, { keys: { anthropic: "sk-ant-api03-test-key-0000" } });
+    await confirmAndSend(dialog, "Extract with AI");
+    await waitFor(() => expect(within(dialog).getByTestId("records-status").textContent).toMatch(/^Extracted 1 record with \d+ proposed values from 1 page\.$/));
+    expect(calls).toHaveLength(1);
+    expect(calls[0].text).toMatch(/ONE REGION of the page/);
+    expect(calls[0].text).not.toMatch(/STAMP or MARGIN NOTE/);
     const card = within(dialog).getByTestId("record-card");
     expect(card.textContent).toMatch(/death · 1866-03-26 \(julian\)/);
-    expect(card.textContent).toMatch(/Șfatu Loti/);
     expect(within(card).getAllByTestId("assertion-row").every((r) => /proposed · llm-extraction · 70%/.test(r.textContent))).toBe(true);
-    // the boxed record got its own region on the image
-    expect(within(dialog).getAllByTestId("region-box")).toHaveLength(1);
+    expect(await library.assertions.listByStatus("confirmed")).toEqual([]);
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));             // the list refreshes on close
+    await waitFor(() => expect(screen.getByTestId("runs").textContent).toMatch(/llm-extraction extraction-v1 · succeeded · 1 page/));
+  });
+
+  it("a stamp / margin note box tells the model it is a later annotation", async () => {
+    await extract.saveAiSettings(storage, { keys: { anthropic: "sk-ant-api03-test-key-0000" } });
+    await readOnePage();
+    const dialog = await openReview("pag32.png");
+    fireEvent.click(within(dialog).getByRole("tab", { name: "Records" }));
+    await drawBox(dialog, { purpose: "annotation", from: [700, 100], to: [990, 400] });
+    expect(within(dialog).getByText(/Margin note \/ stamp 1/)).toBeTruthy();
+    const text = await confirmAndSend(dialog, "Extract with AI");
+    expect(text).toMatch(/Extract "Margin note \/ stamp 1" with AI\?/);
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0].text).toMatch(/STAMP or MARGIN NOTE[\s\S]*marriage, an adoption, a death or a divorce/);
   });
 });
 

@@ -4,6 +4,7 @@ import { uncertainSpans, activeAnnotations } from "../../evidence/domain/reading
 import { needsReview } from "../../ingest/pipeline.js";
 import { currentRegionsOf } from "../../evidence/index.js";
 import RegionOverlay from "./RegionOverlay.jsx";
+import { ANNOTATION_LABEL } from "../../extract/extractor.js";
 import PageRecords from "./PageRecords.jsx";
 
 // Review text (P5.T7): the page image beside its text. The transcription is what the machine read and is never
@@ -82,6 +83,9 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
   const [extracting, setExtracting] = useState(null);   // AbortController while an extraction runs
   const [shownLayerId, setShownLayerId] = useState(null); // transcription shown in the Transcription tab (null = current)
   const [aiReading, setAiReading] = useState(null);       // AbortController while "Read with AI" runs
+  const [confirmAi, setConfirmAi] = useState(null);       // { title, lines, missing, send } before anything is sent
+  const [source, setSource] = useState(null);
+  useEffect(() => { if (copy.sourceId) library.sources.get(copy.sourceId).then(setSource).catch(() => {}); }, [library, copy.sourceId]);
   const textRef = useRef(null);
   const page = pages[idx] ?? null;
   // side by side on wide screens; image above text on narrow ones (each pane scrolls on its own when side by side)
@@ -117,7 +121,10 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
   const drawRegion = async (box) => {
     try {
       const whole = regions.find((r) => r.kind === "page");
-      const region = await library.pages.addRegion({ pageId: page.id, parentRegionId: whole?.id ?? null, box, kind: "block", label: `Region ${regions.length}` });
+      const n = regions.filter((r) => r.kind !== "page").length + 1;
+      const region = await library.pages.addRegion(drawing === "annotation"
+        ? { pageId: page.id, parentRegionId: whole?.id ?? null, box, kind: "other", label: `${ANNOTATION_LABEL} ${n}` }
+        : { pageId: page.id, parentRegionId: whole?.id ?? null, box, kind: "block", label: `Entry ${n}` });
       await loadRegions();
       setSelectedRegionId(region.id); setDrawing(false);
     } catch (e) { setMessage(`Not saved: ${e.message}`); }
@@ -188,15 +195,47 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
   const offerProposal = proposal && proposal.layer.proposedReading !== (reading?.originalText ?? null) ? proposal : null;
   const adopt = () => act(() => library.textLayers.adoptProposedReading({ regionId: data.region.id, fromLayerId: offerProposal.layer.id }),
     reading ? "The AI reading is saved as a new version of your reading; earlier versions stay in the history." : "Reading started from the AI's modern reading.");
-  const readWithAi = async () => {
-    const ctl = new AbortController(); setAiReading(ctl); setMessage("Sending the page image to the AI provider…");
-    try { const r = await runReading({ copy, pageIds: [page.id], force: true, signal: ctl.signal }); await load(); setShownLayerId(null); setMessage(r.message); }
-    catch (e) { setMessage(`Failed: ${e.message}`); }
-    finally { setAiReading(null); }
+  // AI is used on demand only, as a last resort, and nothing is sent before the researcher confirms an estimate.
+  const estimateText = (s) => {
+    const p = s.pages[0];
+    if (!p) return "Nothing to send.";
+    return `About ${p.estimatedInputTokens.toLocaleString("en")} input tokens${p.image ? ` and a ${Math.round(p.image.bytes / 1024)} kB image (${p.image.width}×${p.image.height})` : ""} will be sent to ${s.sendTo}.`;
   };
+  const askAi = async ({ title, dry, send }) => {
+    setMessage("");
+    try {
+      const est = await dry();
+      setConfirmAi({ title, text: estimateText(est), missing: est.missing ?? "", send });
+    } catch (e) { setMessage(`Failed: ${e.message}`); }
+  };
+  const readWithAi = () => askAi({
+    title: "Read this page with AI?",
+    dry: async () => (await runReading({ copy, pageIds: [page.id], force: true, dryRun: true })).summary,
+    send: async () => {
+      const ctl = new AbortController(); setAiReading(ctl); setMessage("Sending the page image to the AI provider…");
+      try { const r = await runReading({ copy, pageIds: [page.id], force: true, signal: ctl.signal }); await load(); setShownLayerId(null); setMessage(r.message); }
+      catch (e) { setMessage(`Failed: ${e.message}`); }
+      finally { setAiReading(null); }
+    },
+  });
+  // prominent only when the earlier steps gave poor text: no text, OCR flagged, or a handwritten source
+  const lowQuality = !data?.transcription || needsReview(data?.transcription) || source?.script === "handwritten";
   const aiButton = runReading ? (aiReading
     ? <button style={mini} onClick={() => aiReading.abort()}>Cancel AI reading</button>
-    : <button style={mini} onClick={readWithAi} title="The AI provider chosen in AI settings transcribes this page image and proposes a modern reading">Read with AI</button>) : null;
+    : lowQuality
+      ? <button style={mini} onClick={readWithAi} title="Last resort when OCR fails: the AI provider chosen in AI settings transcribes this page image and proposes a modern reading. You see the cost estimate first.">Read with AI (when OCR fails)</button>
+      : <button style={{ ...mini, border: "none", background: "none", textDecoration: "underline", color: C.inkSoft }} onClick={readWithAi}>Read with AI anyway…</button>) : null;
+  const confirmPanel = confirmAi ? (
+    <div data-testid="ai-confirm" role="alertdialog" aria-label={confirmAi.title} style={{ border: `1px solid ${C.focus}`, borderRadius: 3, padding: 8, margin: "0 0 8px", background: "#fff" }}>
+      <div style={{ font: "700 12px Archivo, sans-serif", color: C.ink }}>{confirmAi.title}</div>
+      <div style={{ ...small, color: C.ink }}>{confirmAi.text} Your provider charges for it.</div>
+      {confirmAi.missing && <div style={{ ...small, color: C.focus }}>{confirmAi.missing}</div>}
+      <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+        <button style={primary} disabled={!!confirmAi.missing} onClick={() => { const go = confirmAi.send; setConfirmAi(null); go(); }}>Send</button>
+        <button style={mini} onClick={() => setConfirmAi(null)}>Cancel</button>
+      </div>
+    </div>
+  ) : null;
   const proposalPanel = offerProposal ? (
     <div data-testid="ai-proposal" style={{ border: `1px solid ${C.rel[1]}`, borderRadius: 3, padding: 8, margin: "8px 0", background: "#fff" }}>
       <div style={{ ...small, color: C.ink, marginBottom: 4 }}>
@@ -255,26 +294,30 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
               <button role="tab" aria-selected={tab === "records"} style={tabStyle(tab === "records")} onClick={() => setTab("records")}>Records</button>
             </div>
 
+            {confirmPanel}
             {!data ? <div style={small}>Loading…</div> : !data.region ? <div style={small}>This page has no text region yet. Read the document first.</div> : tab === "records" ? (
               <PageRecords library={library} page={page} regions={regions} selectedRegionId={selectedRegionId} onSelectRegion={setSelectedRegionId}
                 drawing={drawing} onDrawing={setDrawing} imageUrl={image.state === "ready" ? image.url : null}
                 extra={runExtraction ? ({ target, reload, setMessage: say }) => {
-                  const go = async (options) => {
-                    const ctl = new AbortController(); setExtracting(ctl); say(options.dryRun ? "Preparing the dry run…" : "Sending the page to the AI provider…");
-                    try {
-                      const s = await runExtraction({ copy, ...(target.kind === "page" ? { pageIds: [page.id] } : { regionId: target.id }), force: true, signal: ctl.signal, ...options });
-                      await loadRegions(); await reload();
-                      say(describeExtraction(s));
-                    } catch (e) { say(`Failed: ${e.message}`); }
-                    finally { setExtracting(null); }
-                  };
+                  const boxed = target && target.kind !== "page";
+                  const extract = () => askAi({
+                    title: `Extract "${target.label || "this box"}" with AI?`,
+                    dry: () => runExtraction({ copy, regionId: target.id, force: true, dryRun: true }),
+                    send: async () => {
+                      const ctl = new AbortController(); setExtracting(ctl); say("Sending the box to the AI provider…");
+                      try {
+                        const s = await runExtraction({ copy, regionId: target.id, force: true, signal: ctl.signal });
+                        await loadRegions(); await reload();
+                        say(describeExtraction(s));
+                      } catch (e) { say(`Failed: ${e.message}`); }
+                      finally { setExtracting(null); }
+                    },
+                  });
                   return extracting ? (
                     <button style={mini} onClick={() => extracting.abort()}>Cancel extraction</button>
                   ) : (
-                    <>
-                      <button style={mini} onClick={() => go({})} title="Send this region (or the whole page) to the AI provider chosen in AI settings">Extract with AI</button>
-                      <button style={mini} onClick={() => go({ dryRun: true })} title="Show what would be sent, without sending">Dry run</button>
-                    </>
+                    <button style={mini} disabled={!boxed} onClick={extract}
+                      title={boxed ? "When an entry is very hard to read: the AI provider reads this box. You see the cost estimate first." : "Draw a box around the entry, stamp or margin note first"}>Extract with AI</button>
                   );
                 } : undefined} />
             ) : tab === "transcription" ? (

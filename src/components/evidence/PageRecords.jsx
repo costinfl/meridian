@@ -37,10 +37,12 @@ export default function PageRecords({ library, page, regions, selectedRegionId, 
   return (
     <div data-testid="page-records">
       <div style={{ ...small, marginBottom: 6 }}>
-        Draw a region around one entry on the image (or use the whole page), then type its record or let AI extract it.
+        Draw a box around one entry, or around a stamp or margin note (later events such as a marriage, adoption, death or
+        divorce are often noted there), then type its record. If it is very hard to read, <strong>Extract with AI</strong> reads only that box.
       </div>
       <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center", marginBottom: 8 }}>
-        <button style={toggle(drawing)} aria-pressed={drawing} onClick={() => onDrawing(!drawing)}>{drawing ? "Drawing… (drag on the image)" : "Draw region"}</button>
+        <button style={toggle(drawing === "entry")} aria-pressed={drawing === "entry"} onClick={() => onDrawing(drawing === "entry" ? false : "entry")}>{drawing === "entry" ? "Drawing… (drag on the image)" : "Draw entry box"}</button>
+        <button style={toggle(drawing === "annotation")} aria-pressed={drawing === "annotation"} onClick={() => onDrawing(drawing === "annotation" ? false : "annotation")}>{drawing === "annotation" ? "Drawing… (drag on the image)" : "Draw stamp / margin note"}</button>
         <span style={small}>Working on: <strong style={{ color: C.ink }}>{targetLabel}</strong></span>
         {selected && <button style={mini} onClick={() => onSelectRegion(null)}>Use whole page</button>}
         {!entering && target && <button style={mini} onClick={() => { setEntering(true); setMessage(""); }}>New record…</button>}
