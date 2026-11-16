@@ -10,6 +10,7 @@
     "test": "vitest"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
     "@tesseract.js-data/ron": "^1.0.0",
     "ajv": "^8.20.0",
     "jszip": "^3.10.1",

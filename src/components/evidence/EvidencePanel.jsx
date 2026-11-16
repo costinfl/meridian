@@ -6,6 +6,7 @@ import { dryRunLegacyConversion, formatDryRun, convertLegacyFacts, confirmLegacy
 import { currentLinks, decideLink } from "../../conclusions/personaLinks.js";
 import { displayName } from "../../models/project.js";
 import DocumentsSection from "./DocumentsSection.jsx";
+import AiSettings from "./AiSettings.jsx";
 
 // Evidence layer entry point (behind the evidenceUi flag, loaded lazily from App.jsx).
 // Phase 4: record existing timeline facts as evidence, in two deliberate steps.
@@ -134,6 +135,7 @@ export default function EvidencePanel({ onClose, storage, project, onProjectChan
         )}
 
         {library && <DocumentsSection storage={storage} library={library} />}
+        {library && storage?.getSetting && <AiSettings storage={storage} />}
 
         <div data-testid="storage-status" style={{ marginTop: 14, font: "400 11px 'IBM Plex Mono', monospace", color: C.inkSoft, lineHeight: 1.5 }}>{line}</div>
         <div style={{ marginTop: 14, textAlign: "right" }}>

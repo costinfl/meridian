@@ -64,7 +64,7 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : "");
 /**
  * @param {{ library, copy, loadImage: (page) => Promise<{bytes, mimeType}|null>, onClose: () => void }} props
  */
-export default function TextReview({ library, copy, loadImage, onClose }) {
+export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction }) {
   const [pages, setPages] = useState([]);
   const [idx, setIdx] = useState(0);
   const [data, setData] = useState(null);        // { region, transcription, transcriptionRun, reading, history }
@@ -79,6 +79,7 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
   const [regions, setRegions] = useState([]);
   const [selectedRegionId, setSelectedRegionId] = useState(null);
   const [drawing, setDrawing] = useState(false);
+  const [extracting, setExtracting] = useState(null);   // AbortController while an extraction runs
   const textRef = useRef(null);
   const page = pages[idx] ?? null;
   // side by side on wide screens; image above text on narrow ones (each pane scrolls on its own when side by side)
@@ -225,7 +226,26 @@ export default function TextReview({ library, copy, loadImage, onClose }) {
 
             {!data ? <div style={small}>Loading…</div> : !data.region ? <div style={small}>This page has no text region yet. Read the document first.</div> : tab === "records" ? (
               <PageRecords library={library} page={page} regions={regions} selectedRegionId={selectedRegionId} onSelectRegion={setSelectedRegionId}
-                drawing={drawing} onDrawing={setDrawing} imageUrl={image.state === "ready" ? image.url : null} />
+                drawing={drawing} onDrawing={setDrawing} imageUrl={image.state === "ready" ? image.url : null}
+                extra={runExtraction ? ({ target, reload, setMessage: say }) => {
+                  const go = async (options) => {
+                    const ctl = new AbortController(); setExtracting(ctl); say(options.dryRun ? "Preparing the dry run…" : "Sending the page to the AI provider…");
+                    try {
+                      const s = await runExtraction({ copy, ...(target.kind === "page" ? { pageIds: [page.id] } : { regionId: target.id }), force: true, signal: ctl.signal, ...options });
+                      await loadRegions(); await reload();
+                      say(describeExtraction(s));
+                    } catch (e) { say(`Failed: ${e.message}`); }
+                    finally { setExtracting(null); }
+                  };
+                  return extracting ? (
+                    <button style={mini} onClick={() => extracting.abort()}>Cancel extraction</button>
+                  ) : (
+                    <>
+                      <button style={mini} onClick={() => go({})} title="Send this region (or the whole page) to the AI provider chosen in AI settings">Extract with AI</button>
+                      <button style={mini} onClick={() => go({ dryRun: true })} title="Show what would be sent, without sending">Dry run</button>
+                    </>
+                  );
+                } : undefined} />
             ) : tab === "transcription" ? (
               <div data-testid="transcription-tab">
                 <div style={{ ...mono, marginBottom: 6 }}>
