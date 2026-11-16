@@ -447,6 +447,14 @@ export default function App() {
     }
   };
 
+  /* P6.T5: attach a confirmed assertion to a fact (a user action; the fact's own values do not change) */
+  const attachEvidence = async ({ kind, id, laneId, assertionId }) => {
+    const [{ createEvidenceLibrary }, { attachAssertionToFact, attachToProject }] = await Promise.all([import("./evidence/index.js"), import("./conclusions/factEvidence.js")]);
+    const target = { personId: laneId, kind, factId: kind === "birth" || kind === "death" ? null : id, assertionId };
+    await attachAssertionToFact({ library: createEvidenceLibrary(storage), project, ...target });   // checks: confirmed, fact exists
+    updateProject((prev) => attachToProject(prev, target));                                           // applied to the latest project
+  };
+
   const saveItem = ({ kind, mode, id, laneKey, laneId, values }) => {
     if (mode === "edit" && (kind === "birth" || kind === "death" || ["event", "period", "group"].includes(kind))) {
       syncFactEdit({ laneId, kind, id, values });
@@ -845,6 +853,7 @@ export default function App() {
           onSave={saveItem}
           onDelete={deleteItem}
           onClose={() => setItemModal(null)}
+          evidence={project?.settings?.evidenceUi === true ? { onAttach: attachEvidence, defaultQuery: people.find((p) => p.id === itemModal.laneId)?.name ?? "" } : null}
         />
       )}
 

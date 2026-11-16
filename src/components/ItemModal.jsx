@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { Modal } from "./Modal.jsx";
 import { C, btnStyle, hexA, ITEM_COLORS, EVENT_TYPES, eventType } from "../theme.js";
 
@@ -14,6 +14,9 @@ const KIND_META = {
   birth:      { label: "Birth",             point: true,  titleField: "place", fact: true },
   death:      { label: "Death",             point: true,  titleField: "place", fact: true },
 };
+
+// Evidence of a fact (Phase 6, behind the evidence flag); loaded only when shown, so the timeline stays small.
+const FactEvidence = lazy(() => import("./evidence/FactEvidence.jsx"));
 
 // Kinds that carry a `verified` flag (i.e. can flow into standard GEDCOM export).
 const VERIFIABLE = new Set(["event", "period", "group", "birth", "death"]);
@@ -83,7 +86,7 @@ function SourceView({ source, storage }) {
   );
 }
 
-export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete, onClose }) {
+export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete, onClose, evidence = null }) {
   const [kind, setKind] = useState(descriptor.kind);
   const [form, setForm] = useState(() => initForm(descriptor.kind, descriptor.item));
 
@@ -122,6 +125,14 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
     emit(values);
   };
 
+  // evidence = { onAttach(assertionId), defaultQuery } when the evidence layer is on; facts only, not while creating
+  const evidenceBlock = evidence && VERIFIABLE.has(kind) && mode !== "create" && descriptor.item ? (
+    <Suspense fallback={null}>
+      <FactEvidence storage={storage} fact={descriptor.item} defaultQuery={evidence.defaultQuery}
+        onAttach={mode === "edit" ? (assertionId) => evidence.onAttach({ kind, id: descriptor.id, laneId: descriptor.laneId, assertionId }) : null} />
+    </Suspense>
+  ) : null;
+
   const verifiedBadge = (on) => (
     <span style={{ font: "700 9px Archivo, sans-serif", letterSpacing: ".08em", textTransform: "uppercase", padding: "1px 6px", borderRadius: 2,
       color: on ? C.paperHi : C.inkSoft, background: on ? "#34635C" : hexA(C.ink, 0.08), border: `1px solid ${on ? "#34635C" : C.rule}` }}>
@@ -155,6 +166,7 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
         ) : (
           <div style={{ font: "italic 500 11px Fraunces, Georgia, serif", color: hexA(C.ink, 0.4), marginTop: 10 }}>No source linked.</div>
         )}
+        {evidenceBlock}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
           <button style={btnStyle(false)} onClick={onClose}>Close</button>
         </div>
@@ -258,6 +270,8 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
           </button>
         </>
       )}
+
+      {evidenceBlock}
 
       <div style={{ display: "flex", gap: 8, justifyContent: "space-between", marginTop: 14 }}>
         <div>

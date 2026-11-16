@@ -110,6 +110,17 @@ export function createRecordStore(storage) {
     },
     /** Personas with exactly this folded name (case/accent-insensitive). */
     findPersonasByName: (name) => storage.dbGetAllByIndex(PERSONAS, "byNameKey", searchKey(name)),
+    /** Personas whose name contains every word of `query` (diacritics and case folded). Scans; fine at personal scale. */
+    async searchPersonas(query, { limit = 50 } = {}) {
+      const words = searchKey(query).split(" ").filter(Boolean);
+      if (!words.length) return [];
+      const out = [];
+      for (const p of await storage.dbGetAll(PERSONAS)) {
+        if (words.every((w) => p.nameKey.includes(w))) out.push(p);
+        if (out.length >= limit) break;
+      }
+      return out;
+    },
     /** Personas whose name has a token with this Daitch-Mokotoff code. */
     findPersonasByDm: (code) => storage.dbGetAllByIndex(PERSONAS, "bySurnameDm", code),
   };
