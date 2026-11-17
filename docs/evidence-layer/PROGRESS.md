@@ -5,9 +5,9 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 ## Current status
 
 - **Current phase:** 7b — Transkribus import
-- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Phase 7b report, documentation, pull request.
-- **Last updated:** 2026-11-17 (P7b.T4)
+- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** Wait for review of Phase 7b.
+- **Last updated:** 2026-11-17 (Phase 7b complete)
 
 ## Phase overview
 
@@ -21,7 +21,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 5 Ingestion v1 | approved | evidence/p5 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-14 |
 | 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
 | 7 Search | approved | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
-| 7b Transkribus import | in progress | done on `ccr-adaa4345-wbnkkm` | |
+| 7b Transkribus import | awaiting review | done on `ccr-adaa4345-wbnkkm` | |
 | 8 Graph projection | not started | evidence/p8 | |
 | 9 Entity resolution | not started | evidence/p9 | |
 
@@ -321,6 +321,46 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 
 ## Phase reports
 
+### Phase 7b report
+- **Built:** import of Transkribus exports (PAGE XML), as files:
+  - *P7b.T1* a PAGE XML reader (any PAGE version or prefix): page size, metadata and recognition model, lines in reading order with 0–1 boxes (I4);
+  - *P7b.T2* reading a ZIP export (METS order) or loose XML files, and matching pages by image file name (with or without Transkribus's number prefix) or by page order onto a chosen document, with an aspect check (different shape / turned by 90°); unmatched pages are reported with the reason;
+  - *P7b.T3* the import: a `transkribus` run (model recorded), raw PAGE XML kept, a new transcription layer per page with lines as positioned words; the same XML is never imported twice;
+  - *P7b.T4* **Import Transkribus export…** in Documents (matches with tick boxes, unmatched with reasons, document picker, result line) and **Show line boxes on the image** in Review text.
+- **IndexedDB version / stores added:** none (still 6). New processor value `transkribus`.
+- **New dependencies:** none (JSZip and DOMParser were already available). Main bundle unchanged.
+- **Deviations:** none from the plan; reviewer decisions in the log (2026-11-17).
+- **Invariants:** I1 imported text is a new layer; nothing is overwritten. I3 a run per import, an item per page. I4 line boxes 0–1, clamped. I6 the importer adds transcriptions only (architecture rule; no readings). I7 search picks the text up through the incremental index (tested).
+- **Tests:** 473 → **489**. `npm test -- --run` and `npm run build` pass.
+- **Real-browser check (headless Chromium, dev server):** I built a Transkribus-style ZIP (`<doc>/<title>/page/0001_pag32-upright.xml` plus `mets.xml`) for the 1866 page, from my own transcription with hand-placed line positions. On the page already read by OCR:
+  - the export was matched by file name and imported ("Imported 1 page");
+  - importing it again gave "Imported 0 pages; 1 already imported";
+  - Review text listed the transkribus transcription (with its model) above the tesseract one;
+  - **Show line boxes** drew 16 boxes over the lines;
+  - Search found "Constandin Cristescu" on the page.
+  - No page errors.
+- **How to verify:** with a real Transkribus document:
+  1. In Transkribus: Export → **PAGE XML** (images not needed).
+  2. In Meridian, Evidence → Documents: add the same scans (or the PDF) and **Read**.
+  3. **Import Transkribus export…** → check the matches (pick the document for a PDF) → **Import**.
+  4. Open Review text → Transcription → compare with OCR; tick **Show line boxes**.
+  5. Search for a name from the page.
+- **Backup reminder:** no database change in this phase; a bundle backup is still good practice.
+- **Known limitations:**
+  1. **No real Transkribus export was available here.** The reader follows the PAGE schemas and the files Transkribus writes, but please try a real one.
+  2. The Transkribus API (sending scans and fetching results directly) is not built; this phase imports files only.
+  3. Images in the export are ignored, so a page Meridian does not already have cannot be created from the export.
+  4. A page whose image was rotated in Transkribus is flagged, but its line boxes are not turned.
+  5. The questions from the Phase 7 report (ranking, undated text with a year filter, a name-variant screen, search on real data) are still open.
+- **Questions for the reviewer:**
+  - (a) After importing a real export: is the matching right for how you upload (by file name, or by page order for a PDF)?
+  - (b) Should importing a Transkribus page also start your modern reading from it when you have none yet?
+  - (c) Should the Transkribus API be planned (it needs your account and key), or is file import enough?
+
+**Review**
+- Approved: no
+- Reviewer notes:
+
 ### Phase 7 report
 - **Built:** search over everything read so far, on the Evidence page:
   - *P7.T1* the search index: IndexedDB **v6** store `evSearchIndex`; one document per region with text or evidence (current transcription, current modern reading, values read there; names with Daitch–Mokotoff codes and one-hop variants; date bounds; places with their ancestors; source/page/box; confirmed/proposed flags; rejected and superseded values left out); MiniSearch, serialised to the store; a Web Worker (`src/workers/search.worker.js`) with an in-page fallback;
@@ -590,6 +630,7 @@ Template for each phase:
 | 2026-11-08 | Phase 2 review | see git log | Phase 2 approved by merge; Phase 3 started. |
 | 2026-11-08 | P3.T1-P3.T7 | see git log | Phase 3 complete (246 tests), awaiting review; PR opened. |
 | 2026-11-10 | P5.T1-P5.T6 | see git log | Phase 5 complete (380 tests), awaiting review; PR opened. |
+| 2026-11-17 | P7b.T1-P7b.T4 | see git log | Phase 7b complete (489 tests), awaiting review; PR opened. |
 | 2026-11-17 | P7.T1-P7.T4 | see git log | Phase 7 complete (473 tests), awaiting review; PR opened. |
 | 2026-11-16 | P6.T1-P6.T6 | see git log | Phase 6 complete (455 tests), awaiting review; PR opened. |
 | 2026-11-14 | P5.T7 | see git log | Review answers recorded; text review page with modern reading and sourced corrections (396 tests); awaiting review. |
