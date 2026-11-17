@@ -283,6 +283,18 @@ OCR fails on handwriting. When a page has no text, OCR flagged it **needs review
 - The AI transcription is added next to the OCR text; the **Transcription** tab has a list to switch between them.
 - The modern reading is only a proposal. The **Modern reading** tab shows **AI proposes a modern reading**; check it against the image and click **Use AI reading**. If you already have a reading, it becomes a new version; your earlier versions and corrections stay in **History**.
 
+### Importing text from Transkribus
+
+[Transkribus](https://www.transkribus.org) reads handwriting with models trained for it, and is usually better (and cheaper) than AI for registers. Read your scans there, then bring the text into Meridian:
+
+1. In Transkribus, export the document with **PAGE XML** (images are not needed). You get a ZIP file.
+2. In Meridian, add the same scans under **Documents** and click **Read** (so the pages exist).
+3. Click **Import Transkribus export…** and choose the ZIP (or the PAGE `.xml` files).
+
+Pages are matched by the **image file name** (`0001_pag32.jpg` matches `pag32.jpg`). If you uploaded a **PDF** to Transkribus, or the names differ, choose the document under **Match by page order onto**: export page 1 goes to page 1, and so on; a different number of pages is pointed out. A page whose image has a different shape (or is turned by 90°) is listed unticked: tick it only if it is the same scan. Pages that cannot be matched are listed with the reason; nothing is guessed. **Import N pages** adds the text.
+
+What you get: a new **Transkribus** transcription for each page, next to the OCR (and AI) text, which stays. Each line keeps its position: in Review text, **Transcription (as read)**, tick **Show line boxes on the image** to check them. The modern reading, corrections, records and search work with it as with any transcription. Importing the same export again changes nothing; an export with corrected text adds a newer transcription.
+
 ### Records: reading people and facts from a page
 
 Open **Review text** and the **Records** tab.

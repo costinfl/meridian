@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pc:PcGts xmlns:pc="http://schema.primaresearch.org/PAGE/gts/pagecontent/2019-07-15">
+  <pc:Metadata>
+    <pc:Creator>Transkribus</pc:Creator>
+    <pc:Created>2026-11-12T10:00:00</pc:Created>
+    <pc:LastChange>2026-11-12T10:05:00</pc:LastChange>
+    <pc:MetadataItem type="processingStep" name="text recognition" value="Romanian Civil Registers 19th c. (Text Titan)">
+      <pc:Labels><pc:Label type="model" value="Romanian Civil Registers 19th c."/></pc:Labels>
+    </pc:MetadataItem>
+  </pc:Metadata>
+  <pc:Page imageFilename="0002_registru.jpg" imageWidth="2000" imageHeight="3000">
+    <pc:TextRegion id="tr1">
+      <pc:Coords points="0,0 2000,0 2000,3000 0,3000"/>
+      <pc:TextLine id="tl1">
+        <pc:Coords points="100,100 1900,100 1900,180 100,180"/>
+        <pc:Word id="w1"><pc:Coords points="100,100 400,100 400,180 100,180"/><pc:TextEquiv><pc:Unicode>Ştefan</pc:Unicode></pc:TextEquiv></pc:Word>
+        <pc:Word id="w2"><pc:Coords points="420,100 900,100 900,180 420,180"/><pc:TextEquiv><pc:Unicode>Hariton</pc:Unicode></pc:TextEquiv></pc:Word>
+      </pc:TextLine>
+      <pc:TextLine id="tl2">
+        <pc:Coords points="-20,200 2100,200 2100,280 -20,280"/>
+        <pc:TextEquiv index="1"><pc:Unicode>alternative reading</pc:Unicode></pc:TextEquiv>
+        <pc:TextEquiv index="0"><pc:Unicode>născut la Săhăteni</pc:Unicode></pc:TextEquiv>
+      </pc:TextLine>
+    </pc:TextRegion>
+  </pc:Page>
+</pc:PcGts>

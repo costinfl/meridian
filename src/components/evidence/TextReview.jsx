@@ -82,6 +82,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
   const [drawing, setDrawing] = useState(false);
   const [extracting, setExtracting] = useState(null);   // AbortController while an extraction runs
   const [shownLayerId, setShownLayerId] = useState(null); // transcription shown in the Transcription tab (null = current)
+  const [showLines, setShowLines] = useState(false);      // outline the positioned lines/words of the shown transcription
   const [aiReading, setAiReading] = useState(null);       // AbortController while "Read with AI" runs
   const [confirmAi, setConfirmAi] = useState(null);       // { title, lines, missing, send } before anything is sent
   const [source, setSource] = useState(null);
@@ -201,6 +202,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
 
   const shown = data?.transcriptions?.find((t) => t.layer.id === shownLayerId) ?? (data?.transcription ? { layer: data.transcription, run: data.transcriptionRun } : null);
   const doubtful = needsReview(shown?.layer);
+  const shownWords = (shown?.layer.words ?? []).filter((w) => w?.box);
   const run = shown?.run;
   // the newest AI transcription's proposed modern reading, if it differs from the researcher's reading
   const proposal = data?.transcriptions?.find((t) => typeof t.layer.proposedReading === "string") ?? null;
@@ -292,6 +294,9 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
                 <div style={{ position: "relative", width: `${zoom * 100}%` }}>
                   <img src={image.url} alt={`Page ${idx + 1} of ${copy.fileName}`} style={{ width: "100%", display: "block", userSelect: "none" }} draggable={false} />
                   {tab === "records" && <RegionOverlay regions={regions} selectedId={selectedRegionId} drawing={drawing} onDraw={drawRegion} onSelect={setSelectedRegionId} />}
+                  {tab === "transcription" && showLines && (shownWords ?? []).map((w, i) => (
+                    <div key={i} data-testid="line-box" title={w.text} style={{ position: "absolute", left: `${w.box.x0 * 100}%`, top: `${w.box.y0 * 100}%`, width: `${(w.box.x1 - w.box.x0) * 100}%`, height: `${(w.box.y1 - w.box.y0) * 100}%`, border: `1px solid ${C.rel[2]}`, background: "rgba(52,99,92,.08)", boxSizing: "border-box", pointerEvents: "none" }} />
+                  ))}
                 </div>
               )}
               {image.state === "loading" && <div style={small}>Loading the page image…</div>}
@@ -350,6 +355,11 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
                     : "No transcription: this page has not been read (or waits for handwriting recognition)."}
                 </div>
                 {doubtful && <div style={{ ...small, color: C.focus, marginBottom: 6 }}>Needs review: the OCR confidence is low or the text does not look like words. Handwriting is not read well by OCR.</div>}
+                {shownWords?.length > 0 && (
+                  <label style={{ ...small, display: "block", marginBottom: 6 }}>
+                    <input type="checkbox" checked={showLines} onChange={(e) => setShowLines(e.target.checked)} /> Show line boxes on the image ({shownWords.length})
+                  </label>
+                )}
                 <div style={{ ...textBox, background: C.paper }} data-testid="transcription-text">{shown?.layer.originalText || <span style={small}>(empty)</span>}</div>
                 <div style={{ ...small, marginTop: 6 }}>This is exactly what the machine read. It is never changed; corrections go into the modern reading.</div>
               </div>

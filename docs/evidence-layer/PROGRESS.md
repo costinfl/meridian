@@ -4,10 +4,10 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 7 — Search
+- **Current phase:** 7b — Transkribus import
 - **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 7.
-- **Last updated:** 2026-11-17 (Phase 7 complete)
+- **Next action:** Wait for review of Phase 7b.
+- **Last updated:** 2026-11-17 (Phase 7b complete)
 
 ## Phase overview
 
@@ -20,7 +20,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 4 Conclusions, legacy facts, bundle v2 | approved | evidence/p4 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
 | 5 Ingestion v1 | approved | evidence/p5 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-14 |
 | 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
-| 7 Search | awaiting review | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | |
+| 7 Search | approved | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
+| 7b Transkribus import | awaiting review | done on `ccr-adaa4345-wbnkkm` | |
 | 8 Graph projection | not started | evidence/p8 | |
 | 9 Entity resolution | not started | evidence/p9 | |
 
@@ -110,6 +111,14 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P7.T2 | done | src/search/{indexer,service,index}.js, src/tests/searchIncremental.test.js | `updateIndex`: compares the stores with what the index has seen and rebuilds only the documents of changed regions (MiniSearch discard + add), then stores the index. Changes are found from the data itself (no hooks in evidence code): text layers, regions (and the region a corrected box replaces), records, personas, assertions (and the one a correction supersedes), decisions; a new or changed source/copy re-does its pages; a new name variant triggers a full rebuild (variants touch any document). Exactness: the index stores the latest timestamp it saw and the ids at that timestamp, so changes landing in the same millisecond are not missed. **I7 tests:** after new pages, readings, confirm/reject/correct and a corrected box, the incremental index gives the same stored documents and the same hits and scores as a full rebuild, also after reloading from the store; tests run without delays. The search service gains `update()`. 3 new tests. |
 | P7.T3 | done | src/search/{query,service,index}.js, src/tests/searchQuery.test.js | Each query word is looked up three ways and every word must match (AND): as written in text and names (folded; prefix from 3 letters; fuzzy 0.2 from 4 letters for OCR noise), through its name variants (one hop), and through its Daitch-Mokotoff codes in the names' D-M field. Filters: year range (overlap with the document's date bounds), place by name (documents list their place and its ancestors, so a county finds its towns), source kind, scope (source ids; none = whole library), confirmed only. Each hit has the reasons ("name", "text", "variant of …", "sounds like …", "similar to …") and a snippet in the original spelling with the matched words marked. **Acceptance:** "Stefan" finds Ştefan and Ștefan; "Loti" finds Șfatu Loti (proposed); "Ioan" finds Iohannes as a variant, one hop only; "Szvet" finds Șfatu Loti by sound (D-M 473000), which fuzzy matching cannot; "Haritun" finds Hariton; rejected values are never found; every filter tested. 6 new tests. |
 | P7.T4 | done | src/components/evidence/{SearchSection,EvidencePage,DocumentsSection,TextReview}.jsx, src/workers/searchClient.js, src/search/{documents,query}.js, src/tests/searchSection.test.jsx | **Search** is the first section of the Evidence page: a search box, filters (years from–to, place, source kind, only this project's sources, confirmed only), the index status ("N regions indexed · updated …", **Rebuild index**). The index is brought up to date each time the section opens; it runs in a Web Worker (falls back to the page if the worker cannot start, so search never hangs). Results: a crop of the region from the cached page image, source and page, the hit's text (names first, then values, the modern reading and the machine text, in the original spelling with matched words marked), the people, and badges (name / text / variant of … / sounds like … / similar to …, proposed values, confirmed values). Clicking a result opens the page workspace on that page: the Records tab with the box selected for record hits, the text for text-only hits. Fixed during the browser check: React StrictMode's development remount closed the worker the section still used. 3 new tests. |
+
+### Phase 7b
+| ID | Status | Files touched | Notes |
+| --- | --- | --- | --- |
+| P7b.T1 | done | src/ingest/transkribus/pageXml.js, src/tests/pageXml.test.js, src/tests/fixtures/transkribus/*.xml | `parsePageXml`: DOMParser, namespace-agnostic (PAGE 2010/2013/2019, any prefix). Reads the image name and size, metadata (Creator, Created, LastChange, TranskribusMetadata attributes, MetadataItems with labels; `modelOf` finds the recognition model in the places Transkribus has used), regions in reading order (ReadingOrder refs, else Transkribus `custom` readingOrder, else document order) and lines in their reading order. A line's text is its TextEquiv/Unicode (index 0 preferred among alternatives), else its words joined; its box is the polygon's bounding box, 0-1 and clamped (I4). Page text = lines, blank line between regions; region-level text used only when a region has no lines. Errors: not well-formed, not PAGE, no image size. Fixtures: the 1866 page (2013), a prefixed 2019 page with words and alternatives, an empty page, a broken file. 4 tests. |
+| P7b.T2 | done | src/ingest/transkribus/exportReader.js, src/tests/transkribusExport.test.js | `readExport(files)`: a Transkribus ZIP (…/page/*.xml; mets.xml gives the page order, nested file groups handled; images, doc.xml and other non-PAGE files skipped) or loose PAGE XML files (natural name order); unreadable files are reported. `matchPages`: (1) by **file name**: the page's imageFilename against single-image documents, with and without Transkribus's number prefix (`0007_`), exactly one candidate, document must have been read; (2) by **page order** onto a document the user picks (PDF or multi-page), with a warning when the counts differ; (3) **aspect check** within 3%, flagging an image that is the page turned by 90° (`rotated`). Ambiguous names, unread documents and pages without a match are listed with the reason, never guessed. 10 tests. |
+| P7b.T3 | done | src/ingest/transkribus/{importer,index}.js, src/evidence/repositories/runStore.js (processor transkribus), src/tests/transkribusImport.test.js | `importTranskribus`: one `transkribus` run per import (importer version `page-xml-1`, model from the PAGE metadata, export name, models, export date); per page a run item (file, image name, lines, how it was matched, sha256), the PAGE XML kept verbatim as raw output, and a new **transcription** layer on the whole-page region with the page text and every line as a positioned word (box 0-1). It becomes the current transcription; OCR and AI layers stay; no reading is created (I6). The same XML for the same page is skipped; a changed export adds a newer layer. Search finds the imported text (tested). 4 tests. |
+| P7b.T4 | done | src/components/evidence/{TranskribusImport,DocumentsSection,TextReview}.jsx, src/tests/transkribusUi.test.jsx | **Import Transkribus export…** in the Documents list (ZIP or PAGE XML files) opens a panel: the matched pages (export file → document, page, how matched, number of lines) with a tick box each (unticked when the image has a different shape or is turned by 90°), the unmatched pages with the reason, a **Match by page order onto** document picker, skipped files, **Import N pages** and the result line ("Imported 12 pages; 2 already imported; 1 not matched"). Review text's Transcription tab lists the Transkribus transcription (with its model) beside OCR/AI and a **Show line boxes on the image** toggle that outlines its lines (also works for OCR word boxes). Documents from a handwritten source now say "import its Transkribus export, or use Read with AI as a last resort" until their pages have text. 2 tests. |
 
 ### Phase 8
 | ID | Status | Files touched | Notes |
@@ -263,6 +272,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-17 | P7b start | Reviewer decisions: match exported pages by image file name, or by page order for a document the user picks (PDF); keep lines as positioned words of one page transcription, no boxes drawn | Reviewer answers at the start of Phase 7b | Match by file name only; one region per text block |
 | 2026-11-17 | P7 start | Reviewer decisions: proposed values are searchable (marked as proposed; rejected never found; a confirmed-only filter); the default scope is the whole library (a switch narrows to the open project's sources) | Reviewer answers at the start of Phase 7 | Confirmed only; project scope by default |
 | 2026-11-17 | P7.T1 | IndexedDB **v6** adds `evSearchIndex` (one row, the serialised MiniSearch index; derived data). The indexer reads one snapshot of the library (`library.searchIndex.snapshot()`, a repository method, so search code never calls db*). Regions that a corrected box replaced stay indexed while evidence still cites them. The worker client lives in `src/workers/` (search may not import workers) | The plan names `evSearchIndex`; the snapshot makes full and incremental builds see the same data (I7) | Keeping the index in `settings` (device-only, not derived); per-region reads (slow) |
 | 2026-11-16 | P6 review answers | (a) AI on demand only, as a last resort, with a cost confirmation before every call and no bulk AI; (b) AI extraction only on a drawn box; boxes can be marked as stamp / margin note (later events); record kinds adoption, divorce added to contract v1 (additive, no version change); (c) re-extraction keeps proposing everything except rejected values; (d) evidence on by default (`settings.evidenceOff` to hide it; old `evidenceUi` ignored) and on its own page (`#evidence`); Transkribus import scheduled as Phase 7b | Reviewer answers after Phase 6 | Bulk AI with a page limit; whole-page extraction; a new contract version for two enum values; keeping the modal panel |
@@ -311,6 +321,46 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 
 ## Phase reports
 
+### Phase 7b report
+- **Built:** import of Transkribus exports (PAGE XML), as files:
+  - *P7b.T1* a PAGE XML reader (any PAGE version or prefix): page size, metadata and recognition model, lines in reading order with 0–1 boxes (I4);
+  - *P7b.T2* reading a ZIP export (METS order) or loose XML files, and matching pages by image file name (with or without Transkribus's number prefix) or by page order onto a chosen document, with an aspect check (different shape / turned by 90°); unmatched pages are reported with the reason;
+  - *P7b.T3* the import: a `transkribus` run (model recorded), raw PAGE XML kept, a new transcription layer per page with lines as positioned words; the same XML is never imported twice;
+  - *P7b.T4* **Import Transkribus export…** in Documents (matches with tick boxes, unmatched with reasons, document picker, result line) and **Show line boxes on the image** in Review text.
+- **IndexedDB version / stores added:** none (still 6). New processor value `transkribus`.
+- **New dependencies:** none (JSZip and DOMParser were already available). Main bundle unchanged.
+- **Deviations:** none from the plan; reviewer decisions in the log (2026-11-17).
+- **Invariants:** I1 imported text is a new layer; nothing is overwritten. I3 a run per import, an item per page. I4 line boxes 0–1, clamped. I6 the importer adds transcriptions only (architecture rule; no readings). I7 search picks the text up through the incremental index (tested).
+- **Tests:** 473 → **489**. `npm test -- --run` and `npm run build` pass.
+- **Real-browser check (headless Chromium, dev server):** I built a Transkribus-style ZIP (`<doc>/<title>/page/0001_pag32-upright.xml` plus `mets.xml`) for the 1866 page, from my own transcription with hand-placed line positions. On the page already read by OCR:
+  - the export was matched by file name and imported ("Imported 1 page");
+  - importing it again gave "Imported 0 pages; 1 already imported";
+  - Review text listed the transkribus transcription (with its model) above the tesseract one;
+  - **Show line boxes** drew 16 boxes over the lines;
+  - Search found "Constandin Cristescu" on the page.
+  - No page errors.
+- **How to verify:** with a real Transkribus document:
+  1. In Transkribus: Export → **PAGE XML** (images not needed).
+  2. In Meridian, Evidence → Documents: add the same scans (or the PDF) and **Read**.
+  3. **Import Transkribus export…** → check the matches (pick the document for a PDF) → **Import**.
+  4. Open Review text → Transcription → compare with OCR; tick **Show line boxes**.
+  5. Search for a name from the page.
+- **Backup reminder:** no database change in this phase; a bundle backup is still good practice.
+- **Known limitations:**
+  1. **No real Transkribus export was available here.** The reader follows the PAGE schemas and the files Transkribus writes, but please try a real one.
+  2. The Transkribus API (sending scans and fetching results directly) is not built; this phase imports files only.
+  3. Images in the export are ignored, so a page Meridian does not already have cannot be created from the export.
+  4. A page whose image was rotated in Transkribus is flagged, but its line boxes are not turned.
+  5. The questions from the Phase 7 report (ranking, undated text with a year filter, a name-variant screen, search on real data) are still open.
+- **Questions for the reviewer:**
+  - (a) After importing a real export: is the matching right for how you upload (by file name, or by page order for a PDF)?
+  - (b) Should importing a Transkribus page also start your modern reading from it when you have none yet?
+  - (c) Should the Transkribus API be planned (it needs your account and key), or is file import enough?
+
+**Review**
+- Approved: no
+- Reviewer notes:
+
 ### Phase 7 report
 - **Built:** search over everything read so far, on the Evidence page:
   - *P7.T1* the search index: IndexedDB **v6** store `evSearchIndex`; one document per region with text or evidence (current transcription, current modern reading, values read there; names with Daitch–Mokotoff codes and one-hop variants; date bounds; places with their ancestors; source/page/box; confirmed/proposed flags; rejected and superseded values left out); MiniSearch, serialised to the store; a Web Worker (`src/workers/search.worker.js`) with an in-page fallback;
@@ -340,7 +390,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - **Questions for the reviewer:** (a) Is the default ranking right (names count three times text; variants twice; sound-alike less)? (b) Should undated text be kept when a year range is set (marked "undated") rather than excluded? (c) Should a screen to pair name variants (Ioan – Iohannes) come before Phase 9, or with it? (d) Search speed and quality on your real documents.
 
 **Review**
-- Approved: no
+- Approved: yes (PR #12 merged 2026-11-17; questions (a)-(d) not answered yet, kept open)
 - Reviewer notes:
 
 ### Phase 6 report
@@ -580,6 +630,7 @@ Template for each phase:
 | 2026-11-08 | Phase 2 review | see git log | Phase 2 approved by merge; Phase 3 started. |
 | 2026-11-08 | P3.T1-P3.T7 | see git log | Phase 3 complete (246 tests), awaiting review; PR opened. |
 | 2026-11-10 | P5.T1-P5.T6 | see git log | Phase 5 complete (380 tests), awaiting review; PR opened. |
+| 2026-11-17 | P7b.T1-P7b.T4 | see git log | Phase 7b complete (489 tests), awaiting review; PR opened. |
 | 2026-11-17 | P7.T1-P7.T4 | see git log | Phase 7 complete (473 tests), awaiting review; PR opened. |
 | 2026-11-16 | P6.T1-P6.T6 | see git log | Phase 6 complete (455 tests), awaiting review; PR opened. |
 | 2026-11-14 | P5.T7 | see git log | Review answers recorded; text review page with modern reading and sourced corrections (396 tests); awaiting review. |
