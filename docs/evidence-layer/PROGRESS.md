@@ -5,9 +5,9 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 ## Current status
 
 - **Current phase:** 7 — Search
-- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Phase 7 report, documentation, pull request.
-- **Last updated:** 2026-11-17 (P7.T4)
+- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** Wait for review of Phase 7.
+- **Last updated:** 2026-11-17 (Phase 7 complete)
 
 ## Phase overview
 
@@ -20,7 +20,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 4 Conclusions, legacy facts, bundle v2 | approved | evidence/p4 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
 | 5 Ingestion v1 | approved | evidence/p5 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-14 |
 | 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
-| 7 Search | in progress | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | |
+| 7 Search | awaiting review | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | |
 | 8 Graph projection | not started | evidence/p8 | |
 | 9 Entity resolution | not started | evidence/p9 | |
 
@@ -311,6 +311,38 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 
 ## Phase reports
 
+### Phase 7 report
+- **Built:** search over everything read so far, on the Evidence page:
+  - *P7.T1* the search index: IndexedDB **v6** store `evSearchIndex`; one document per region with text or evidence (current transcription, current modern reading, values read there; names with Daitch–Mokotoff codes and one-hop variants; date bounds; places with their ancestors; source/page/box; confirmed/proposed flags; rejected and superseded values left out); MiniSearch, serialised to the store; a Web Worker (`src/workers/search.worker.js`) with an in-page fallback;
+  - *P7.T2* incremental updates from the data itself (no hooks in evidence code), exact to the millisecond; **I7**: incremental = full rebuild, tested;
+  - *P7.T3* queries: each word as written (folded, prefix, fuzzy for OCR noise), through name variants (one hop) and by sound (D–M); all words must match; filters for years, place (and places below it), source kind, scope, confirmed only; reasons and snippets;
+  - *P7.T4* the **Search** section: search box, filters, index status and Rebuild, results with crops and reasons, opening a result in the page workspace.
+- **IndexedDB version / stores added:** **v6**, store `evSearchIndex` (derived data; deleting it loses nothing). Upgrade test v5 → v6 with evidence and settings: lossless.
+- **New dependency:** `minisearch` 7.2.0 (MIT), in the Evidence page chunk and the search worker. Main bundle unchanged (336 kB). Evidence page chunk 123 kB.
+- **Deviations:** see the log (2026-11-17): the snapshot read is a repository method; regions replaced by a corrected box stay indexed while evidence cites them; the worker client lives in `src/workers/`.
+- **Invariants:** I5/architecture: `src/search` imports only `src/evidence`; the worker and its client are in `src/workers`. I6: search only reads. I7: incremental updates give the same stored documents, hits and scores as a full rebuild, also after reloading (tested, without delays between changes). I8: lossless v5 → v6 upgrade (tested).
+- **Tests:** 457 → **473**. `npm test -- --run` and `npm run build` pass.
+- **Real-browser check (headless Chromium, dev server, worker in use):** the 1866 page read by OCR, the death record typed by hand, the variant Alexandru – Alecsandru added. Each query took about 200 ms, measured with a fixed 150 ms wait in the test script included:
+  - "Loti", "sfatu", "Szvet" (sounds like) and "Alexandru" (variant) found the record;
+  - "Dragoescu" (misspelt) found Drăgoiescu;
+  - "Loti" with years 1900–1950 found nothing; confirmed only found it (typed values are confirmed);
+  - clicking the result opened the page workspace;
+  - after a reload the stored index was used as it was (same "updated" time).
+  - **Timing:** a synthetic library of 3,000 pages × 60 words rebuilt in **0.6 s**, and a query took about 250 ms in the same measure. No page errors.
+- **How to verify:** `npm ci`, `npm test -- --run`, `npm run build`, `npm run dev`, open `http://localhost:5173/meridian/`, **Evidence** → **Search**:
+  1. Type a name you know is in your documents; try it without diacritics and misspelt.
+  2. Pair two spellings (no UI yet for pairs, see limitations) or try a sound-alike name.
+  3. Use the filters (years, place, source kind, only this project, confirmed only).
+  4. Click a result; check it opens the right page and box.
+  5. Reload: the index status keeps its time; add a page in Documents and come back: the count grows.
+- **Backup reminder:** this phase **upgrades the database to version 6** (a new store only; tested lossless). **Export a native bundle backup before merging.**
+- **Known limitations:** (1) There is no screen yet to pair name variants (they come from the library API; Phase 9 proposes pairs from accepted links). (2) Places only match records that have a place id; places written as text are found as text. (3) Dates filter only regions with dated records or date values; undated page text is excluded when a year range is set. (4) Results are capped at 100. (5) Daitch–Mokotoff is designed for names; on ordinary words it can add loose matches (shown as "sounds like"). (6) The index is per browser and device, like the rest of the library.
+- **Questions for the reviewer:** (a) Is the default ranking right (names count three times text; variants twice; sound-alike less)? (b) Should undated text be kept when a year range is set (marked "undated") rather than excluded? (c) Should a screen to pair name variants (Ioan – Iohannes) come before Phase 9, or with it? (d) Search speed and quality on your real documents.
+
+**Review**
+- Approved: no
+- Reviewer notes:
+
 ### Phase 6 report
 - **Built:** extraction of records, people and facts from pages, by hand or with an AI provider, their review, and the link to the timeline (all behind the evidence flag):
   - *P6.T1* extraction contract v1 (JSON Schema, Ajv validator plus semantic checks, `toEvidence` mapping; Julian default before 1919), in `src/evidence/contract/`;
@@ -548,6 +580,7 @@ Template for each phase:
 | 2026-11-08 | Phase 2 review | see git log | Phase 2 approved by merge; Phase 3 started. |
 | 2026-11-08 | P3.T1-P3.T7 | see git log | Phase 3 complete (246 tests), awaiting review; PR opened. |
 | 2026-11-10 | P5.T1-P5.T6 | see git log | Phase 5 complete (380 tests), awaiting review; PR opened. |
+| 2026-11-17 | P7.T1-P7.T4 | see git log | Phase 7 complete (473 tests), awaiting review; PR opened. |
 | 2026-11-16 | P6.T1-P6.T6 | see git log | Phase 6 complete (455 tests), awaiting review; PR opened. |
 | 2026-11-14 | P5.T7 | see git log | Review answers recorded; text review page with modern reading and sourced corrections (396 tests); awaiting review. |
 | 2026-11-09 | P4 review follow-up | see git log | Reviewer answers a-e applied (330 tests): candidate links + per-person accept, applyFactEdit, date/place split, ADR-0006. |

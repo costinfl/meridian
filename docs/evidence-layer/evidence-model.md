@@ -119,7 +119,7 @@ A place has at most one parent per hierarchy at any moment (decision, 2026-11-09
 
 ## Search, graph and bundle
 
-**Search index** (Web Worker, serialised to `evSearchIndex`, always rebuildable): one document per region with original and normalised text, Daitch–Mokotoff codes of persona names (JavaScript implementation verified against published test vectors), expanded name variants, date bounds, place ids expanded up the hierarchy, source kind. Fuzzy matching covers OCR noise. Project scope = the project's source list. Every hit returns its region so the UI can show the crop.
+**Search index** (Web Worker, serialised to `evSearchIndex`, always rebuildable): one document per region with original and normalised text, Daitch–Mokotoff codes of persona names (JavaScript implementation verified against published test vectors), expanded name variants, date bounds, place ids expanded up the hierarchy, source kind. Fuzzy matching covers OCR noise. Project scope = the project's source list (the default scope is the whole library, reviewer decision 2026-11-17). Every hit returns its region so the UI can show the crop. Proposed values are indexed and marked; rejected and superseded assertions are not. IndexedDB v6 holds one row: the serialised index plus what it has seen (the latest timestamp and the rows at it), so an update re-reads only the regions whose text layers, regions, records, personas, assertions or decisions changed; a new name variant rebuilds everything. Incremental and full builds give identical results (I7, tested).
 
 **Graph projection** (in memory, built from the stores; no graph database):
 
