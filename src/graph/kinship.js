@@ -148,7 +148,7 @@ export function kinshipLabel(byId, focus, person) {
   // spouse of a blood relative
   for (const s of (p.spouseIds ?? []).filter((x) => byId[x])) {
     const rel = closeLabel(byId, f, byId[s]) ?? bloodLabel(byId, f, byId[s]);
-    if (rel && rel !== "spouse") return `${sexed(p, "husband", "wife", "spouse")} of ${/^(father|mother|child|sibling)$/.test(rel) ? "the " : ""}${rel}`;
+    if (rel && rel !== "spouse") return `${sexed(p, "husband", "wife", "spouse")} of the ${rel}`;
   }
   return "relative";
 }

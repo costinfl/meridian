@@ -1,4 +1,5 @@
 import { createEvent, createPeriod, createGroup, createSource } from "./models/project.js";
+import { createFamily, derivePeopleFromFamilies } from "./models/families.js";
 
 /* ============================================================
    GEDCOM 5.5.1 — standard, verified-only export + import.
@@ -124,6 +125,10 @@ export function parseGedcom(text) {
   let sub = null;    // current level-1 substructure { tag, ... }
   let curSrc = null; // current level-0 SOUR record
   let last = null;   // { obj, key } target for CONC/CONT continuation
+  const famRecords = []; // level-0 FAM records: { husb, wife, chil: [], marrDate, marrPlace }
+  let curFam = null;
+  let famSub = null;   // the level-1 tag inside a FAM (MARR)
+  const ref = (v) => String(v).replace(/@/g, "").trim();
 
   const flushSub = () => {
     if (cur && sub) {
@@ -149,12 +154,29 @@ export function parseGedcom(text) {
     if (lvl === 0) {
       flushSub();
       if (cur) { people.push(cur); cur = null; }
-      curSrc = null; last = null;
-      if (tag === "INDI") {
+      curSrc = null; last = null; curFam = null; famSub = null;
+      if (tag === "FAM") {
+        curFam = { husb: null, wife: null, chil: [], marrDate: null, marrPlace: "" };
+        famRecords.push(curFam);
+      } else if (tag === "INDI") {
         cur = { id: "imp_" + (xref || people.length), name: "Unnamed", sex: "U", birth: {}, death: {}, events: [], periods: [], groups: [], media: [], spouseIds: [] };
       } else if (tag === "SOUR" && xref) {
         curSrc = createSource({ title: "Untitled source" });
         sourceRecords[xref] = curSrc;
+      }
+      return;
+    }
+
+    // ---- inside a FAM record: partners, children, marriage ----
+    if (curFam) {
+      if (lvl === 1) {
+        famSub = tag;
+        if (tag === "HUSB") curFam.husb = ref(val);
+        else if (tag === "WIFE") curFam.wife = ref(val);
+        else if (tag === "CHIL") curFam.chil.push(ref(val));
+      } else if (lvl === 2 && famSub === "MARR") {
+        if (tag === "DATE") curFam.marrDate = val.trim() || null;
+        else if (tag === "PLAC") curFam.marrPlace = val.trim();
       }
       return;
     }
@@ -181,7 +203,7 @@ export function parseGedcom(text) {
       else if (tag === "OCCU") sub = { tag: "OCCU", label: val };
       else if (tag === "EVEN") sub = { tag: "EVEN", label: val };
       else if (tag === "NOTE") { sub = { tag: "NOTE", text: val }; last = { obj: sub, key: "text" }; }
-      // FAMC / FAMS intentionally ignored (relationships not reconstructed here)
+      // FAMC / FAMS are ignored here: relationships are read from the FAM records (HUSB / WIFE / CHIL)
       return;
     }
 
@@ -225,5 +247,66 @@ export function parseGedcom(text) {
 
   // keep genuine individuals (a real name or any dated fact)
   const keep = people.filter((p) => (p.name && p.name !== "Unnamed") || p.birth?.year || p.death?.year || p.events.length || p.periods.length);
-  return { people: keep, sources };
+
+  // families (FAM): HUSB fills partner1 (the father slot), WIFE partner2, as in the export; people not kept are left out
+  const kept = new Set(keep.map((p) => p.id));
+  const pid = (xref) => (xref && kept.has("imp_" + xref) ? "imp_" + xref : null);
+  const families = [];
+  for (const f of famRecords) {
+    const partner1Id = pid(f.husb), partner2Id = pid(f.wife);
+    const children = [...new Set(f.chil.map(pid).filter(Boolean))];
+    if (!children.length && !(partner1Id && partner2Id)) continue;         // nothing to relate
+    families.push(createFamily({ partner1Id, partner2Id, children, marriage: { date: f.marrDate, placeText: f.marrPlace }, rationale: "Imported from GEDCOM" }));
+  }
+  // the legacy fields, consistent with the families (normalizeProject derives them again from families)
+  const byId = new Map(keep.map((p) => [p.id, p]));
+  for (const f of families) {
+    for (const c of f.children) {
+      const child = byId.get(c.personId);
+      if (child && !child.fatherId && !child.motherId) { child.fatherId = f.partner1Id; child.motherId = f.partner2Id; }
+    }
+    if (f.partner1Id && f.partner2Id) {
+      const a = byId.get(f.partner1Id), b = byId.get(f.partner2Id);
+      if (!a.spouseIds.includes(b.id)) a.spouseIds.push(b.id);
+      if (!b.spouseIds.includes(a.id)) b.spouseIds.push(a.id);
+    }
+  }
+  return { people: keep, sources, families };
+}
+
+/**
+ * Add a parsed GEDCOM ({ people, families }) to a project. People already in the project (same id) are kept as
+ * they are; a family whose two partners match an existing family gains the missing children; other families are
+ * added. Re-importing the same file therefore adds missing families without duplicating anyone. Parents and
+ * spouses on people are then derived from the families, as normalizeProject does.
+ * Returns { project, addedPeople, addedFamilies, updatedFamilies }.
+ */
+export function mergeGedcomImport(project, { people: imp = [], families: impFams = [] }) {
+  const existingIds = new Set((project.people ?? []).map((p) => p.id));
+  const newPeople = imp.filter((p) => !existingIds.has(p.id));
+  let families = [...(project.families ?? [])];
+  let addedFamilies = 0, updatedFamilies = 0;
+  const same = (f, g) => (f.partner1Id ?? null) === (g.partner1Id ?? null) && (f.partner2Id ?? null) === (g.partner2Id ?? null);
+  for (const g of impFams) {
+    // a couple matches an existing family; a single parent only matches when they share a child
+    const i = families.findIndex((f) => same(f, g) && ((g.partner1Id && g.partner2Id) || f.children.some((c) => g.children.some((d) => d.personId === c.personId))));
+    if (i < 0) {
+      // a child already placed in another family keeps those parents (never two sets)
+      const placed = new Set(families.flatMap((f) => f.children.map((c) => c.personId)));
+      const children = g.children.filter((c) => !placed.has(c.personId));
+      if (!children.length && !(g.partner1Id && g.partner2Id)) continue;
+      families.push({ ...g, children: children.map((c, k) => ({ personId: c.personId, order: k })) });
+      addedFamilies++;
+      continue;
+    }
+    const f = families[i];
+    const placed = new Set(families.flatMap((x) => x.children.map((c) => c.personId)));
+    const extra = g.children.filter((c) => !placed.has(c.personId));
+    if (extra.length) {
+      families[i] = { ...f, children: [...f.children, ...extra.map((c, k) => ({ personId: c.personId, order: f.children.length + k }))] };
+      updatedFamilies++;
+    }
+  }
+  const people = derivePeopleFromFamilies([...(project.people ?? []), ...newPeople], families);
+  return { project: { ...project, people, families }, addedPeople: newPeople.length, addedFamilies, updatedFamilies };
 }

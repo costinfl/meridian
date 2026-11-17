@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense, laz
 import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifiedBorderStyle, verifiedMarker, VERIFIED_MARK } from "./theme.js";
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin, displayName } from "./models/project.js";
-import { exportGedcom, parseGedcom } from "./gedcom.js";
+import { exportGedcom, parseGedcom, mergeGedcomImport } from "./gedcom.js";
 import { exportProjectZip, importProjectBundle } from "./share.js";
 import { storage } from "./storage/StorageService.js";
 import { useProject } from "./hooks/useProject.js";
@@ -541,12 +541,17 @@ export default function App() {
         const ev = evidence && !evidence.skipped ? ` Evidence: ${sum(evidence.added)} entries added, ${sum(evidence.skipped)} already in your library.` : "";
         flash(`Imported project "${proj.name}".${ev}`);
       } else {
-        const { people: imp, sources: impSrc } = parseGedcom(await f.text());
+        const parsed = parseGedcom(await f.text());
+        const { people: imp, sources: impSrc } = parsed;
         if (!imp.length) { flash("No individuals found in that file."); }
         else {
-          setPeople((ps) => [...ps, ...imp.filter((p) => !ps.some((q) => q.id === p.id))]);
+          // people and their families (parents, spouses) together; a re-import adds missing families only
+          const counts = mergeGedcomImport(project ?? { people, families: [] }, parsed);
+          updateProject((prev) => mergeGedcomImport(prev, parsed).project);
           impSrc.forEach((s) => addSource(s));
-          flash(`Imported ${imp.length} people${impSrc.length ? ` and ${impSrc.length} source${impSrc.length === 1 ? "" : "s"}` : ""} — add them from "+ relative".`);
+          const fams = counts.addedFamilies + counts.updatedFamilies;
+          const known = imp.length - counts.addedPeople;
+          flash(`Imported ${counts.addedPeople} people${known ? ` (${known} already here)` : ""}, ${fams} famil${fams === 1 ? "y" : "ies"}${impSrc.length ? ` and ${impSrc.length} source${impSrc.length === 1 ? "" : "s"}` : ""} — add them from "+ relative".`);
         }
       }
     } catch (err) {

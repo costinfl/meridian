@@ -79,7 +79,7 @@ describe("kinship (P8.T4)", () => {
     expect(L("me", "dil")).toBe("daughter-in-law");
     expect(L("me", "bil")).toBe("brother-in-law");
     expect(L("me", "step")).toBe("stepfather");
-    expect(L("me", "ua")).toBe("wife of uncle");
+    expect(L("me", "ua")).toBe("wife of the uncle");
     expect(L("me", "gg2")).toBe("great-grandmother");
     expect(kinshipLabel(b, b.me, { id: "x", name: "stranger", fatherId: null, motherId: null })).toBe("relative");
     // today's labels still win where they apply
