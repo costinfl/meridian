@@ -1,0 +1,35 @@
+import { loadIndex, rebuildIndex } from "./indexer.js";
+
+// One search service per library: keeps the index in memory, loads it from the store, rebuilds it when missing.
+// Used inside the search worker (src/workers/search.worker.js) or, without workers, directly in the page.
+export function createSearchService(library, { now = () => Date.now() } = {}) {
+  let state = null;   // { index, docCount, builtAt }
+  return {
+    /** The index, from memory, the store, or a rebuild. Returns { docCount, builtAt, rebuilt, ms }. */
+    async ensure() {
+      const t = now();
+      let rebuilt = false;
+      if (!state) state = await loadIndex(library);
+      if (!state) { state = await rebuildIndex(library); rebuilt = true; }
+      return { docCount: state.index.documentCount, builtAt: state.builtAt, rebuilt, ms: now() - t };
+    },
+    async rebuild() {
+      const t = now();
+      state = await rebuildIndex(library);
+      return { docCount: state.index.documentCount, builtAt: state.builtAt, rebuilt: true, ms: now() - t };
+    },
+    /** The in-memory index (after ensure). */
+    current: () => state,
+    _set: (s) => { state = s; },
+  };
+}
+
+/** Operations understood by the service (shared by the worker and the in-page fallback). */
+export async function runOp(service, op, args = {}) {
+  if (op === "ensure") return service.ensure();
+  if (op === "rebuild") return service.rebuild();
+  if (op === "update") return service.update ? service.update(args) : service.ensure();
+  if (op === "query") return service.query(args);
+  throw new Error(`unknown search operation: ${op}`);
+}
+

@@ -4,10 +4,10 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 6 — Extraction contract and review
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 6 (review follow-up added to PR #11).
-- **Last updated:** 2026-11-16 (Phase 6 review follow-up)
+- **Current phase:** 7 — Search
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** P7.T2: incremental index updates (I7).
+- **Last updated:** 2026-11-17 (P7.T1)
 
 ## Phase overview
 
@@ -19,8 +19,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 3 Evidence, places, names, dates | approved | evidence/p3 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
 | 4 Conclusions, legacy facts, bundle v2 | approved | evidence/p4 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
 | 5 Ingestion v1 | approved | evidence/p5 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-14 |
-| 6 Extraction and review | awaiting review | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | |
-| 7 Search | not started | evidence/p7 | |
+| 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
+| 7 Search | in progress | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | |
 | 8 Graph projection | not started | evidence/p8 | |
 | 9 Entity resolution | not started | evidence/p9 | |
 
@@ -106,7 +106,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 7
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P7.T1 | todo | | |
+| P7.T1 | done | src/storage/upgrades/{v6,index}.js, src/evidence/repositories/searchIndexStore.js, src/evidence/index.js, src/search/{documents,engine,indexer,service,index}.js, src/workers/{search.worker,searchClient}.js, src/tests/{searchIndex.test.js,searchHelpers.js,upgrade.test.js}, package.json (minisearch 7.2.0) | IndexedDB v6: `evSearchIndex` (lossless upgrade test with evidence and settings). One search document per region with text or evidence: current transcription + current modern reading + values read there (folded with `searchKey`), names (name assertions and personas of records citing the region) with Daitch-Mokotoff codes and one-hop variants, date bounds (record events, date assertions), places expanded up the hierarchy, source/page/box metadata, confirmed/proposed flags; rejected and superseded assertions left out. MiniSearch (fields text, names, variants, dm; same folding for queries) serialised to the store; `rebuildIndex`, `loadIndex`; a search service usable in a worker (`src/workers/search.worker.js`, client `src/workers/searchClient.js`) or in the page. 4 new tests. |
 | P7.T2 | todo | | |
 | P7.T3 | todo | | |
 | P7.T4 | todo | | |
@@ -263,6 +263,8 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-17 | P7 start | Reviewer decisions: proposed values are searchable (marked as proposed; rejected never found; a confirmed-only filter); the default scope is the whole library (a switch narrows to the open project's sources) | Reviewer answers at the start of Phase 7 | Confirmed only; project scope by default |
+| 2026-11-17 | P7.T1 | IndexedDB **v6** adds `evSearchIndex` (one row, the serialised MiniSearch index; derived data). The indexer reads one snapshot of the library (`library.searchIndex.snapshot()`, a repository method, so search code never calls db*). Regions that a corrected box replaced stay indexed while evidence still cites them. The worker client lives in `src/workers/` (search may not import workers) | The plan names `evSearchIndex`; the snapshot makes full and incremental builds see the same data (I7) | Keeping the index in `settings` (device-only, not derived); per-region reads (slow) |
 | 2026-11-16 | P6 review answers | (a) AI on demand only, as a last resort, with a cost confirmation before every call and no bulk AI; (b) AI extraction only on a drawn box; boxes can be marked as stamp / margin note (later events); record kinds adoption, divorce added to contract v1 (additive, no version change); (c) re-extraction keeps proposing everything except rejected values; (d) evidence on by default (`settings.evidenceOff` to hide it; old `evidenceUi` ignored) and on its own page (`#evidence`); Transkribus import scheduled as Phase 7b | Reviewer answers after Phase 6 | Bulk AI with a page limit; whole-page extraction; a new contract version for two enum values; keeping the modal panel |
 | 2026-11-16 | P6.T3 | (1) Anthropic output is constrained with **structured outputs** (`output_config.format`), not a forced tool call: current Claude models reject forced `tool_choice`. (2) Calls go through the official `@anthropic-ai/sdk` with `dangerouslyAllowBrowser` (the user's own key, on the user's device, sent only to Anthropic); the SDK sends the key as a bearer token. (3) Refusal fallbacks (`fallbacks: "default"`) and effort `high` are set for Claude models that support them. (4) "Not re-proposed" is checked per **page** (property + normalised value), not per region: each extraction creates new child regions, so a per-region check would never match. (5) Images are re-encoded to JPEG with the long side at most 1568 px | API behaviour of current models; reading old handwriting is accuracy-sensitive; upload size | Forced tool use; raw fetch for Anthropic; per-region rule |
 | 2026-11-14 | P6.T1 | Contract validated with **Ajv 8** (new dependency, loaded only with extraction) plus semantic checks. Persona facts are fields in the contract (name, role, sex, age, occupation, residence, house number, religion, birth/death date and place) and relations are a list; `toEvidence` turns each stated fact into one assertion, rather than the extractor writing assertions itself. Dates without a stated calendar default to Julian before 1919 (Romania adopted the Gregorian calendar in 1919). A date without a year is kept as written under `x-<property>-unparsed`; religion uses `x-religion` | Fewer ways for a model to produce inconsistent output (a persona field and an assertion saying different things); one place to map to the store | Free-form assertion list in the contract; a hand-written validator |
@@ -341,7 +343,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
   - *Tests:* 455 → 457 (UI tests rewritten for the confirmation flow, the box rule and the page). Real Chromium (stand-in provider): Evidence on without URL flag; `#evidence` survives reload; no AI buttons in the list; workspace inline; Read with AI showed "About 2,315 input tokens and a 322 kB image (997×1568) will be sent to Anthropic Claude claude-opus-5-5" and sent nothing on Cancel; Extract disabled without a box; a stamp box (414×418 px, 35 kB) extracted after Send with the annotation hint; ← Documents and ← Timeline work; no page errors.
 
 **Review**
-- Approved: no
+- Approved: yes (PR #11 merged 2026-11-17)
 - Reviewer notes: 2026-11-16 answers: (a) AI only on demand, as a last resort (Read with AI where earlier steps are poor; Extract with AI for very hard entries); Transkribus or similar tools are trained for this; (b) only the drawn box, also for stamps and margin notes recording later events; (c) no: a new reading may bring new information; (d) on by default, on a page of its own. Transkribus import after Phase 7.
 
 ### Phase 5 report
