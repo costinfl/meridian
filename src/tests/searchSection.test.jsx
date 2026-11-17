@@ -36,7 +36,7 @@ describe("Search section (P7.T4)", () => {
     fireEvent.change(screen.getByLabelText("Search for"), { target: { value: "Stefan" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
     await waitFor(() => expect(within(screen.getByTestId("search-results")).getByTestId("hit-snippet").querySelector("mark").textContent).toBe("Ştefan"));
-    expect(within(screen.getByTestId("search-results")).getByTestId("hit-crop")).toBeTruthy();     // the page image was cached
+    expect(await within(screen.getByTestId("search-results")).findByTestId("hit-crop")).toBeTruthy(); // the page image was cached (loads asynchronously)
 
     fireEvent.change(screen.getByLabelText("Search for"), { target: { value: "Ioan" } });
     fireEvent.click(screen.getByRole("button", { name: "Search" }));
