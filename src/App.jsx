@@ -12,6 +12,7 @@ import { ProjectManager } from "./components/ProjectManager.jsx";
 import { SourcesPanel } from "./components/SourcesPanel.jsx";
 import { isEvidenceEnabled } from "./evidenceFlag.js";
 import { requestPersistence } from "./storage/persistence.js";
+import { kinshipLabel } from "./graph/kinship.js";
 
 // Evidence UI is code-split: nothing is downloaded unless the flag is on and the panel is opened.
 const EvidencePage = lazy(() => import("./components/evidence/EvidencePage.jsx"));
@@ -61,20 +62,6 @@ function pickStep(ppy) {
   const steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500];
   for (const s of steps) if (s * ppy >= 76) return s;
   return 500;
-}
-
-function relationTo(p, f, byId) {
-  if (!f || p.id === f.id) return "";
-  if (p.id === f.fatherId) return "father";
-  if (p.id === f.motherId) return "mother";
-  if ((f.spouseIds || []).includes(p.id)) return "spouse";
-  if (p.fatherId === f.id || p.motherId === f.id) return "child";
-  if ((p.fatherId && p.fatherId === f.fatherId) || (p.motherId && p.motherId === f.motherId)) return "sibling";
-  const fF = byId[f.fatherId], fM = byId[f.motherId];
-  if ((fF && (p.id === fF.fatherId || p.id === fF.motherId)) || (fM && (p.id === fM.fatherId || p.id === fM.motherId))) return "grandparent";
-  const pF = byId[p.fatherId], pM = byId[p.motherId];
-  if ((pF && (pF.fatherId === f.id || pF.motherId === f.id)) || (pM && (pM.fatherId === f.id || pM.motherId === f.id))) return "grandchild";
-  return "relative";
 }
 
 /* ---------------- lane sub-components ---------------- */
@@ -311,6 +298,8 @@ export default function App() {
   const byId = useMemo(() => Object.fromEntries(people.map((p) => [p.id, p])), [people]);
   const sourcesById = useMemo(() => Object.fromEntries(sources.map((s) => [s.id, s])), [sources]);
   const focus = byId[focusId] || people[0];
+  // how each person is related to the focus person (Phase 8 kinship: today's labels kept, precise ones added)
+  const kin = useMemo(() => Object.fromEntries(people.map((p) => [p.id, kinshipLabel(byId, focus, p)])), [people, byId, focus]);
   const relatives = relativeIds.map((id) => byId[id]).filter(Boolean);
   const ctxLanes = CONTEXT_LANES.filter((l) => ctxOn[l.id]);
 
@@ -805,7 +794,7 @@ export default function App() {
                   <div style={{ font: "600 12.5px Fraunces, Georgia, serif", color: relColor(i) }}>{displayName(p)}</div>
                   <div style={{ font: "500 10px 'IBM Plex Mono', monospace", color: C.inkSoft }}>
                     {p.birth?.year}–{p.death?.year || "…"}
-                    <span style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", marginLeft: 6 }}>{relationTo(p, focus, byId)}</span>
+                    <span style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", marginLeft: 6 }}>{kin[p.id]}</span>
                   </div>
                   <div style={{ position: "absolute", bottom: 6, left: 12, display: "flex", gap: 6 }}>
                     <button style={{ ...btnStyle(false), padding: "1px 6px", fontSize: 10 }} onClick={() => promote(p.id)} title="Make this person the focus">⌖ focus</button>
@@ -924,7 +913,7 @@ export default function App() {
             {people.filter((p) => p.id !== focusId && !relativeIds.includes(p.id)).map((p) => (
               <button key={p.id} onClick={() => { setRelativeIds((r) => [...r, p.id]); setAddRelOpen(false); }}
                 style={{ ...btnStyle(false), textAlign: "left", display: "flex", justifyContent: "space-between", gap: 10 }}>
-                <span>{displayName(p)} <em style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", color: C.inkSoft }}>{relationTo(p, focus, byId)}</em></span>
+                <span>{displayName(p)} <em style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", color: C.inkSoft }}>{kin[p.id]}</em></span>
                 <span style={{ font: "400 11px 'IBM Plex Mono', monospace", color: C.inkSoft }}>{p.birth?.year}–{p.death?.year || "…"}</span>
               </button>
             ))}
