@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo, Suspense, lazy } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense, lazy } from "react";
 import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifiedBorderStyle, verifiedMarker, VERIFIED_MARK } from "./theme.js";
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin, displayName } from "./models/project.js";
@@ -289,6 +289,10 @@ export default function App() {
   useEffect(() => { if (evidenceOn) requestPersistence(); }, [evidenceOn]);
 
   const contentRef = useRef(null);
+  // the timeline area as state too: it unmounts while the Evidence page is shown, and sizing / wheel listeners must
+  // attach to the element that is actually mounted (a page opened at #evidence used to leave the width at 0)
+  const [contentEl, setContentEl] = useState(null);
+  const contentRefCb = useCallback((el) => { contentRef.current = el; setContentEl(el); }, []);
   const viewRef = useRef(view);
   viewRef.current = view;
   const dragRef = useRef(null);
@@ -308,15 +312,15 @@ export default function App() {
   const viewRange = [view.left, view.left + trackW / view.ppy];
   const focusLife = focus?.birth?.year ? [focus.birth.year, focus.death?.year || 2026] : null;
 
-  /* sizing — depends on isLoading so the observer attaches after the content div mounts */
+  /* sizing — whenever the timeline area mounts (first load, or back from the Evidence page) */
   useEffect(() => {
-    const el = contentRef.current;
+    const el = contentEl;
     if (!el) return;
     setTrackW(el.clientWidth - HEADER_W);
     const ro = new ResizeObserver(() => setTrackW(el.clientWidth - HEADER_W));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [isLoading]);
+  }, [contentEl]);
 
   /* initial view fit — only when ppy is still default (8) */
   useEffect(() => {
@@ -354,7 +358,7 @@ export default function App() {
 
   /* wheel zoom (native, non-passive) */
   useEffect(() => {
-    const el = contentRef.current;
+    const el = contentEl;
     if (!el) return;
     const onWheel = (e) => {
       const rect = el.getBoundingClientRect();
@@ -370,7 +374,7 @@ export default function App() {
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [contentEl]);
 
   /* pointer: pan / research-drag / crosshair */
   const onPointerDown = (e) => {
@@ -707,7 +711,7 @@ export default function App() {
       {/* ------- board ------- */}
       {!(evidenceOn && page === "evidence") && <>
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
-        <div ref={contentRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+        <div ref={contentRefCb} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
           onPointerLeave={() => { setCrosshair(null); }}
           style={{ position: "relative", minHeight: "100%", touchAction: "none", userSelect: "none" }}>
 
