@@ -5,7 +5,7 @@ import { DB_VERSION, UPGRADES } from "../storage/upgrades/index.js";
 import { createProject, createSource } from "../models/project.js";
 
 const EXPECTED_STORES = ["blobs", "projects", "settings", "evRepositories", "evSources", "evCopies", "evPages", "evRegions", "evRuns", "evRunItems", "evRawOutputs", "evTextLayers", "evPageCache",
-  "evPlaces", "evPlaceNames", "evPlaceParents", "evNameVariants", "evRecords", "evPersonas", "evAssertions", "evAssertionDecisions"];
+  "evPlaces", "evPlaceNames", "evPlaceParents", "evNameVariants", "evRecords", "evPersonas", "evAssertions", "evAssertionDecisions", "evSearchIndex"];
 const idbReq = (r) => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
 
 /** Build a genuine version-1 database by hand (independent of the upgrade code). */
@@ -128,8 +128,8 @@ describe("IndexedDB upgrade framework (I8)", () => {
     await new Promise((res) => { tx.oncomplete = res; });
     db4.close();
 
-    const db = await openDB(); // current version
-    expect(db.version).toBe(DB_VERSION);
+    const db = await openDB({ version: 5, steps: UPGRADES.slice(0, 5) }); // stop at v5: this test pins the v4 -> v5 step
+    expect(db.version).toBe(5);
     const get = (store, key) => idbReq(db.transaction(store).objectStore(store).get(key));
     expect((await get("evRegions", "r1")).id).toBe("r1");
     expect([...db.transaction("evRegions").objectStore("evRegions").indexNames]).toContain("bySupersedes");
@@ -143,6 +143,33 @@ describe("IndexedDB upgrade framework (I8)", () => {
     }
     expect(await get("evAssertions", "entered-by-user")).toMatchObject({ status: "confirmed", decidedBy: "user" }); // untouched
     expect(db.transaction("evAssertionDecisions").objectStore("evAssertionDecisions").index("byAssertion").unique).toBe(true);
+    db.close();
+  });
+
+  it("upgrades a version-5 database (with evidence and settings) to version 6 losslessly and adds the search index store", async () => {
+    const db5 = await openDB({ version: 5, steps: UPGRADES.slice(0, 5) });
+    const stores = ["projects", "settings", "evSources", "evRegions", "evTextLayers", "evRecords", "evPersonas", "evAssertions", "evAssertionDecisions"];
+    const sample = {
+      projects: createProject("Five"), settings: { key: "aiSettings", value: { provider: "anthropic" } },
+      evSources: { id: "s1", title: "Registrul stării civile" }, evRegions: { id: "r1", pageId: "pg", kind: "block", box: { x0: 0, y0: 0, x1: 1, y1: 1 } },
+      evTextLayers: { id: "t1", regionId: "r1", runId: "run", kind: "transcription", originalText: "Șfatu Loti" },
+      evRecords: { id: "rec1", kind: "death", regionIds: ["r1"], runId: "run" }, evPersonas: { id: "p1", recordId: "rec1", nameAsWritten: "Șfatu Loti", nameKey: "sfatu loti", surnameDm: [] },
+      evAssertions: { id: "a1", subjectId: "p1", property: "name", status: "proposed", runId: "run", citationRegionId: "r1", supersedesId: null, createdAt: "2026-11-16T10:00:00.000Z" },
+      evAssertionDecisions: { id: "d1", assertionId: "a1", status: "confirmed", decidedBy: "user", decidedAt: "2026-11-16T11:00:00.000Z" },
+    };
+    const tx = db5.transaction(stores, "readwrite");
+    for (const s of stores) tx.objectStore(s).put(sample[s]);
+    await new Promise((res) => { tx.oncomplete = res; });
+    db5.close();
+
+    const db = await openDB();
+    expect(db.version).toBe(6);
+    expect([...db.objectStoreNames]).toContain("evSearchIndex");
+    for (const s of stores) {
+      const key = s === "settings" ? "aiSettings" : sample[s].id;
+      expect(await idbReq(db.transaction(s).objectStore(s).get(key)), s).toEqual(sample[s]);
+    }
+    expect(await idbReq(db.transaction("evSearchIndex").objectStore("evSearchIndex").count())).toBe(0);
     db.close();
   });
 
@@ -165,15 +192,15 @@ describe("IndexedDB upgrade framework (I8)", () => {
     expect((await new IndexedDBAdapter().loadProject(p.id)).name).toBe("Gamma");
   });
 
-  it("a future step (v6) applies on top of the current schema and keeps existing data", async () => {
+  it("a future step (v7) applies on top of the current schema and keeps existing data", async () => {
     const adapter = new IndexedDBAdapter();
     const p = createProject("Delta");
     await adapter.saveProject(p);
     await adapter.putSetting("k", { a: 1 });
     adapter._db.close();
 
-    const v6 = { version: 6, up(db) { db.createObjectStore("evTest", { keyPath: "id" }); } };
-    const db = await openDB({ version: 6, steps: [...UPGRADES, v6] });
+    const v7 = { version: 7, up(db) { db.createObjectStore("evTest", { keyPath: "id" }); } };
+    const db = await openDB({ version: 7, steps: [...UPGRADES, v7] });
     expect([...db.objectStoreNames].sort()).toEqual([...EXPECTED_STORES, "evTest"].sort());
     const kept = await idbReq(db.transaction("projects").objectStore("projects").get(p.id));
     expect(kept.name).toBe("Delta");
@@ -187,9 +214,9 @@ describe("IndexedDB upgrade framework (I8)", () => {
     const adapter = new IndexedDBAdapter({ onVersionChange: () => notified++ });
     await adapter.saveProject(createProject("Epsilon"));
 
-    const v6 = { version: 6, up(db) { db.createObjectStore("evTest", { keyPath: "id" }); } };
-    const db = await openDB({ version: 6, steps: [...UPGRADES, v6] }); // would hang forever if not closed
-    expect(db.version).toBe(6);
+    const next = { version: DB_VERSION + 1, up(db) { db.createObjectStore("evTest", { keyPath: "id" }); } };
+    const db = await openDB({ version: DB_VERSION + 1, steps: [...UPGRADES, next] }); // would hang forever if not closed
+    expect(db.version).toBe(DB_VERSION + 1);
     expect(notified).toBe(1);
     expect(adapter._db).toBeNull();
     db.close();

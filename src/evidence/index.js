@@ -14,6 +14,7 @@ import { createPersonaView } from "./repositories/personaView.js";
 import { createStaleEvidence } from "./repositories/staleEvidence.js";
 import { createEvidenceBundle } from "./repositories/evidenceBundle.js";
 import { createPageCacheStore } from "./repositories/pageCacheStore.js";
+import { createSearchIndexStore } from "./repositories/searchIndexStore.js";
 
 export { EvidenceError } from "./domain/errors.js";
 export { normalizedBox, boxFromPixels, WHOLE_PAGE_BOX } from "./domain/box.js";
@@ -48,5 +49,6 @@ export function createEvidenceLibrary(storage) {
     ...createStaleEvidence(storage),
     bundle: createEvidenceBundle(storage),
     pageCache: createPageCacheStore(storage),
+    searchIndex: createSearchIndexStore(storage),
   };
 }

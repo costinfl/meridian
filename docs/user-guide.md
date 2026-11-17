@@ -295,6 +295,19 @@ Values found by the AI are **proposed**. Each record shows a crop of the image i
 
 Dates before 1919 are read as Julian-calendar dates (Romania's civil and church calendar until 1919), unless the record says otherwise.
 
+### Search
+
+**Search** (the first section of the Evidence page) finds words and names in everything read so far: the text of pages (OCR, AI and your modern readings) and the values in records.
+
+- Type a name, a place or any word and press **Search**. Every word must be found.
+- Spelling does not need to be exact: **Stefan** finds *Ştefan* and *Ștefan*; a word misread by OCR is still found (**Haritun** finds *Hariton*); names that **sound alike** are found too (Daitch–Mokotoff: **Szvet** finds *Șfatu*).
+- **Name variants** you paired (for example Ioan – Iohannes) are used one step only: **Ioan** finds *Iohannes*, but a pair is never chained to another.
+- Values found by the AI that you have not confirmed are found and marked **proposed values**; values you **rejected are never found**. Tick **confirmed only** to see only regions with confirmed values.
+- Filters: **Years** (records dated in that range), **Place** (a place and the places below it, e.g. a county finds its towns), **Source** kind, and **only this project's sources** (by default the whole library on this device is searched).
+- Each result shows a crop of the page, the source and page, the text with the matching words marked, the people named, and why it matched. Click it to open the page: records open on the **Records** tab with their box selected.
+
+The search index lives in this browser. It is brought up to date each time you open Search (only what changed is re-read); **Rebuild index** builds it again from everything. Searching works offline.
+
 ### Evidence on the timeline
 
 With the evidence layer on, the editor of a birth, death, event, role or group shows an **Evidence** section: the evidence attached to that fact, where it was read, and a crop of the page. In research mode, **Attach evidence…** searches confirmed values by a person's name as written (for example "Loti") and attaches the one that supports the fact. Attaching does not change the fact itself.

@@ -63,7 +63,7 @@ function summarize(r) {
 }
 
 /** @param {{ storage, library, services?: () => Promise<{engines, ocr}>, picker?: Function }} props  (services/picker injectable for tests) */
-export default function DocumentsSection({ storage, library, services = defaultServices, aiServices = defaultAiServices, picker, inlineWorkspace = false }) {
+export default function DocumentsSection({ storage, library, services = defaultServices, aiServices = defaultAiServices, picker, inlineWorkspace = false, openAt = null }) {
   const [folder, setFolder] = useState(null);          // { handle, name } or null
   const [copies, setCopies] = useState([]);
   const [sources, setSources] = useState({});
@@ -205,8 +205,14 @@ export default function DocumentsSection({ storage, library, services = defaultS
 
   const closeReview = useCallback(() => { setReviewing(null); refresh().catch(() => {}); }, [refresh]);
 
+  // a search hit asks to open its page (and region) in the workspace
+  useEffect(() => {
+    if (!openAt?.copyId) return;
+    library.copies.get(openAt.copyId).then((copy) => copy && setReviewing({ copy, pageId: openAt.pageId, tab: openAt.tab, regionId: openAt.regionId })).catch(() => {});
+  }, [library, openAt]);
+
   const workspace = reviewing ? (
-    <TextReview library={library} copy={reviewing.copy} initialPageId={reviewing.pageId} initialTab={reviewing.tab} loadImage={loadImage} onClose={closeReview}
+    <TextReview library={library} copy={reviewing.copy} initialPageId={reviewing.pageId} initialTab={reviewing.tab} initialRegionId={reviewing.regionId ?? null} loadImage={loadImage} onClose={closeReview}
       runExtraction={runExtraction} describeExtraction={describeExtraction} runReading={runReading} inline={inlineWorkspace} />
   ) : null;
 
