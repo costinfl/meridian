@@ -6,6 +6,23 @@
 export const MAX_GENERATIONS = 30;
 const parentsOf = (byId, id) => { const p = byId[id]; return p ? [p.fatherId, p.motherId].filter((x) => x && byId[x]) : []; };
 
+// Per-tree caches (keyed by the byId object, which callers memoise): ancestors per person and the sibling index, so
+// labelling every person against one focus stays fast on large trees. A new byId object starts fresh caches.
+const caches = new WeakMap();
+const cacheOf = (byId) => { let c = caches.get(byId); if (!c) caches.set(byId, (c = { anc: new Map(), sib: null })); return c; };
+const anc = (byId, id) => { const c = cacheOf(byId); if (!c.anc.has(id)) c.anc.set(id, ancestors(byId, id)); return c.anc.get(id); };
+function siblingsOf(byId, id) {
+  const c = cacheOf(byId);
+  if (!c.sib) {
+    const kids = new Map();
+    for (const x of Object.values(byId)) for (const par of parentsOf(byId, x.id)) { if (!kids.has(par)) kids.set(par, new Set()); kids.get(par).add(x.id); }
+    c.sib = kids;
+  }
+  const out = new Set();
+  for (const par of parentsOf(byId, id)) for (const k of c.sib.get(par) ?? []) if (k !== id) out.add(k);
+  return [...out];
+}
+
 /** All ancestors: Map ancestorId -> sorted generations at which they are reached (1 = parent), and the number of paths. */
 export function ancestors(byId, id, { maxGenerations = MAX_GENERATIONS } = {}) {
   const out = new Map();               // id -> { gens: Set, paths: number }
@@ -43,7 +60,7 @@ export function descendants(byId, id, { maxGenerations = MAX_GENERATIONS } = {})
  * "Nearest" = an ancestor that is not itself an ancestor of another common ancestor already found closer.
  */
 export function commonAncestors(byId, aId, bId) {
-  const A = ancestors(byId, aId), B = ancestors(byId, bId);
+  const A = anc(byId, aId), B = anc(byId, bId);
   if (A.has(bId) || B.has(aId)) return [];
   const all = [];
   for (const [id, ea] of A) if (B.has(id)) all.push({ id, a: ea.generations[0], b: B.get(id).generations[0] });
@@ -51,7 +68,7 @@ export function commonAncestors(byId, aId, bId) {
   // drop ancestors of nearer common ancestors
   const nearest = [];
   for (const c of all) {
-    const covered = nearest.some((n) => ancestors(byId, n.id).has(c.id));
+    const covered = nearest.some((n) => anc(byId, n.id).has(c.id));
     if (!covered) nearest.push(c);
   }
   return nearest;
@@ -82,9 +99,9 @@ function closeLabel(byId, f, p) {
 
 /** Blood relation of p to f (or null). Includes "related twice" when the nearest common ancestors are on different lines. */
 function bloodLabel(byId, f, p) {
-  const Af = ancestors(byId, f.id);
+  const Af = anc(byId, f.id);
   if (Af.has(p.id)) { const g = Af.get(p.id).generations[0]; return g >= 3 ? sexed(p, `${greats(g - 2)}grandfather`, `${greats(g - 2)}grandmother`, `${greats(g - 2)}grandparent`) : null; }
-  const Ap = ancestors(byId, p.id);
+  const Ap = anc(byId, p.id);
   if (Ap.has(f.id)) { const g = Ap.get(f.id).generations[0]; return g >= 3 ? sexed(p, `${greats(g - 2)}grandson`, `${greats(g - 2)}granddaughter`, `${greats(g - 2)}grandchild`) : null; }
   const cas = commonAncestors(byId, f.id, p.id);
   if (!cas.length) return null;
@@ -127,8 +144,7 @@ export function kinshipLabel(byId, focus, person) {
   // in-laws
   if (spousesF.some((s) => parentsOf(byId, s).includes(p.id))) return sexed(p, "father-in-law", "mother-in-law", "parent-in-law");
   if ((p.spouseIds ?? []).some((s) => parentsOf(byId, s).includes(f.id))) return sexed(p, "son-in-law", "daughter-in-law", "child-in-law");
-  const siblingsOf = (id) => Object.values(byId).filter((x) => x.id !== id && parentsOf(byId, x.id).some((par) => parentsOf(byId, id).includes(par))).map((x) => x.id);
-  if (spousesF.some((s) => siblingsOf(s).includes(p.id)) || siblingsOf(f.id).some((sib) => (byId[sib].spouseIds ?? []).includes(p.id))) return sexed(p, "brother-in-law", "sister-in-law", "sibling-in-law");
+  if (spousesF.some((s) => siblingsOf(byId, s).includes(p.id)) || siblingsOf(byId, f.id).some((sib) => (byId[sib].spouseIds ?? []).includes(p.id))) return sexed(p, "brother-in-law", "sister-in-law", "sibling-in-law");
   // spouse of a blood relative
   for (const s of (p.spouseIds ?? []).filter((x) => byId[x])) {
     const rel = closeLabel(byId, f, byId[s]) ?? bloodLabel(byId, f, byId[s]);

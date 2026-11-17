@@ -1,4 +1,4 @@
-import { markOf, newerThan } from "../evidence/index.js";
+import { markOf, newerThan } from "../evidence/domain/snapshotMark.js";
 import { buildGraph, prepareRecords, recordPart, addRecordPart, removeRecord, personLayer } from "./projection.js";
 
 // Keeping the graph up to date (P8.T2). Record parts are rebuilt only for records touched since the graph was
