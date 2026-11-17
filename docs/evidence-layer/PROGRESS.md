@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Phase 8 report, docs, browser check, PR.
-- **Last updated:** 2026-11-17 (P8.T5)
+- **Next action:** reviewer: review Phase 8 (PR to master). Then Phase 9 (entity resolution).
+- **Last updated:** 2026-11-17 (Phase 8 report)
 
 ## Phase overview
 
@@ -22,7 +22,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
 | 7 Search | approved | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
 | 7b Transkribus import | approved | done on `ccr-adaa4345-wbnkkm` | 2026-11-17 |
-| 8 Graph projection | in progress | evidence/p8 (done on `ccr-adaa4345-wbnkkm`) | |
+| 8 Graph projection | in review | evidence/p8 (done on `ccr-adaa4345-wbnkkm`) | |
 | 9 Entity resolution | not started | evidence/p9 | |
 
 ## Task checklist
@@ -322,6 +322,48 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - Link a stamp / margin-note record to the main entry's record ("this stamp is about that child"), e.g. as an assertion relating the two subjects.
 
 ## Phase reports
+
+### Phase 8 report
+- **Built:** the graph projection, in memory, never stored (I7):
+  - *P8.T1* `src/graph/projection.js`: records (date, place, source, page), personas (role, house), co-occurrence with the relations the records state and "same house", persons, parents/children/partners from families, persona links (accepted and candidate; rejected left out), accepted relationships;
+  - *P8.T2* incremental updates: only records touched since the last build are recomputed (the exact snapshot mark, now shared with search in `src/evidence/domain/snapshotMark.js`); the person layer is rebuilt when its fingerprint changes; tested equal to a full rebuild after new records, confirmations, rejections, new links and family edits;
+  - *P8.T3* `fanOf` (list by record, 1 or 2 steps, role and year filters, candidates marked "possible") and `candidateClusters` (input for Phase 9);
+  - *P8.T4* kinship: `ancestors`, `descendants`, `commonAncestors` bounded at 30 generations (endogamy and looped data terminate); `kinshipLabel` with today's labels unchanged and precise ones otherwise (reviewer decision); the timeline uses it; ancestors and siblings cached per tree;
+  - *P8.T5* **People** on the Evidence page: person picker (focus by default), the records with the person's role and the others with roles, relations, same house and linked persons (click to switch; "possible" for candidates), **Open page**, filters, and a Kinship line with the nearest common ancestors.
+- **IndexedDB version / stores added:** none (still 6).
+- **New dependencies:** none. Main bundle 339 kB (+3 kB, the kinship labels); the People section is in the lazily loaded Evidence chunk.
+- **Deviations:** the role filter keeps records in which someone has that role (it does not hide people inside a record), labelled "Records with a". Otherwise as planned; reviewer decisions in the log (2026-11-17).
+- **Invariants:** I7 the graph is a projection, rebuildable, incremental = rebuild (tested). I6 `src/graph` makes no user decisions (architecture rule) and imports only `src/evidence`. Rejected assertions and rejected links never appear.
+- **Tests:** 489 → **505**. `npm test -- --run` and `npm run build` pass.
+- **Timing (Node, synthetic tree):** 5,000 people over 10 generations (heavily intermarried: every generation of 500 descends from the one before), 8,000 records, 32,000 personas and links:
+  - full build 220–250 ms; update after one new record ~85 ms;
+  - `fanOf` at 2 steps 0.07 ms;
+  - candidate clusters 14 ms;
+  - kinship labels for all 5,000 people against one focus: 0.5–1.1 s the first time, ~0.33 s when the focus changes after that (caches warm). Before the per-tree cache this was 28 ms per pair (minutes for a full relabel), so the cache was added in this phase. Ordinary trees with little intermarriage are much faster.
+- **Real-browser check (headless Chromium, dev server, fresh database, sample project):** I added the 1866 page (32) and entered the death record (Șfatu Loti, deceased; informants Alecsandru Drăgoiescu "nepotu mortei" and Constandin Cristescu "vecin cu morta"). The record was entered through the app's own evidence modules, not by typing in Records. I linked Loti to Maria Hariton (accepted) and Drăgoiescu to Gheorghe D. Hariton (candidate).
+  - Evidence → People opened in 74 ms;
+  - for Maria: "1 record"; the card showed death · 1866-03-28 (julian), page 1 (32), As deceased ("Șfatu Loti"), both informants with "informant for" and the words as written, and Drăgoiescu → "possible: Gheorghe D. Hariton";
+  - the Kinship line said "Maria Hariton (b. Văleanu) is the mother of Dumitru D. Hariton";
+  - clicking Gheorghe switched to him: "1 record (1 through possible links)", and the line said "child of Dumitru D. Hariton";
+  - **Open page** opened Documents on the record;
+  - the timeline labels for the sample family were unchanged (father, child);
+  - no page errors.
+- **How to verify:**
+  1. Open a page with a record you entered (Records) and accept the link of one of its people to a person of your tree (Legacy facts → link, or enter the record for a linked person).
+  2. Evidence → **People**, choose that person: the record, the others in it and their relations.
+  3. Click a linked name, try **Steps 2**, **Records with a** godparent, and **Years**.
+  4. On the timeline, **+ relative**: check the labels of cousins, in-laws and great-grandparents in your tree.
+- **Backup reminder:** no database change in this phase; a bundle backup is still good practice.
+- **Known limitations:**
+  1. Records reach the view only through persona links. Today links come from legacy facts or from your own linking; Phase 9 will propose links.
+  2. Two steps follow accepted links only (candidates are shown but not followed further).
+  3. Kinship uses the tree's parents and spouses; relationships entered in Sources (godparent, etc.) are in the graph but not in the labels.
+  4. There is no drawn graph (a decision: list by record).
+  5. The Phase 7 and 7b questions are still open.
+- **Questions for the reviewer:**
+  - (a) On your tree, are the new labels right and readable (e.g. "first cousin once removed", "wife of the nephew", "related twice")?
+  - (b) Should two steps also follow candidate ("possible") links, marked, or stay with accepted links only?
+  - (c) Should the timeline's **+ relative** list be sortable or filterable by kinship (e.g. only blood relatives)?
 
 ### Phase 7b report
 - **Built:** import of Transkribus exports (PAGE XML), as files:
