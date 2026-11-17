@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2013-07-15" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <Metadata>
+    <Creator>prov=READ-COOP:name=PyLaia@TranskribusPlatform:version=2.15.0:model_id=54321:lm=none:date=10_11_2026_14:00</Creator>
+    <Created>2026-11-10T13:59:02.123+01:00</Created>
+    <LastChange>2026-11-10T14:03:41.877+01:00</LastChange>
+    <TranskribusMetadata docId="1234567" pageId="76543210" pageNr="32" status="IN_PROGRESS"/>
+  </Metadata>
+  <Page imageFilename="pag32-upright.png" imageWidth="1475" imageHeight="2320">
+    <ReadingOrder>
+      <OrderedGroup id="ro_1" caption="Regions reading order">
+        <RegionRefIndexed index="0" regionRef="r_head"/>
+        <RegionRefIndexed index="1" regionRef="r_body"/>
+      </OrderedGroup>
+    </ReadingOrder>
+    <TextRegion id="r_body" custom="readingOrder {index:1;}">
+      <Coords points="120,300 1400,300 1400,1250 120,1250"/>
+      <TextLine id="l_2" custom="readingOrder {index:1;}">
+        <Coords points="130,420 1390,420 1390,470 130,470"/>
+        <Baseline points="130,465 1390,465"/>
+        <TextEquiv><Unicode>Martie la dece ore diminiața din naintea nostră primarulu</Unicode></TextEquiv>
+      </TextLine>
+      <TextLine id="l_1" custom="readingOrder {index:0;}">
+        <Coords points="130,350 1390,350 1390,400 130,400"/>
+        <Baseline points="130,395 1390,395"/>
+        <TextEquiv><Unicode>Anulu una mie optu sute șaizeci și șase la douădieci și optu ale lunii</Unicode></TextEquiv>
+      </TextLine>
+      <TextLine id="l_3" custom="readingOrder {index:2;}">
+        <Coords points="130,990 1390,990 1390,1040 130,1040"/>
+        <TextEquiv><Unicode>la unsprezece ore noaptea D-ei Șfatu Loti Catolică în</Unicode></TextEquiv>
+      </TextLine>
+      <TextEquiv><Unicode>(region text, ignored when lines exist)</Unicode></TextEquiv>
+    </TextRegion>
+    <TextRegion id="r_head" custom="readingOrder {index:0;}">
+      <Coords points="300,100 1100,100 1100,220 300,220"/>
+      <TextLine id="l_h" custom="readingOrder {index:0;}">
+        <Coords points="300,120 1100,120 1100,200 300,200"/>
+        <TextEquiv><Unicode>Actu de încetare din viață.</Unicode></TextEquiv>
+      </TextLine>
+    </TextRegion>
+  </Page>
+</PcGts>

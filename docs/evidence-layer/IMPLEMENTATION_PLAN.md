@@ -202,10 +202,16 @@ Meridian is a client-only Vite 5 + React 18 app. Data lives in IndexedDB; tests 
 
 ## Phase 7b — Transkribus import (scheduled after Phase 7 by the reviewer, 2026-11-16)
 
-AI reading is a costly last resort; Transkribus (and similar HTR tools) are trained for handwritten registers. Tasks are detailed when the phase starts. Scope:
-- Import a Transkribus **PAGE XML** export (file import first; the Transkribus API, which needs an account and a key, later): text regions and lines become regions with boxes (I4) and a `transcription` text layer from a `transkribus` processor run (model and version recorded, I3).
-- Match the export to registered pages (file name, page number, image size); unmatched pages are reported, never guessed.
-- The imported transcription appears in Review text beside OCR and AI transcriptions; the modern reading and corrections work as today.
+AI reading is a costly last resort; Transkribus (and similar HTR tools) are trained for handwritten registers. File import first; the Transkribus API (account and key) later. Reviewer decisions (2026-11-17): pages are matched by image file name, or by page order for a document the user picks (PDF); lines are kept as positioned "words" of one page transcription, no extra boxes are drawn.
+
+| ID | Task | Acceptance |
+| --- | --- | --- |
+| P7b.T1 | PAGE XML reader: page size, metadata (creator, dates, Transkribus data, model), text lines with polygons in reading order; line boxes 0-1 (I4); any PAGE namespace/prefix. | Fixture tests (2013, 2019 prefixed, reading order, words, alternatives, empty, broken). |
+| P7b.T2 | Read an export (ZIP or loose XML; METS order) and match pages: by image file name, or by order for a chosen document; aspect-ratio check; unmatched pages reported, never guessed. | Tests for each rule. |
+| P7b.T3 | Import: a `transkribus` run (model from the metadata), raw PAGE XML kept, a `transcription` layer per page with lines as positioned words; the same XML is not imported twice. | Tests incl. search finding the text and OCR untouched. |
+| P7b.T4 | UI: Import Transkribus export… panel (matches, unmatched with reasons, document picker, aspect warnings), result line; Show line boxes in Review text; handwritten documents point to the import. | Component test; real-browser check. |
+
+**Reviewer checks:** import a real Transkribus export of a register; judge matching and text quality.
 
 ---
 

@@ -4,10 +4,10 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 7 — Search
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 7.
-- **Last updated:** 2026-11-17 (Phase 7 complete)
+- **Current phase:** 7b — Transkribus import
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** P7b.T2: reading an export and matching pages.
+- **Last updated:** 2026-11-17 (P7b.T1)
 
 ## Phase overview
 
@@ -20,7 +20,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 4 Conclusions, legacy facts, bundle v2 | approved | evidence/p4 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-09 |
 | 5 Ingestion v1 | approved | evidence/p5 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-14 |
 | 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
-| 7 Search | awaiting review | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | |
+| 7 Search | approved | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
+| 7b Transkribus import | in progress | done on `ccr-adaa4345-wbnkkm` | |
 | 8 Graph projection | not started | evidence/p8 | |
 | 9 Entity resolution | not started | evidence/p9 | |
 
@@ -110,6 +111,14 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | P7.T2 | done | src/search/{indexer,service,index}.js, src/tests/searchIncremental.test.js | `updateIndex`: compares the stores with what the index has seen and rebuilds only the documents of changed regions (MiniSearch discard + add), then stores the index. Changes are found from the data itself (no hooks in evidence code): text layers, regions (and the region a corrected box replaces), records, personas, assertions (and the one a correction supersedes), decisions; a new or changed source/copy re-does its pages; a new name variant triggers a full rebuild (variants touch any document). Exactness: the index stores the latest timestamp it saw and the ids at that timestamp, so changes landing in the same millisecond are not missed. **I7 tests:** after new pages, readings, confirm/reject/correct and a corrected box, the incremental index gives the same stored documents and the same hits and scores as a full rebuild, also after reloading from the store; tests run without delays. The search service gains `update()`. 3 new tests. |
 | P7.T3 | done | src/search/{query,service,index}.js, src/tests/searchQuery.test.js | Each query word is looked up three ways and every word must match (AND): as written in text and names (folded; prefix from 3 letters; fuzzy 0.2 from 4 letters for OCR noise), through its name variants (one hop), and through its Daitch-Mokotoff codes in the names' D-M field. Filters: year range (overlap with the document's date bounds), place by name (documents list their place and its ancestors, so a county finds its towns), source kind, scope (source ids; none = whole library), confirmed only. Each hit has the reasons ("name", "text", "variant of …", "sounds like …", "similar to …") and a snippet in the original spelling with the matched words marked. **Acceptance:** "Stefan" finds Ştefan and Ștefan; "Loti" finds Șfatu Loti (proposed); "Ioan" finds Iohannes as a variant, one hop only; "Szvet" finds Șfatu Loti by sound (D-M 473000), which fuzzy matching cannot; "Haritun" finds Hariton; rejected values are never found; every filter tested. 6 new tests. |
 | P7.T4 | done | src/components/evidence/{SearchSection,EvidencePage,DocumentsSection,TextReview}.jsx, src/workers/searchClient.js, src/search/{documents,query}.js, src/tests/searchSection.test.jsx | **Search** is the first section of the Evidence page: a search box, filters (years from–to, place, source kind, only this project's sources, confirmed only), the index status ("N regions indexed · updated …", **Rebuild index**). The index is brought up to date each time the section opens; it runs in a Web Worker (falls back to the page if the worker cannot start, so search never hangs). Results: a crop of the region from the cached page image, source and page, the hit's text (names first, then values, the modern reading and the machine text, in the original spelling with matched words marked), the people, and badges (name / text / variant of … / sounds like … / similar to …, proposed values, confirmed values). Clicking a result opens the page workspace on that page: the Records tab with the box selected for record hits, the text for text-only hits. Fixed during the browser check: React StrictMode's development remount closed the worker the section still used. 3 new tests. |
+
+### Phase 7b
+| ID | Status | Files touched | Notes |
+| --- | --- | --- | --- |
+| P7b.T1 | done | src/ingest/transkribus/pageXml.js, src/tests/pageXml.test.js, src/tests/fixtures/transkribus/*.xml | `parsePageXml`: DOMParser, namespace-agnostic (PAGE 2010/2013/2019, any prefix). Reads the image name and size, metadata (Creator, Created, LastChange, TranskribusMetadata attributes, MetadataItems with labels; `modelOf` finds the recognition model in the places Transkribus has used), regions in reading order (ReadingOrder refs, else Transkribus `custom` readingOrder, else document order) and lines in their reading order. A line's text is its TextEquiv/Unicode (index 0 preferred among alternatives), else its words joined; its box is the polygon's bounding box, 0-1 and clamped (I4). Page text = lines, blank line between regions; region-level text used only when a region has no lines. Errors: not well-formed, not PAGE, no image size. Fixtures: the 1866 page (2013), a prefixed 2019 page with words and alternatives, an empty page, a broken file. 4 tests. |
+| P7b.T2 | todo | | |
+| P7b.T3 | todo | | |
+| P7b.T4 | todo | | |
 
 ### Phase 8
 | ID | Status | Files touched | Notes |
@@ -263,6 +272,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-17 | P7b start | Reviewer decisions: match exported pages by image file name, or by page order for a document the user picks (PDF); keep lines as positioned words of one page transcription, no boxes drawn | Reviewer answers at the start of Phase 7b | Match by file name only; one region per text block |
 | 2026-11-17 | P7 start | Reviewer decisions: proposed values are searchable (marked as proposed; rejected never found; a confirmed-only filter); the default scope is the whole library (a switch narrows to the open project's sources) | Reviewer answers at the start of Phase 7 | Confirmed only; project scope by default |
 | 2026-11-17 | P7.T1 | IndexedDB **v6** adds `evSearchIndex` (one row, the serialised MiniSearch index; derived data). The indexer reads one snapshot of the library (`library.searchIndex.snapshot()`, a repository method, so search code never calls db*). Regions that a corrected box replaced stay indexed while evidence still cites them. The worker client lives in `src/workers/` (search may not import workers) | The plan names `evSearchIndex`; the snapshot makes full and incremental builds see the same data (I7) | Keeping the index in `settings` (device-only, not derived); per-region reads (slow) |
 | 2026-11-16 | P6 review answers | (a) AI on demand only, as a last resort, with a cost confirmation before every call and no bulk AI; (b) AI extraction only on a drawn box; boxes can be marked as stamp / margin note (later events); record kinds adoption, divorce added to contract v1 (additive, no version change); (c) re-extraction keeps proposing everything except rejected values; (d) evidence on by default (`settings.evidenceOff` to hide it; old `evidenceUi` ignored) and on its own page (`#evidence`); Transkribus import scheduled as Phase 7b | Reviewer answers after Phase 6 | Bulk AI with a page limit; whole-page extraction; a new contract version for two enum values; keeping the modal panel |
@@ -340,7 +350,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - **Questions for the reviewer:** (a) Is the default ranking right (names count three times text; variants twice; sound-alike less)? (b) Should undated text be kept when a year range is set (marked "undated") rather than excluded? (c) Should a screen to pair name variants (Ioan – Iohannes) come before Phase 9, or with it? (d) Search speed and quality on your real documents.
 
 **Review**
-- Approved: no
+- Approved: yes (PR #12 merged 2026-11-17; questions (a)-(d) not answered yet, kept open)
 - Reviewer notes:
 
 ### Phase 6 report
