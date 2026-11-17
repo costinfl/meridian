@@ -7,7 +7,7 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
 - **Next action:** reviewer: review Phase 8 (PR to master). Then Phase 9 (entity resolution).
-- **Last updated:** 2026-11-17 (Phase 8 report)
+- **Last updated:** 2026-11-17 (Phase 8 review follow-up)
 
 ## Phase overview
 
@@ -272,6 +272,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-17 | P8 review | (a) Imported GEDCOM people all showed "relative": the import never read FAM records, so they had no parents or spouses (the labels were fine). The import now reads FAM (HUSB, WIFE, CHIL, MARR) into families; re-importing adds missing families without duplicating people. (b) Two steps follow candidate links too, marked "possible", after accepted ones. (c) No kinship filter on + relative: any person's life may give context to another, especially with name conflicts and uncertain years. Bug: life lines missing after the app started on #evidence (timeline width never measured); fixed with a callback ref | Reviewer feedback on PR #14 | Parents on people only (normalizeProject derives them from families and would drop them); a kinship filter |
 | 2026-11-17 | P8 start | Reviewer decisions: precise kinship labels on the timeline (today's labels unchanged); FAN view as a list by record; accepted links followed, candidate links shown as "possible", rejected never | Reviewer answers at the start of Phase 8 | Keep "relative"; a small graph; accepted links only |
 | 2026-11-17 | P8.T1 | The graph module takes its inputs as data (library snapshot; people, families, current persona links and relationships from the project): `src/graph` may import only evidence, so the caller resolves links with `currentLinks` | Architecture rule (graph imports evidence only) | Letting graph import conclusions/models |
 | 2026-11-17 | P7b start | Reviewer decisions: match exported pages by image file name, or by page order for a document the user picks (PDF); keep lines as positioned words of one page transcription, no boxes drawn | Reviewer answers at the start of Phase 7b | Match by file name only; one region per text block |
@@ -360,7 +361,13 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
   3. Kinship uses the tree's parents and spouses; relationships entered in Sources (godparent, etc.) are in the graph but not in the labels.
   4. There is no drawn graph (a decision: list by record).
   5. The Phase 7 and 7b questions are still open.
-- **Questions for the reviewer:**
+- **Review follow-up (2026-11-17, same PR):**
+  - **GEDCOM families.** Your imported people all showed "relative" because the GEDCOM import ignored FAM records. It now reads them: partners, children in order, marriage date and place. Families are merged on re-import: people already present are kept, missing families are added, and a child who already has parents keeps them. Test with a 5.5.1 file shaped like a desktop-app export (custom `_` tags, FAMC/FAMS, MARR). In the browser: father, mother, grandparent, aunt, "husband of the aunt", sibling, first cousin; a re-import added 0 people and 0 families. **Please import your MyFamilyTree file again** to add the families to your project.
+  - **Life lines.** When the app started on the Evidence page (#evidence), the timeline width was never measured once the timeline was shown, so only birth and death markers appeared until a reload. The cause was in Meridian, not Chrome. The timeline now measures itself whenever it appears (wheel zoom too). Reproduced in the browser before the fix (18 life lines vs 1) and checked after (18 and 18); a regression test fails without the fix.
+  - **Two steps** now follow possible links too, marked "Records of possible: …" and listed after accepted ones.
+  - Spouse labels read "husband/wife of the …" for every relation.
+  - Questions (a)–(c) answered (see log). Tests 505 → **512**.
+- **Questions for the reviewer** (answered, see the follow-up above):
   - (a) On your tree, are the new labels right and readable (e.g. "first cousin once removed", "wife of the nephew", "related twice")?
   - (b) Should two steps also follow candidate ("possible") links, marked, or stay with accepted links only?
   - (c) Should the timeline's **+ relative** list be sortable or filterable by kinship (e.g. only blood relatives)?

@@ -65,7 +65,7 @@ Zoom and position are remembered per project.
 ## People on the board
 
 - The **focus** person has the tall lane in the middle. Choose them from the **Focus** list.
-- Click **+ relative** to add someone to **Compare**. The list shows everyone not yet on the board, with their relationship to the focus person and their years: father, mother, spouse, child, sibling, grandparent, grandchild as before, and more precise labels for everyone else: great-grandfather (2× great-…), uncle, aunt, nephew, niece, first cousin once removed, father-in-law, brother-in-law, son-in-law, stepmother, "wife of the nephew", and ", related twice" when someone is related through two lines (for example double first cousins, or cousins who married). "relative" is left only when no line is found in the tree.
+- Click **+ relative** to add someone to **Compare**. The list shows everyone not yet on the board, with their relationship to the focus person and their years: father, mother, spouse, child, sibling, grandparent, grandchild as before, and more precise labels for everyone else: great-grandfather (2× great-…), uncle, aunt, nephew, niece, first cousin once removed, father-in-law, brother-in-law, son-in-law, stepmother, "wife of the nephew", "husband of the aunt", and ", related twice" when someone is related through two lines (for example double first cousins, or cousins who married). "relative" is left only when no line is found in the tree.
 - Each comparison lane has **⌖ focus** (make this person the focus; the previous focus moves to Compare) and **×** (remove the lane; the person stays in the project).
 
 People cannot be created in the app yet. They come from the sample project, a GEDCOM import, or a bundle import (see [Limits](#limits-you-should-know-about)).
@@ -188,9 +188,9 @@ GEDCOM is the common exchange format of genealogy programs. Meridian reads and w
 
 Roles are written as occupations with a date range, events as generic events with a type, and groups as notes. Colours, brackets, eras, media pins and unverified facts are not part of GEDCOM; use a bundle to keep them.
 
-**Import** (**Import**, choosing a `.ged` file) adds the people in the file to the open project, with their birth and death year and place, occupations, events, notes and sources. Add them to the board with **+ relative**.
+**Import** (**Import**, choosing a `.ged` file) adds the people in the file to the open project, with their birth and death year and place, occupations, events, notes and sources, and their **families** (parents, spouses, children, and the marriage date and place). Add them to the board with **+ relative**: their relationship to the focus person is shown (father, grandparent, first cousin, husband of the aunt…).
 
-GEDCOM import does **not** read family links yet, so imported people have no parents or spouses in Meridian. Imported facts are always unverified, even from a file that Meridian exported: tick **Verified** again once you have checked them.
+Importing the same file again does not duplicate anyone: people already in the project are kept as they are, and families that are missing are added. If you imported a file before families were read (they all showed "relative"), import it again to add the families. A child who already has parents in Meridian keeps them. Custom tags of other programs (those starting with `_`) are ignored. Imported facts are always unverified, even from a file that Meridian exported: tick **Verified** again once you have checked them.
 
 ## Evidence layer
 
@@ -328,7 +328,7 @@ The search index lives in this browser. It is brought up to date each time you o
 - Each record is shown on its own, newest first: kind, date, place, source and page, and **Open page** (opens the page on the **Records** tab with the box selected).
 - Under it: the person's own role, and the others named in the record with their role, the relation the record states (for example *informant for* "nepotu mortei", with the words as written; **proposed** when not confirmed), **same house** when they lived at the same house number, and the person of your tree they are linked to. Click that name to switch to them.
 - Links you **accepted** are followed. Links not decided yet are shown as **possible** (in amber). Links you **rejected** are never used.
-- Filters: **Records with a** role (e.g. only records with a godparent), **Years**, and **Steps**: 2 also shows the records of the people linked to those associates (each record only once).
+- Filters: **Records with a** role (e.g. only records with a godparent), **Years**, and **Steps**: 2 also shows the records of the people linked to those associates (each record only once); people reached through a link not accepted yet are shown after the others, as **possible**.
 - **Kinship** says how the chosen person is related to the timeline's focus person and names their nearest common ancestors (with the number of generations up on each side).
 
 Nothing on this page is saved: it is worked out from your records and tree each time it opens and kept up to date while it is open.

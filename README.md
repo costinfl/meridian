@@ -93,7 +93,7 @@ An **evidence layer** is being added in phases: document ingestion, OCR, extract
 Known gaps in the current app:
 
 - People cannot yet be created or deleted in the interface; they come from the sample, a GEDCOM import or a bundle import.
-- Parents and spouses cannot yet be edited in the interface, and GEDCOM import does not read family links.
+- Parents and spouses cannot yet be edited in the interface; they come from the sample, a bundle, or a GEDCOM import (which reads the families: parents, spouses, children).
 - The context lanes (local, national, world history) are the built-in sample only.
 
 ## Browser support
