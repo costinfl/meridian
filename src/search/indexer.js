@@ -4,24 +4,8 @@ import { createIndex, serialize, deserialize, INDEX_SCHEMA_VERSION } from "./eng
 // Building, storing and loading the search index (P7.T1). The stored row (evSearchIndex, IndexedDB v6) is derived
 // data: a full rebuild from the library always gives the same index (I7).
 
-/**
- * What the index has seen, exactly: the latest timestamp in the snapshot it was built from (`mark`) and the keys
- * of the rows that carry exactly that timestamp (`atMark`). A row is new if its time is later than the mark, or
- * equal to it but not one of those rows. (Wall-clock milliseconds can repeat, so a time alone is not enough.)
- */
-const STAMPED = [
-  ["sources", (x) => x.updatedAt ?? x.createdAt], ["copies", (x) => x.updatedAt ?? x.createdAt], ["regions", (x) => x.createdAt],
-  ["textLayers", (x) => x.createdAt], ["records", (x) => x.createdAt], ["personas", (x) => x.createdAt],
-  ["assertions", (x) => x.createdAt], ["decisions", (x) => x.decidedAt], ["nameVariants", (x) => x.createdAt],
-];
-export function markOf(snapshot) {
-  let mark = "";
-  for (const [k, t] of STAMPED) for (const x of snapshot[k]) { const ts = t(x) ?? ""; if (ts > mark) mark = ts; }
-  const atMark = [];
-  for (const [k, t] of STAMPED) for (const x of snapshot[k]) if ((t(x) ?? "") === mark && mark) atMark.push(`${k}:${x.id}`);
-  return { mark, atMark: atMark.sort() };
-}
-const isNewer = (seen, kind, row, ts) => !!ts && (ts > seen.mark || (ts === seen.mark && !seen.atMarkSet.has(`${kind}:${row.id}`)));
+import { markOf, newerThan } from "../evidence/domain/snapshotMark.js";
+export { markOf };
 
 const placeAncestorsOf = (library) => (placeId, when) => library.places.ancestorsAt(placeId, when ?? null).catch(() => []);
 const nowIso = () => new Date().toISOString();
@@ -59,9 +43,7 @@ export async function rebuildIndex(library) {
  * touches documents in ways we do not track per region (name variants, source or copy details).
  */
 export function changedRegions(snapshot, seen) {
-  const s = { mark: seen?.mark ?? "", atMarkSet: new Set(seen?.atMark ?? []) };
-  const stampOf = Object.fromEntries(STAMPED);
-  const newer = (kind) => (x) => isNewer(s, kind, x, stampOf[kind](x));
+  const newer = newerThan(seen);
   if (snapshot.nameVariants.some(newer("nameVariants"))) return { full: true, reason: "name variants changed" };
   let pageRegions = [];
   const newSources = new Set(snapshot.sources.filter(newer("sources")).map((x) => x.id));

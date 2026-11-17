@@ -19,6 +19,7 @@ import { createSearchIndexStore } from "./repositories/searchIndexStore.js";
 export { EvidenceError } from "./domain/errors.js";
 export { normalizedBox, boxFromPixels, WHOLE_PAGE_BOX } from "./domain/box.js";
 export { sha256Hex } from "./domain/hash.js";
+export { markOf, newerThan, STAMPED } from "./domain/snapshotMark.js";
 export { SOURCE_KINDS } from "./repositories/sourceStore.js";
 export { REPOSITORY_KINDS } from "./repositories/repositoryStore.js";
 export { PROCESSORS } from "./repositories/runStore.js";

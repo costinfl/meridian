@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P8.T2: incremental graph updates (I7).
-- **Last updated:** 2026-11-17 (P8.T1)
+- **Next action:** P8.T3: FAN queries and candidate clusters.
+- **Last updated:** 2026-11-17 (P8.T2)
 
 ## Phase overview
 
@@ -124,7 +124,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
 | P8.T1 | done | src/graph/{projection,index}.js, src/tests/{graphProjection.test.js,graphHelpers.js} | `buildGraph({ snapshot, people, families, links, relationships })` in plain Maps: records (kind, date bounds from the event or event.date values, place id and place as written, source, copy, page, region, personas), personas (role, house number, age), co-occurrence edges between every pair of personas of a record with the relation assertions stated between them (status kept; rejected and superseded left out) and a same-house flag; persons, parents/children and partners from accepted families; persona↔person links (accepted and candidate, rejected left out, score kept); accepted relationships. Record-level parts (`recordPart`, `addRecordPart`, `removeRecord`) for updates; `canonical(g)` for comparisons. 3 tests. |
-| P8.T2 | todo | | |
+| P8.T2 | done | src/graph/{update,index}.js, src/evidence/domain/snapshotMark.js (markOf moved here from src/search/indexer.js), src/search/indexer.js, src/tests/graphIncremental.test.js | `updateGraph(g, inputs)`: record parts are rebuilt only for records touched since the graph was built (new records, personas, assertions and the ones they supersede, decisions, and records on a changed copy or source), found with the exact "seen" mark now shared with the search index (`src/evidence/domain/snapshotMark.js`); the person layer is rebuilt when a fingerprint of people, families, links and relationships changes. **I7 test:** a new record with relations, a confirmation, a rejection, a relation added to an old record, a new person, a link accepted and a new family: the updated graph equals a full rebuild; a second update with no changes does nothing. 1 test (search tests unchanged). |
 | P8.T3 | todo | | |
 | P8.T4 | todo | | |
 | P8.T5 | todo | | |
