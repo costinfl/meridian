@@ -4,10 +4,10 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 7b — Transkribus import
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 7b.
-- **Last updated:** 2026-11-17 (Phase 7b complete)
+- **Current phase:** 8 — Graph projection
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** P8.T2: incremental graph updates (I7).
+- **Last updated:** 2026-11-17 (P8.T1)
 
 ## Phase overview
 
@@ -21,8 +21,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 5 Ingestion v1 | approved | evidence/p5 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-14 |
 | 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
 | 7 Search | approved | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
-| 7b Transkribus import | awaiting review | done on `ccr-adaa4345-wbnkkm` | |
-| 8 Graph projection | not started | evidence/p8 | |
+| 7b Transkribus import | approved | done on `ccr-adaa4345-wbnkkm` | 2026-11-17 |
+| 8 Graph projection | in progress | evidence/p8 (done on `ccr-adaa4345-wbnkkm`) | |
 | 9 Entity resolution | not started | evidence/p9 | |
 
 ## Task checklist
@@ -123,7 +123,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 8
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P8.T1 | todo | | |
+| P8.T1 | done | src/graph/{projection,index}.js, src/tests/{graphProjection.test.js,graphHelpers.js} | `buildGraph({ snapshot, people, families, links, relationships })` in plain Maps: records (kind, date bounds from the event or event.date values, place id and place as written, source, copy, page, region, personas), personas (role, house number, age), co-occurrence edges between every pair of personas of a record with the relation assertions stated between them (status kept; rejected and superseded left out) and a same-house flag; persons, parents/children and partners from accepted families; persona↔person links (accepted and candidate, rejected left out, score kept); accepted relationships. Record-level parts (`recordPart`, `addRecordPart`, `removeRecord`) for updates; `canonical(g)` for comparisons. 3 tests. |
 | P8.T2 | todo | | |
 | P8.T3 | todo | | |
 | P8.T4 | todo | | |
@@ -272,6 +272,8 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-17 | P8 start | Reviewer decisions: precise kinship labels on the timeline (today's labels unchanged); FAN view as a list by record; accepted links followed, candidate links shown as "possible", rejected never | Reviewer answers at the start of Phase 8 | Keep "relative"; a small graph; accepted links only |
+| 2026-11-17 | P8.T1 | The graph module takes its inputs as data (library snapshot; people, families, current persona links and relationships from the project): `src/graph` may import only evidence, so the caller resolves links with `currentLinks` | Architecture rule (graph imports evidence only) | Letting graph import conclusions/models |
 | 2026-11-17 | P7b start | Reviewer decisions: match exported pages by image file name, or by page order for a document the user picks (PDF); keep lines as positioned words of one page transcription, no boxes drawn | Reviewer answers at the start of Phase 7b | Match by file name only; one region per text block |
 | 2026-11-17 | P7 start | Reviewer decisions: proposed values are searchable (marked as proposed; rejected never found; a confirmed-only filter); the default scope is the whole library (a switch narrows to the open project's sources) | Reviewer answers at the start of Phase 7 | Confirmed only; project scope by default |
 | 2026-11-17 | P7.T1 | IndexedDB **v6** adds `evSearchIndex` (one row, the serialised MiniSearch index; derived data). The indexer reads one snapshot of the library (`library.searchIndex.snapshot()`, a repository method, so search code never calls db*). Regions that a corrected box replaced stay indexed while evidence still cites them. The worker client lives in `src/workers/` (search may not import workers) | The plan names `evSearchIndex`; the snapshot makes full and incremental builds see the same data (I7) | Keeping the index in `settings` (device-only, not derived); per-region reads (slow) |
@@ -358,7 +360,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
   - (c) Should the Transkribus API be planned (it needs your account and key), or is file import enough?
 
 **Review**
-- Approved: no
+- Approved: yes (PR #13 merged 2026-11-17; questions (a)-(c) not answered yet, kept open)
 - Reviewer notes:
 
 ### Phase 7 report
