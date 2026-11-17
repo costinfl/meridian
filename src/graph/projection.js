@@ -50,8 +50,10 @@ export function recordPart(ctx, recordId) {
     }
   }
   const placeText = (ctx.assertionsBySubject.get(rec.id) ?? []).find((a) => a.property === "event.place")?.originalValue ?? "";
+  const ev = rec.event;
+  const dateLabel = ev?.earliest || ev?.latest ? `${ev.earliest === ev.latest ? ev.earliest : `${ev.earliest ?? "…"} – ${ev.latest ?? "…"}`}${ev.calendar ? ` (${ev.calendar})` : ""}` : dateText;
   const record = {
-    id: rec.id, kind: rec.kind, earliestDay, latestDay, dateText, placeId: rec.placeId ?? null, placeText,
+    id: rec.id, kind: rec.kind, earliestDay, latestDay, dateText, dateLabel, placeId: rec.placeId ?? null, placeText,
     regionId: rec.regionIds?.[0] ?? null, pageId: page?.id ?? null, pageIndex: page?.pageIndex ?? null, pageLabel: page?.label ?? "",
     copyId: copy?.id ?? null, fileName: copy?.fileName ?? "", sourceId: copy?.sourceId ?? null,
     personaIds: personas.map((p) => p.id),

@@ -8,9 +8,10 @@ import { displayName } from "../../models/project.js";
 import DocumentsSection from "./DocumentsSection.jsx";
 import AiSettings from "./AiSettings.jsx";
 import SearchSection from "./SearchSection.jsx";
+import PeopleSection from "./PeopleSection.jsx";
 
 // The Evidence page (its own page beside the timeline; loaded lazily from App.jsx; on unless the project turns it off).
-// Sections: Documents (with the page workspace and the review queue), AI settings, Legacy facts (Phase 4).
+// Sections: Search, Documents (with the page workspace and the review queue), People (FAN and kinship, Phase 8), AI settings, Legacy facts (Phase 4).
 export default function EvidencePage({ onClose, storage, project, onProjectChange, initialSection = "search" }) {
   const [section, setSection] = useState(initialSection);
   const [openAt, setOpenAt] = useState(null);   // a search hit to open in the page workspace
@@ -20,6 +21,7 @@ export default function EvidencePage({ onClose, storage, project, onProjectChang
     setOpenAt({ copyId: h.copyId, pageId: h.pageId, regionId: h.regionKind === "page" ? null : h.regionId, tab: records ? "records" : "reading", nonce: Date.now() });
     setSection("documents");
   };
+  const openRecord = (r) => { setOpenAt({ copyId: r.copyId, pageId: r.pageId, regionId: r.regionId, tab: "records", nonce: Date.now() }); setSection("documents"); };
   const [line, setLine] = useState("Checking storage…");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -89,6 +91,7 @@ export default function EvidencePage({ onClose, storage, project, onProjectChang
         <div style={{ ...small, marginBottom: 12 }}>Documents, their text, and the records and facts read from them. Your timeline changes only when you attach evidence to a fact.</div>
         {navItem("search", "Search")}
         {navItem("documents", "Documents")}
+        {project?.people?.length > 0 && navItem("people", "People")}
         {navItem("ai", "AI settings")}
         {report && navItem("legacy", "Legacy facts", pending > 0 || candidates.length > 0 ? <span aria-label="needs attention">•</span> : null)}
         <span style={{ flex: 1 }} />
@@ -97,6 +100,7 @@ export default function EvidencePage({ onClose, storage, project, onProjectChang
       </nav>
       <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: "14px 18px" }}>
         {section === "search" && library && <SearchSection library={library} project={project} onOpen={openHit} />}
+        {section === "people" && library && <PeopleSection library={library} project={project} onOpen={openRecord} />}
         {section === "documents" && library && <DocumentsSection storage={storage} library={library} inlineWorkspace openAt={openAt} />}
         {section === "ai" && library && storage?.getSetting && <AiSettings storage={storage} />}
         {section === "legacy" && (
