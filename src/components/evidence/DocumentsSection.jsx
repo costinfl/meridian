@@ -7,6 +7,7 @@ import {
 } from "../../ingest/index.js";
 import { getPageImage, loadCopyBytes, openDocument } from "../../ingest/documents.js";
 import TextReview from "./TextReview.jsx";
+import TranskribusImport from "./TranskribusImport.jsx";
 import { proposalsByPage, recordsOfPage } from "../../evidence/index.js";
 
 // Documents (Phase 5): link a folder or add files, scan them into the library, read their text (embedded text
@@ -243,6 +244,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
         <button style={mini} disabled={!!busy} onClick={() => fileRef.current?.click()}>Add files…</button>
         <input ref={fileRef} data-testid="doc-files" type="file" multiple accept=".pdf,.docx,.jpg,.jpeg,.png,.tif,.tiff" style={{ display: "none" }}
           onChange={(e) => { if (e.target.files?.length) addFiles(e.target.files); e.target.value = ""; }} />
+        {copies.length > 0 && <TranskribusImport library={library} copies={copies} disabled={!!busy} onDone={async (msg) => { await refresh().catch(() => {}); setMessage(msg); }} />}
         {totalProposed > 0 && <span data-testid="proposals-waiting" style={{ ...small, color: C.rel[1] }}>{totalProposed} proposed values waiting for review</span>}
         {unread.length > 0 && <button style={{ ...mini, ...btnStyle(true), padding: "2px 8px", fontSize: 11 }} disabled={!!busy} onClick={() => readCopies(unread)}>Read {unread.length} unread</button>}
       </div>
@@ -274,7 +276,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
                   </span>
                 </div>
                 <div style={{ ...small, display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  {src ? <span>Source: {src.title}{src.script === "handwritten" ? " (handwritten: waits for HTR)" : ""}</span> : (
+                  {src ? <span>Source: {src.title}{src.script === "handwritten" ? (s.pages && s.withText === s.pages ? " (handwritten)" : " (handwritten: import its Transkribus export, or use Read with AI as a last resort)") : ""}</span> : (
                     <>
                       <span>Inbox — which source is this from?</span>
                       <input aria-label={`Source title for ${c.fileName}`} placeholder="Source title" value={titles[c.id] ?? ""} onChange={(e) => setTitles((t) => ({ ...t, [c.id]: e.target.value }))} style={field} />
