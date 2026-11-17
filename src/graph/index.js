@@ -2,3 +2,4 @@
 // other code uses for graph questions (FAN, kinship).
 export { buildGraph, personLayer, prepareRecords, recordPart, addRecordPart, removeRecord, canonical, RELATION_PROPERTIES } from "./projection.js";
 export { buildTrackedGraph, updateGraph, changedRecords, personFingerprint } from "./update.js";
+export { fanOf, candidateClusters, personsOfPersona } from "./fan.js";
