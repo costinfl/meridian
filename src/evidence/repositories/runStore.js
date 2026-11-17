@@ -2,7 +2,7 @@ import { newId, nowIso } from "../ids.js";
 import { sha256Hex } from "../domain/hash.js";
 import { EvidenceError, invalid, notFound, pick, requireOneOf } from "../domain/errors.js";
 
-export const PROCESSORS = ["router", "pdf-text", "docx-text", "tesseract", "llm-reading", "llm-extraction", "entity-resolution", "manual", "import"];
+export const PROCESSORS = ["router", "pdf-text", "docx-text", "tesseract", "transkribus", "llm-reading", "llm-extraction", "entity-resolution", "manual", "import"];
 export const RUN_STATUSES = ["running", "succeeded", "partial", "failed", "cancelled"];
 export const FINAL_RUN_STATUSES = RUN_STATUSES.filter((s) => s !== "running");
 export const ITEM_STATUSES = ["queued", "running", "succeeded", "failed", "skipped", "awaiting-htr"];

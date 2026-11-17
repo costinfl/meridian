@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 7b — Transkribus import
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P7b.T3: import as a transcription layer.
-- **Last updated:** 2026-11-17 (P7b.T2)
+- **Next action:** P7b.T4: import UI and line boxes.
+- **Last updated:** 2026-11-17 (P7b.T3)
 
 ## Phase overview
 
@@ -117,7 +117,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | --- | --- | --- | --- |
 | P7b.T1 | done | src/ingest/transkribus/pageXml.js, src/tests/pageXml.test.js, src/tests/fixtures/transkribus/*.xml | `parsePageXml`: DOMParser, namespace-agnostic (PAGE 2010/2013/2019, any prefix). Reads the image name and size, metadata (Creator, Created, LastChange, TranskribusMetadata attributes, MetadataItems with labels; `modelOf` finds the recognition model in the places Transkribus has used), regions in reading order (ReadingOrder refs, else Transkribus `custom` readingOrder, else document order) and lines in their reading order. A line's text is its TextEquiv/Unicode (index 0 preferred among alternatives), else its words joined; its box is the polygon's bounding box, 0-1 and clamped (I4). Page text = lines, blank line between regions; region-level text used only when a region has no lines. Errors: not well-formed, not PAGE, no image size. Fixtures: the 1866 page (2013), a prefixed 2019 page with words and alternatives, an empty page, a broken file. 4 tests. |
 | P7b.T2 | done | src/ingest/transkribus/exportReader.js, src/tests/transkribusExport.test.js | `readExport(files)`: a Transkribus ZIP (…/page/*.xml; mets.xml gives the page order, nested file groups handled; images, doc.xml and other non-PAGE files skipped) or loose PAGE XML files (natural name order); unreadable files are reported. `matchPages`: (1) by **file name**: the page's imageFilename against single-image documents, with and without Transkribus's number prefix (`0007_`), exactly one candidate, document must have been read; (2) by **page order** onto a document the user picks (PDF or multi-page), with a warning when the counts differ; (3) **aspect check** within 3%, flagging an image that is the page turned by 90° (`rotated`). Ambiguous names, unread documents and pages without a match are listed with the reason, never guessed. 10 tests. |
-| P7b.T3 | todo | | |
+| P7b.T3 | done | src/ingest/transkribus/{importer,index}.js, src/evidence/repositories/runStore.js (processor transkribus), src/tests/transkribusImport.test.js | `importTranskribus`: one `transkribus` run per import (importer version `page-xml-1`, model from the PAGE metadata, export name, models, export date); per page a run item (file, image name, lines, how it was matched, sha256), the PAGE XML kept verbatim as raw output, and a new **transcription** layer on the whole-page region with the page text and every line as a positioned word (box 0-1). It becomes the current transcription; OCR and AI layers stay; no reading is created (I6). The same XML for the same page is skipped; a changed export adds a newer layer. Search finds the imported text (tested). 4 tests. |
 | P7b.T4 | todo | | |
 
 ### Phase 8
