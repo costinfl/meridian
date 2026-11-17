@@ -60,6 +60,29 @@ describe("FAN queries (P8.T3)", () => {
     expect(two.second).toHaveLength(1);
     expect(two.second[0]).toMatchObject({ person: { name: "Alexandru Drăgoiescu" }, via: { nameAsWritten: "Alecsandru Drăgoiescu" } });
     expect(two.second[0].entries.map((e) => [e.record.kind, e.self.role])).toEqual([["baptism", "father"]]);
+    expect(two.second[0].status).toBe("accepted");
+    expect(two.possible).toBe(0);
+  });
+
+  it("two steps also follow candidate links, marked possible and listed after accepted ones; rejected never", async () => {
+    const fx = await graphFixture();
+    const { fuzzyDate } = await import("../evidence/index.js");
+    const later = await fx.library.records.createRecord({ kind: "baptism", regionIds: [fx.pages.p2.wholePageRegion.id], runId: fx.run.id, event: fuzzyDate({ year: 1870, calendar: "julian" }),
+      personas: [{ nameAsWritten: "Elena Drăgoiescu", role: "child" }, { nameAsWritten: "Alecsandru Drăgoiescu", role: "father" }] });
+    const burial = await fx.library.records.createRecord({ kind: "burial", regionIds: [fx.pages.p2.wholePageRegion.id], runId: fx.run.id, event: fuzzyDate({ year: 1880, calendar: "julian" }),
+      personas: [{ nameAsWritten: "C. Cristescu", role: "deceased" }] });
+    const links = [...fx.links, { id: "L6", personId: "i6", personaId: fx.personas.loti.id, status: "accepted" },
+      { id: "L7", personId: "i5", personaId: fx.personas.drag.id, status: "candidate", score: 0.6 }, { id: "L8", personId: "i5", personaId: later.personas[1].id, status: "accepted" },
+      { id: "L9", personId: "i7", personaId: fx.personas.crist.id, status: "accepted" }, { id: "L10", personId: "i7", personaId: burial.personas[0].id, status: "accepted" }];
+    const people = [...fx.people, { id: "i5", name: "Alexandru Drăgoiescu", sex: "M" }, { id: "i6", name: "Loti Șfatu", sex: "F" }, { id: "i7", name: "Constantin Cristescu", sex: "M" }];
+    const g = buildGraph({ snapshot: await fx.library.searchIndex.snapshot(), people, families: fx.families, links, relationships: [] });
+    const two = fanOf(g, { personId: "i6", hops: 2 });
+    expect(two.second.map((s) => [s.person.name, s.status, s.entries[0].record.kind])).toEqual([
+      ["Constantin Cristescu", "accepted", "burial"], ["Alexandru Drăgoiescu", "candidate", "baptism"]]);
+    expect(two.possible).toBe(1);
+    // rejected: never followed
+    const g2 = buildGraph({ snapshot: await fx.library.searchIndex.snapshot(), people, families: fx.families, links: links.map((l) => (l.id === "L7" ? { ...l, status: "rejected" } : l)), relationships: [] });
+    expect(fanOf(g2, { personId: "i6", hops: 2 }).second.map((s) => s.person.name)).toEqual(["Constantin Cristescu"]);
   });
 
   it("candidate clusters: personas and persons tied by candidate links", async () => {

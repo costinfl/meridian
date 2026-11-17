@@ -36,7 +36,8 @@ function entryOf(g, personaId, link) {
  * @param {object} g  the graph
  * @param {object} q  { personId | personaId, hops = 1 (1 or 2), roles?: string[] (keep records where someone has one
  *                    of these roles), fromYear?, toYear? }
- * @returns {{ entries, second, possible }}  entries newest first; `second`: [{ person, entries }] one step further
+ * @returns {{ entries, second, possible }}  entries newest first; `second`: [{ person, via, status, entries }] one step
+ *                    further (status of the link followed: accepted, or candidate = "possible")
  */
 export function fanOf(g, { personId = null, personaId = null, hops = 1, roles = null, fromYear, toYear } = {}) {
   const [d0, d1] = yearBounds(fromYear, toYear);
@@ -57,18 +58,24 @@ export function fanOf(g, { personId = null, personaId = null, hops = 1, roles = 
   const out = { entries, second: [], possible: entries.filter((e) => e.link?.status === "candidate").length };
   if (hops < 2) return out;
 
-  // one step further: the records of the persons the associates are linked to (accepted links only)
+  // one step further: the records of the persons the associates are linked to. Accepted links first, then
+  // candidate ("possible") links, marked with their status (reviewer decision); rejected links are not in the graph.
   const seenPersons = new Set(personId ? [personId] : []);
   const seenRecords = new Set(entries.map((e) => e.record.id));                 // a record is shown once
   let budget = MAX_RECORDS - entries.length;
-  for (const e of entries) for (const o of e.others) for (const p of o.persons) {
-    if (p.status !== "accepted" || seenPersons.has(p.personId) || budget <= 0) continue;
+  const hopsOut = [];
+  for (const e of entries) for (const o of e.others) for (const p of o.persons) hopsOut.push({ o, p });
+  hopsOut.sort((a, b) => (a.p.status === b.p.status ? 0 : a.p.status === "accepted" ? -1 : 1));   // stable: record order kept
+  for (const { o, p } of hopsOut) {
+    if (seenPersons.has(p.personId) || budget <= 0) continue;
     seenPersons.add(p.personId);
     const theirs = startsOf(p.personId).filter((s) => !visitedPersonas.has(s.personaId) && !seenRecords.has(g.personas.get(s.personaId)?.recordId));
     theirs.forEach((s) => { visitedPersonas.add(s.personaId); seenRecords.add(g.personas.get(s.personaId)?.recordId); });
     const list = sort(theirs.map((s) => entryOf(g, s.personaId, s.link)).filter(Boolean).filter(keep)).slice(0, budget);
     budget -= list.length;
-    if (list.length) out.second.push({ person: g.persons.get(p.personId) ?? { id: p.personId, name: p.name }, via: o.persona, entries: list });
+    if (!list.length) continue;
+    out.second.push({ person: g.persons.get(p.personId) ?? { id: p.personId, name: p.name }, via: o.persona, status: p.status, entries: list });
+    out.possible += list.filter((x) => p.status === "candidate" || x.link?.status === "candidate").length;
   }
   return out;
 }

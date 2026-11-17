@@ -78,6 +78,14 @@ describe("People section (P8.T5)", () => {
     expect(second.textContent).toMatch(/Records of Dumitru Hariton/);
     expect(second.textContent).toMatch(/marriage/);
     expect(second.textContent).not.toMatch(/baptism/);                // a record is shown once
+
+    // from Dumitru, two steps: Ion is linked only as a candidate, so his records are followed and marked possible
+    const run2 = await fx.library.runs.startRun({ processor: "manual" });
+    const conf = await fx.library.records.createRecord({ kind: "census", regionIds: [fx.pages.p1.wholePageRegion.id], runId: run2.id, personas: [{ nameAsWritten: "Ion Hariton", role: "subject" }] });
+    rerender(<PeopleSection library={fx.library} project={{ ...linked, personaLinks: [...linked.personaLinks, { id: "L10", personId: "i2", personaId: conf.personas[0].id, status: "candidate" }] }} />);
+    fireEvent.change(screen.getByLabelText("Person"), { target: { value: "i1" } });
+    await waitFor(() => expect(screen.getByTestId("fan-second").textContent).toMatch(/Records of possible: Ion Hariton/));
+    expect(screen.getByTestId("fan-second").textContent).toMatch(/census/);
   });
 
   it("says so when the project has no people", () => {

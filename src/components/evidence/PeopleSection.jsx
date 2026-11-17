@@ -134,7 +134,7 @@ export default function PeopleSection({ library, project, onOpen }) {
               <div style={{ font: "700 12px Archivo, sans-serif", color: C.ink, marginBottom: 4 }}>One step further</div>
               {fan.second.map((s) => (
                 <div key={s.person.id} style={{ marginBottom: 6 }}>
-                  <div style={small}>Records of <button style={linkBtn} onClick={() => setPersonId(s.person.id)}>{s.person.name}</button> (“{s.via.nameAsWritten}”, {s.via.role})</div>
+                  <div style={small}>Records of {s.status === "candidate" && <span style={{ color: C.rel[1] }}>possible: </span>}<button style={linkBtn} onClick={() => setPersonId(s.person.id)}>{s.person.name}</button> (“{s.via.nameAsWritten}”, {s.via.role})</div>
                   <ul style={{ listStyle: "none", margin: "4px 0 0 12px", padding: 0 }}>
                     {s.entries.map((e) => <RecordCard key={e.record.id + e.self.id} entry={e} onPerson={setPersonId} onOpen={onOpen} />)}
                   </ul>
