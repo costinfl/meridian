@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 7 — Search
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P7.T2: incremental index updates (I7).
-- **Last updated:** 2026-11-17 (P7.T1)
+- **Next action:** P7.T3: query with name variants, D-M codes and filters.
+- **Last updated:** 2026-11-17 (P7.T2)
 
 ## Phase overview
 
@@ -107,7 +107,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
 | P7.T1 | done | src/storage/upgrades/{v6,index}.js, src/evidence/repositories/searchIndexStore.js, src/evidence/index.js, src/search/{documents,engine,indexer,service,index}.js, src/workers/{search.worker,searchClient}.js, src/tests/{searchIndex.test.js,searchHelpers.js,upgrade.test.js}, package.json (minisearch 7.2.0) | IndexedDB v6: `evSearchIndex` (lossless upgrade test with evidence and settings). One search document per region with text or evidence: current transcription + current modern reading + values read there (folded with `searchKey`), names (name assertions and personas of records citing the region) with Daitch-Mokotoff codes and one-hop variants, date bounds (record events, date assertions), places expanded up the hierarchy, source/page/box metadata, confirmed/proposed flags; rejected and superseded assertions left out. MiniSearch (fields text, names, variants, dm; same folding for queries) serialised to the store; `rebuildIndex`, `loadIndex`; a search service usable in a worker (`src/workers/search.worker.js`, client `src/workers/searchClient.js`) or in the page. 4 new tests. |
-| P7.T2 | todo | | |
+| P7.T2 | done | src/search/{indexer,service,index}.js, src/tests/searchIncremental.test.js | `updateIndex`: compares the stores with what the index has seen and rebuilds only the documents of changed regions (MiniSearch discard + add), then stores the index. Changes are found from the data itself (no hooks in evidence code): text layers, regions (and the region a corrected box replaces), records, personas, assertions (and the one a correction supersedes), decisions; a new or changed source/copy re-does its pages; a new name variant triggers a full rebuild (variants touch any document). Exactness: the index stores the latest timestamp it saw and the ids at that timestamp, so changes landing in the same millisecond are not missed. **I7 tests:** after new pages, readings, confirm/reject/correct and a corrected box, the incremental index gives the same stored documents and the same hits and scores as a full rebuild, also after reloading from the store; tests run without delays. The search service gains `update()`. 3 new tests. |
 | P7.T3 | todo | | |
 | P7.T4 | todo | | |
 

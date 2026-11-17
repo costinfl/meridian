@@ -1,4 +1,4 @@
-import { loadIndex, rebuildIndex } from "./indexer.js";
+import { loadIndex, rebuildIndex, updateIndex } from "./indexer.js";
 
 // One search service per library: keeps the index in memory, loads it from the store, rebuilds it when missing.
 // Used inside the search worker (src/workers/search.worker.js) or, without workers, directly in the page.
@@ -17,6 +17,14 @@ export function createSearchService(library, { now = () => Date.now() } = {}) {
       const t = now();
       state = await rebuildIndex(library);
       return { docCount: state.index.documentCount, builtAt: state.builtAt, rebuilt: true, ms: now() - t };
+    },
+    /** Load or build, then apply changes made since the index was built. Returns { docCount, builtAt, changed, full, ms }. */
+    async update() {
+      const t = now();
+      if (!state) state = await loadIndex(library);
+      const r = await updateIndex(library, state);
+      state = r.state;
+      return { docCount: state.index.documentCount, builtAt: state.builtAt, changed: r.changed, full: r.full, ms: now() - t };
     },
     /** The in-memory index (after ensure). */
     current: () => state,
