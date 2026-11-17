@@ -109,6 +109,9 @@ export async function documentOf(ctx, regionId, { placeAncestors } = {}) {
   const source = copy?.sourceId ? ctx.sourceById.get(copy.sourceId) ?? null : null;
   const values = assertions.filter((a) => !NAME_PROPERTIES.has(a.property)).map((a) => a.originalValue).filter(Boolean);
   const plain = [transcription?.originalText, reading?.originalText, ...values].filter(Boolean).join("\n");
+  // what a hit shows: the values read in the region (names first), then the researcher's reading, then the machine text
+  const shownValues = assertions.filter((a) => !NAME_PROPERTIES.has(a.property) && a.property !== "role" && a.property !== "sex").map((a) => a.originalValue).filter(Boolean);
+  const shown = [[...shownNames].join(", "), shownValues.join(" · "), reading?.originalText, transcription?.originalText].filter(Boolean).join("\n");
   return {
     id: regionId,
     text: searchKey(plain),
@@ -124,7 +127,7 @@ export async function documentOf(ctx, regionId, { placeAncestors } = {}) {
     hasConfirmed: assertions.some((a) => a.status === "confirmed"),
     hasProposed: assertions.some((a) => a.status === "proposed"),
     shownNames: [...shownNames].sort(),
-    snippetSource: plain.slice(0, 4000),
+    snippetSource: shown.slice(0, 4000),
   };
 }
 

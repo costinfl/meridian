@@ -65,7 +65,7 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : "");
 /**
  * @param {{ library, copy, loadImage: (page) => Promise<{bytes, mimeType}|null>, onClose: () => void }} props
  */
-export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, runReading, initialPageId = null, initialTab = "reading", inline = false }) {
+export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, runReading, initialPageId = null, initialTab = "reading", initialRegionId = null, inline = false }) {
   const [pages, setPages] = useState([]);
   const [idx, setIdx] = useState(0);
   const [data, setData] = useState(null);        // { region, transcription, transcriptionRun, reading, history }
@@ -116,8 +116,20 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
 
   useEffect(() => { setSelection(null); setRewrite(null); setMessage(""); load().catch((e) => setMessage(`Failed: ${e.message}`)); }, [load]);
 
-  const loadRegions = useCallback(async () => { if (page) setRegions(await currentRegionsOf(library, page.id)); }, [library, page]);
-  useEffect(() => { setSelectedRegionId(null); setDrawing(false); loadRegions().catch(() => {}); }, [loadRegions]);
+  const regionsPage = useRef(null);
+  const loadRegions = useCallback(async () => {
+    if (!page) return;
+    const rs = await currentRegionsOf(library, page.id);
+    setRegions(rs);
+    regionsPage.current = rs.some((r) => r.id === wantedRegion.current) ? page.id : null;
+  }, [library, page]);
+  const wantedRegion = useRef(initialRegionId);   // opened from a search hit: select that region once it is loaded
+  useEffect(() => {
+    setSelectedRegionId(null); setDrawing(false);
+    loadRegions().then(() => {
+      if (wantedRegion.current && page && regionsPage.current === page.id) { setSelectedRegionId(wantedRegion.current); wantedRegion.current = null; }
+    }).catch(() => {});
+  }, [loadRegions]); // eslint-disable-line react-hooks/exhaustive-deps
   const drawRegion = async (box) => {
     try {
       const whole = regions.find((r) => r.kind === "page");

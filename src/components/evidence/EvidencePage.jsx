@@ -7,11 +7,19 @@ import { currentLinks, decideLink } from "../../conclusions/personaLinks.js";
 import { displayName } from "../../models/project.js";
 import DocumentsSection from "./DocumentsSection.jsx";
 import AiSettings from "./AiSettings.jsx";
+import SearchSection from "./SearchSection.jsx";
 
 // The Evidence page (its own page beside the timeline; loaded lazily from App.jsx; on unless the project turns it off).
 // Sections: Documents (with the page workspace and the review queue), AI settings, Legacy facts (Phase 4).
-export default function EvidencePage({ onClose, storage, project, onProjectChange, initialSection = "documents" }) {
+export default function EvidencePage({ onClose, storage, project, onProjectChange, initialSection = "search" }) {
   const [section, setSection] = useState(initialSection);
+  const [openAt, setOpenAt] = useState(null);   // a search hit to open in the page workspace
+  // a hit with records opens the Records tab (on its box); a text-only hit opens the page's text
+  const openHit = (h) => {
+    const records = h.regionKind !== "page" || h.hasProposed || h.hasConfirmed || h.shownNames?.length;
+    setOpenAt({ copyId: h.copyId, pageId: h.pageId, regionId: h.regionKind === "page" ? null : h.regionId, tab: records ? "records" : "reading", nonce: Date.now() });
+    setSection("documents");
+  };
   const [line, setLine] = useState("Checking storage…");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -79,6 +87,7 @@ export default function EvidencePage({ onClose, storage, project, onProjectChang
       <nav aria-label="Evidence sections" style={{ width: 210, flexShrink: 0, borderRight: `1px solid ${C.rule}`, padding: 14, display: "flex", flexDirection: "column", overflowY: "auto" }}>
         <div style={{ font: "700 15px Fraunces, Georgia, serif", color: C.ink, marginBottom: 4 }}>Evidence</div>
         <div style={{ ...small, marginBottom: 12 }}>Documents, their text, and the records and facts read from them. Your timeline changes only when you attach evidence to a fact.</div>
+        {navItem("search", "Search")}
         {navItem("documents", "Documents")}
         {navItem("ai", "AI settings")}
         {report && navItem("legacy", "Legacy facts", pending > 0 || candidates.length > 0 ? <span aria-label="needs attention">•</span> : null)}
@@ -87,7 +96,8 @@ export default function EvidencePage({ onClose, storage, project, onProjectChang
         {onClose && <button onClick={onClose} style={{ ...btnStyle(false), marginTop: 10 }}>← Timeline</button>}
       </nav>
       <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: "14px 18px" }}>
-        {section === "documents" && library && <DocumentsSection storage={storage} library={library} inlineWorkspace />}
+        {section === "search" && library && <SearchSection library={library} project={project} onOpen={openHit} />}
+        {section === "documents" && library && <DocumentsSection storage={storage} library={library} inlineWorkspace openAt={openAt} />}
         {section === "ai" && library && storage?.getSetting && <AiSettings storage={storage} />}
         {section === "legacy" && (
           <>

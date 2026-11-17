@@ -35,9 +35,12 @@ export function expandQuery(q, vmap = new Map()) {
 /** Why a hit matched, in words a researcher understands. */
 function reasonsOf(hit, expansions) {
   const out = new Set();
+  const terms = Object.keys(hit.match ?? {});
+  // a word found as written does not also need "sounds like" (its own D-M code always matches itself)
+  const direct = new Set(expansions.filter((e) => terms.some((t) => t === e.word || t.startsWith(e.word) || e.variants.includes(t))).map((e) => e.word));
   for (const [term, fields] of Object.entries(hit.match ?? {})) {
     for (const e of expansions) {
-      if (fields.includes("dm") && e.dm.includes(term)) out.add(`sounds like “${e.word}”`);
+      if (fields.includes("dm") && e.dm.includes(term)) { if (!direct.has(e.word)) out.add(`sounds like “${e.word}”`); }
       else if (e.variants.includes(term)) out.add(`variant of “${e.word}”`);
       else if (term === e.word || term.startsWith(e.word)) out.add(fields.includes("names") ? "name" : "text");
       else if (!e.dm.includes(term) && (fields.includes("text") || fields.includes("names"))) out.add(`similar to “${e.word}”`);

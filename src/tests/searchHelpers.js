@@ -6,8 +6,8 @@ import { createEvidenceLibrary, toEvidence, writeRecords } from "../evidence/ind
 export const DEATH = JSON.parse(fs.readFileSync(path.join(__dirname, "fixtures", "extraction", "death-1866.json"), "utf8"));
 
 /** A small library: a parish register page (OCR text), the 1866 death page (records from the fixture), name variants. */
-export async function searchLibrary() {
-  const library = createEvidenceLibrary(freshStorage());
+export async function searchLibrary({ storage = freshStorage() } = {}) {
+  const library = createEvidenceLibrary(storage);
   const reg = await library.sources.create({ title: "Registrul de botezuri, Săhăteni", kind: "parish-register" });
   const civ = await library.sources.create({ title: "Registrul stării civile, Craiova, decese 1866", kind: "civil-register" });
   const c1 = (await library.copies.registerFile(new TextEncoder().encode("bot"), { sourceId: reg.id, storage: { mode: "blob", blobKey: "a" } })).copy;
@@ -21,5 +21,5 @@ export async function searchLibrary() {
   const { written } = await writeRecords({ library, runId: llm.id, regionId: p2.wholePageRegion.id, records: toEvidence(DEATH), addAssertion: (i) => library.assertions.propose(i) });
   await library.nameVariants.add({ canonical: "Ioan", variant: "Iohannes" });
   await library.nameVariants.add({ canonical: "Ioan", variant: "Ion" });
-  return { library, sources: { reg, civ }, copies: { c1, c2 }, pages: { p1, p2 }, record: written[0], runs: { ocr, llm } };
+  return { storage, library, sources: { reg, civ }, copies: { c1, c2 }, pages: { p1, p2 }, record: written[0], runs: { ocr, llm } };
 }
