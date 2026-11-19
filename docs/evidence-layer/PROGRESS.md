@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** P9.T2: comparators.
-- **Last updated:** 2026-11-19 (P9.T1)
+- **Next action:** P9.T3: scoring, runs, worker.
+- **Last updated:** 2026-11-19 (P9.T2)
 
 ## Phase overview
 
@@ -133,7 +133,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
 | P9.T1 | done | src/resolve/{profiles,blocking}.js, src/tests/{resolveHelpers.js,resolveBlocking.test.js}, src/tests/archRules.js | New automated module `src/resolve` (may import evidence and graph; architecture rule, and listed with the modules that may only propose). **Profiles:** a persona's name (the name assertion, confirmed before proposed, else as written), given names and surnames (folded), sex (stated, else from the role), birth window (stated date, else stated age at the event ± 1 year, else a window from the role: a baptised child 0–2 years before the event, a groom 14–70 years, a parent 14–75…), death (stated, or the event of a death/burial record), alive at the event, places, relatives in the record (relation assertions and the usual roles: parents of a baptised child, groom and bride), `usesProposed`. A child named without a surname takes the father's; a wife the husband's (kept as borrowed). A tree person's profile adds the names of personas already accepted for them, maiden names "(b. X)", parents, spouses and children from families. **Blocking:** Daitch–Mokotoff codes of the surnames (plus one step of your name variants); pairs whose birth windows are more than 10 years apart are dropped; places optional (off by default). Persona → person pairs for personas not accepted for anyone; persona ↔ persona pairs from different records. Counts per run (pooled, buckets, raw pairs, dropped by date/place, pairs). Fixture: an invented family over 6 records and 16 personas with known answers. 5 tests. |
-| P9.T2 | todo | | |
+| P9.T2 | done | src/resolve/compare.js, src/tests/resolveCompare.test.js | Each signal is 0–1 or unknown (null: missing data never counts against a pair). **Names:** Jaro–Winkler (hand-written) on folded tokens, best over all given names / surnames; your paired variants count 1; a floor of 0.85 when the names sound alike (Daitch–Mokotoff). A borrowed surname, or a woman's, that differs is unknown (names change at marriage). **Dates:** veto when someone is named alive after the other's death, or before a known birth (1 year of slack); overlapping birth windows count by how narrow they are (a stated age counts much more than a role window), windows apart lose value with the gap; deaths the same way. **Sex:** a clear mismatch vetoes. **Places:** same place, one inside the other, or a shared word = 1; both known and different = 0.3. **Relatives:** father, mother, spouse and child named in the record against the tree's (or the other record's) by name, or 1 when both are already linked to the same person. **FAN:** 1 when someone around one side is someone around the other (accepted links), else unknown. 8 tests (known Jaro–Winkler values, each comparator with its unknown and veto cases, the fixture). |
 | P9.T3 | todo | | |
 | P9.T4 | todo | | |
 | P9.T5 | todo | | |
