@@ -194,6 +194,22 @@ export default function DocumentsSection({ storage, library, services = defaultS
     const s = await ai.extractCopy({ library, copy, client, loadImage, prepareImage: ai.prepareImage, regionId, pageIds, force, dryRun, requireRegion: true, maxPages: settings.maxPages, onProgress, signal });
     return { ...s, sendTo: sendToOf(ai, settings), missing };
   }, [aiServices, storage, library, loadImage]);
+  // Transkribus API (Phase 9 review, d): the page image goes to Transkribus with the model chosen in Settings & tools;
+  // a dry run only reports what would be sent. The sign-in lasts for this browser session; the password is never stored.
+  const runTranskribus = useCallback(async ({ copy, pageIds, dryRun = false, onProgress, signal }) => {
+    const tk = await import("../../ingest/transkribus/index.js");
+    const settings = await tk.getTranskribusSettings(storage);
+    const client = tk.sessionClient(settings.baseUrl);
+    const missing = tk.transkribusMissing(settings, client);
+    const pages = (await library.pages.listPages(copy.id)).filter((p) => pageIds.includes(p.id)).map((page) => ({ page, copy }));
+    if (dryRun) {
+      const imgs = await Promise.all(pages.map(({ page }) => loadImage(page)));
+      return { missing, pages: pages.length, kb: Math.round(imgs.reduce((n, i) => n + i.bytes.length, 0) / 1024), model: settings.htrId, user: client.signedIn?.username ?? "" };
+    }
+    if (missing) throw new Error(missing);
+    const r = await tk.recognizePages({ library, client, settings, pages, loadImage, signal, onProgress });
+    return { ...r, message: tk.describeRecognition(r) };
+  }, [storage, library, loadImage]);
   const runReading = useCallback(async ({ copy, pageIds, force = false, dryRun = false, onProgress, signal }) => {
     const ai = await aiServices();
     const settings = await ai.getAiSettings(storage);
@@ -214,7 +230,7 @@ export default function DocumentsSection({ storage, library, services = defaultS
 
   const workspace = reviewing ? (
     <TextReview library={library} copy={reviewing.copy} initialPageId={reviewing.pageId} initialTab={reviewing.tab} initialRegionId={reviewing.regionId ?? null} loadImage={loadImage} onClose={closeReview}
-      runExtraction={runExtraction} describeExtraction={describeExtraction} runReading={runReading} inline={inlineWorkspace} />
+      runExtraction={runExtraction} describeExtraction={describeExtraction} runReading={runReading} runTranskribus={runTranskribus} inline={inlineWorkspace} />
   ) : null;
 
   const totalProposed = useMemo(() => Object.values(status).reduce((n, s) => n + (s.proposed ?? 0), 0), [status]);

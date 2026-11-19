@@ -9,6 +9,8 @@
 //   Record   FROM -> Source; AT -> Place; date bounds
 // Rejected or superseded assertions and rejected links are left out.
 
+import { otherCalendarNote } from "../evidence/domain/calendar.js";
+
 export const RELATION_PROPERTIES = ["childOf", "parentOf", "spouseOf", "godparentOf", "witnessFor", "informantFor"];
 
 const push = (map, key, value) => { if (!map.has(key)) map.set(key, []); map.get(key).push(value); };
@@ -51,7 +53,8 @@ export function recordPart(ctx, recordId) {
   }
   const placeText = (ctx.assertionsBySubject.get(rec.id) ?? []).find((a) => a.property === "event.place")?.originalValue ?? "";
   const ev = rec.event;
-  const dateLabel = ev?.earliest || ev?.latest ? `${ev.earliest === ev.latest ? ev.earliest : `${ev.earliest ?? "…"} – ${ev.latest ?? "…"}`}${ev.calendar ? ` (${ev.calendar})` : ""}` : dateText;
+  const other = otherCalendarNote(ev);
+  const dateLabel = ev?.earliest || ev?.latest ? `${ev.earliest === ev.latest ? ev.earliest : `${ev.earliest ?? "…"} – ${ev.latest ?? "…"}`}${ev.calendar ? ` (${ev.calendar})` : ""}${other ? ` = ${other}` : ""}` : dateText;
   const record = {
     id: rec.id, kind: rec.kind, earliestDay, latestDay, dateText, dateLabel, placeId: rec.placeId ?? null, placeText,
     regionId: rec.regionIds?.[0] ?? null, pageId: page?.id ?? null, pageIndex: page?.pageIndex ?? null, pageLabel: page?.label ?? "",

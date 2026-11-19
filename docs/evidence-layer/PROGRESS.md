@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** reviewer: review Phase 8 (PR to master). Then Phase 9 (entity resolution).
-- **Last updated:** 2026-11-17 (Phase 8 review follow-up)
+- **Next action:** reviewer: review PR #15 (Phase 9 and the follow-up). Then: context lanes that follow the people (next PR).
+- **Last updated:** 2026-11-19 (Phase 9 review follow-up)
 
 ## Phase overview
 
@@ -22,8 +22,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
 | 7 Search | approved | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
 | 7b Transkribus import | approved | done on `ccr-adaa4345-wbnkkm` | 2026-11-17 |
-| 8 Graph projection | in review | evidence/p8 (done on `ccr-adaa4345-wbnkkm`) | |
-| 9 Entity resolution | not started | evidence/p9 | |
+| 8 Graph projection | approved | evidence/p8 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-19 |
+| 9 Entity resolution | in review | evidence/p9 (done on `ccr-adaa4345-wbnkkm`) | |
 
 ## Task checklist
 
@@ -132,11 +132,11 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 9
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P9.T1 | todo | | |
-| P9.T2 | todo | | |
-| P9.T3 | todo | | |
-| P9.T4 | todo | | |
-| P9.T5 | todo | | |
+| P9.T1 | done | src/resolve/{profiles,blocking}.js, src/tests/{resolveHelpers.js,resolveBlocking.test.js}, src/tests/archRules.js | New automated module `src/resolve` (may import evidence and graph; architecture rule, and listed with the modules that may only propose). **Profiles:** a persona's name (the name assertion, confirmed before proposed, else as written), given names and surnames (folded), sex (stated, else from the role), birth window (stated date, else stated age at the event ± 1 year, else a window from the role: a baptised child 0–2 years before the event, a groom 14–70 years, a parent 14–75…), death (stated, or the event of a death/burial record), alive at the event, places, relatives in the record (relation assertions and the usual roles: parents of a baptised child, groom and bride), `usesProposed`. A child named without a surname takes the father's; a wife the husband's (kept as borrowed). A tree person's profile adds the names of personas already accepted for them, maiden names "(b. X)", parents, spouses and children from families. **Blocking:** Daitch–Mokotoff codes of the surnames (plus one step of your name variants); pairs whose birth windows are more than 10 years apart are dropped; places optional (off by default). Persona → person pairs for personas not accepted for anyone; persona ↔ persona pairs from different records. Counts per run (pooled, buckets, raw pairs, dropped by date/place, pairs). Fixture: an invented family over 6 records and 16 personas with known answers. 5 tests. |
+| P9.T2 | done | src/resolve/compare.js, src/tests/resolveCompare.test.js | Each signal is 0–1 or unknown (null: missing data never counts against a pair). **Names:** Jaro–Winkler (hand-written) on folded tokens, best over all given names / surnames; your paired variants count 1; a floor of 0.85 when the names sound alike (Daitch–Mokotoff). A borrowed surname, or a woman's, that differs is unknown (names change at marriage). **Dates:** veto when someone is named alive after the other's death, or before a known birth (1 year of slack); overlapping birth windows count by how narrow they are (a stated age counts much more than a role window), windows apart lose value with the gap; deaths the same way. **Sex:** a clear mismatch vetoes. **Places:** same place, one inside the other, or a shared word = 1; both known and different = 0.3. **Relatives:** father, mother, spouse and child named in the record against the tree's (or the other record's) by name, or 1 when both are already linked to the same person. **FAN:** 1 when someone around one side is someone around the other (accepted links), else unknown. 8 tests (known Jaro–Winkler values, each comparator with its unknown and veto cases, the fixture). |
+| P9.T3 | done | src/resolve/{score,run}.js, src/conclusions/matching.js, src/workers/{resolveClient.js,resolve.worker.js}, src/tests/resolveRun.test.js | **Score:** weighted mean of the known signals (given 0.2, surname 0.15, date 0.2, relatives 0.2, place 0.1, FAN 0.1, sex 0.05), scaled down when less than 0.6 of the weight is known (names alone are not a strong candidate), multiplied by a given name or surname below 0.75; a veto gives 0. Propose at 0.70 or more (0.80 after tuning, see log), at most 3 per persona. **Run:** `findMatches` (pure, in a worker with a fallback to the page) → proposals and groups; `runMatching` records a ProcessingRun `entity-resolution` (scope, weights) and returns `apply(latestProject)`, which adds **candidate** links only (`addLink`, method `entity-resolution`, with each signal, `usesProposed`, the run id, the relatives matched and shared associates) and open groups (`project.matchGroups`). Never again: a pair with a current link of any status (rejected included) is skipped, also when the project changed during the run; accepted personas leave the pool; a dismissed group pair (`project.matchDismissed`) is not grouped again. Groups only gather personas without a tree candidate. **Incremental:** the run keeps the snapshot mark and a print of each person (`project.settings.matching`); the next run compares only personas of records changed since, and persons changed since (name, years, places, parents, spouses, accepted personas), against everything; **Recheck everything** compares all. No database change. On the fixture: 11 of 11 known answers proposed, nothing wrong, the unknown godmother grouped across two records. 6 tests (score, I6 candidates only, run recorded, rejected never again, incremental = full on the new records, dismissed groups, repeatable). |
+| P9.T4 | done | src/components/evidence/{MatchesSection,EvidencePage,SearchSection}.jsx, src/conclusions/matching.js (user actions), src/resolve/profiles.js (`personDraft`), src/tests/{matchesReview.test.jsx,archRules.js} | A **Matches** entry on the Evidence page (a dot when matches or groups wait). **Find matches** / **Recheck everything** with a result line (pairs compared, proposed, groups, skipped as rejected before, time). Proposals best first, filter by person and score band; each shows the record side (crop of the box, name as written, role, record, date, birth window, relatives named, Open page) beside the tree person (name, years, place, parents, spouse), the score and one line of signals ("based on proposed values" when so). Actions, all user actions with `decidedBy` (added to the I6 architecture rule): **Accept** (the persona's other waiting candidates are rejected: a record person is one person), **Reject** (never again), **Someone else…** (rejects, links and accepts the chosen person; also over an earlier rejection, by hand), **Create new person** (a draft from the record: fullest name, sex if it agrees, a birth year only from a narrow window, a death year from a death record). **Groups**: the records side by side; **Create new person from these**, **Link all to…**, **Not the same** (remembered), **Not this one** per record. After an accept with a different spelling, **Add name variant Ion – Iohannes?** (added only on click, origin `learned`). 2 tests (the logic end to end; the section). |
+| P9.T5 | done | src/resolve/calibration.js, src/conclusions/matching.js (`setMatchingWeights`), src/components/evidence/MatchesSection.jsx, src/tests/resolveCalibration.test.jsx | From every matching proposal you accepted or rejected (waiting ones and manual links are not counted): the acceptance rate per score band (0.90–1.00, 0.80–0.90, 0.70–0.80), and per signal the mean value in accepted and in rejected proposals. From 20 decisions with both accepts and rejects: suggested weights (in proportion to how well each signal separates accepted from rejected, with a small floor; signals with too little data keep their weight) and a threshold (the lowest of 0.70 … 0.95 at which at least 80% of the proposals above it were accepted). Shown under **How good are the proposals?** in Matches; **Use these weights** stores them in the project's matching settings for later runs; **Back to the standard weights**. 4 tests (report from fixture decisions, no suggestion too early, settings used by runs, the section). |
 
 ## Environment facts
 
@@ -272,6 +272,9 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-19 | P9 review | (a) Keep the 0.80 threshold (fewer proposals, mostly right). (b) Keep godparents and witnesses: they carry useful details (godparents: baptism, adoption, religious wedding, places; witnesses: age, place, work, sometimes relatives); they are proposed when the names agree **and one detail agrees**: a stated age, the same place, or the same work (new `occupation` signal against the person's roles). (c) Matches lists accepted links with undo. (d) Next: Julian/Gregorian helpers, the Transkribus API (CORS checked: direct browser calls allowed), editing parents and spouses. Context lanes follow the people (separate PR, after this one) | Reviewer answers on PR #15 | Names and dates alone for godparents |
+| 2026-11-19 | P9 tuning | Tightened after a synthetic benchmark with known answers (8,320 people, 22,137 personas; 60% in the tree; spelling noise, missing surnames, stated ages off by a year): the first version was slow (56 s) and loose (best proposal right 45%). Now: blocks on surname sound **and** the given name's first letter (with variants); a woman also under her husband's (or children's) surname; a tree person without years gets a birth window from relatives' years; relatives are compared by name and by their own dates; a proposal needs corroboration (a close date, two agreeing relatives, a relative with agreeing dates or the same linked person, or a shared associate), else it is capped at 0.65; relatives named differently pull the score down; default threshold 0.80 (every 0.70–0.80 proposal was wrong in the benchmark). Result: 6–8 s, best proposal right 83–85%, true person proposed for 67–69% | Benchmark (see report) | Keep the looser rules and let review filter |
+| 2026-11-19 | P9 start | Reviewer decisions: match personas to tree persons and also group unlinked personas that look like one person; run on demand (Find matches; incremental by default, Recheck everything); use confirmed and proposed values (candidates marked when they rest on proposed values; rejected never used); review in a new Matches section | Reviewer answers at the start of Phase 9 | Tree only; automatic runs; confirmed only; review inside People |
 | 2026-11-17 | P8 review | (a) Imported GEDCOM people all showed "relative": the import never read FAM records, so they had no parents or spouses (the labels were fine). The import now reads FAM (HUSB, WIFE, CHIL, MARR) into families; re-importing adds missing families without duplicating people. (b) Two steps follow candidate links too, marked "possible", after accepted ones. (c) No kinship filter on + relative: any person's life may give context to another, especially with name conflicts and uncertain years. Bug: life lines missing after the app started on #evidence (timeline width never measured); fixed with a callback ref | Reviewer feedback on PR #14 | Parents on people only (normalizeProject derives them from families and would drop them); a kinship filter |
 | 2026-11-17 | P8 start | Reviewer decisions: precise kinship labels on the timeline (today's labels unchanged); FAN view as a list by record; accepted links followed, candidate links shown as "possible", rejected never | Reviewer answers at the start of Phase 8 | Keep "relative"; a small graph; accepted links only |
 | 2026-11-17 | P8.T1 | The graph module takes its inputs as data (library snapshot; people, families, current persona links and relationships from the project): `src/graph` may import only evidence, so the caller resolves links with `currentLinks` | Architecture rule (graph imports evidence only) | Letting graph import conclusions/models |
@@ -323,6 +326,83 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - Link a stamp / margin-note record to the main entry's record ("this stamp is about that child"), e.g. as an assertion relating the two subjects.
 
 ## Phase reports
+
+### Phase 9 report
+- **Built:** entity resolution, proposing who in the records is who in the tree, on this device and without AI.
+  - *P9.T1* profiles of personas and tree persons, and blocking (surname sound × given-name initial, with name variants; birth windows; optional places);
+  - *P9.T2* comparators: names (Jaro–Winkler, variants, sound-alike floor), dates with vetoes, sex, place, relatives (by name and by their own dates), FAN overlap;
+  - *P9.T3* scoring with a corroboration rule; matching runs in a worker, recorded as ProcessingRuns; **candidate links only**; groups of records of one unknown person; incremental runs;
+  - *P9.T4* **Matches** on the Evidence page: proposals side by side with their signals; Accept, Reject, Someone else…, Create new person; groups (create, link all, not the same, not this one); name-variant suggestions after an accept;
+  - *P9.T5* calibration: acceptance per score band and per signal from your decisions; suggested weights and threshold, used only when you choose.
+- **IndexedDB version / stores added:** none (still 6). New project data: `matchGroups`, `matchDismissed`, `settings.matching` (all carried by bundles with the project).
+- **New dependencies:** none (Jaro–Winkler and the edit distance are a few lines each). Main bundle 342 kB (+3 kB). The matching worker is 88 kB, loaded only when matching runs.
+- **Deviations:**
+  - Blocking also uses the given name's first letter, not only the surname sound and birth decade; this cut pairs tenfold.
+  - The default threshold is 0.80 (plan: 0.70).
+  - A proposal needs corroboration (see the tuning log).
+  - Parish blocking is optional and off by default: place names are often missing or inconsistent.
+  - Rejections are made when you accept one proposal, or when you link a record person to someone else; the persona's other waiting candidates are rejected then, since a record person is one person.
+- **Invariants:**
+  - I6: matching creates candidates only; the review actions are user actions with `decidedBy`, listed in the architecture rule. The new `src/resolve` module may import evidence and graph only, and is listed with the modules that may only propose.
+  - Rejected pairs are never proposed again, even when the project changed during a run (tested).
+  - I7: the matcher is a pure function of the stores and the project; an incremental run equals a full run on what changed (tested).
+- **Tests:** 512 → **537**. `npm test -- --run` and `npm run build` pass.
+- **Quality and timing.** Measured on a synthetic population with known answers (`scripts/resolve-benchmark.mjs`, Node, full run):
+  - Population: couples over five generations, 40 surnames and 20 given names per sex. Records are written from it with spelling noise (Ion/Ioan/Iohannes, Hariton/Haritonu, swapped letters), children and wives often without a surname, women dying under the husband's name, and stated ages off by a year. Only 60% of the people are in the tree, with some years missing.
+  - "Right" is the share of personas whose best proposal is the true person. "Found" is the share of personas whose true person is in the tree and among the proposals.
+
+  | Population | Personas | Tree | Time | Right | Found | Groups right |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | 3,478 | 9,280 | 2,127 | 1.9 s | 90% | 69% | 75% |
+  | 8,320 | 22,137 | 5,073 | 7.3 s | 83% | 70% | 62% |
+  | 7,772 | 20,443 | 4,757 | 5.9 s | 85% | 71% | 59% |
+  | 10,862 | 29,153 | 6,620 | 11.8 s | 80% | 70% | 52% |
+
+  - Proposals scoring 0.90 or more were right about 80%; 0.80–0.90 about 86%.
+  - Most wrong proposals are namesakes born within a few years of each other, half of them people who are not in the tree. Relatives settle these when the record names them.
+  - Most misses are parents and godparents with nothing to corroborate them (no age, child not in the tree).
+  - The first version was much worse: 45% right and 56 s on the 8,320 population. The tuning is described in the log.
+  - On the small fixture of the tests: 11 of 11 right, no wrong proposal, the unknown godmother grouped across two records.
+  - These figures come from synthetic data; real registers will differ (see the questions).
+- **Real-browser check (headless Chromium, dev server, fresh database, sample project).** I seeded four records of the Hariton family through the app's evidence modules:
+  - a baptism of 1850 ("Dumitru", father Dumitru Hariton, mother "Maria");
+  - a marriage of 1876 ("Dumitru Haritonu" 26, "Elena Băltăceanu" 20, witness Ana Popescu 30);
+  - a baptism of 1878 ("Gheorghe", father, mother "Elena", godmother Ana Popescu 33);
+  - a death of 1884 (Dumitru Hariton 66, informant Dumitru Hariton 34).
+
+  Then in Matches:
+  - **Find matches**: "Compared 30 pairs · 10 proposed · 1 group · 11 ms". All 10 proposals were right (each child, parent, bride, groom, the deceased father and the informant son), with readable signals.
+  - Accepting the groom offered **Add name variant Hariton – Haritonu**; it was added. This check found and fixed a bug: accepting the bride first offered her maiden name as a "variant".
+  - Rejecting the informant, then creating a new person from the Ana Popescu group, worked; **Recheck everything** gave "0 proposed · 0 groups · 1 skipped (rejected before)".
+  - The calibration showed 2 decisions; decisions and the last run survived a reload.
+  - No page errors.
+- **How to verify:**
+  1. With a project that has people and some records entered (or read by AI and reviewed), open Evidence → **Matches** → **Find matches**.
+  2. Check the proposals and their signals; accept, reject, try **Someone else…** and **Create new person**.
+  3. Run **Find matches** again: nothing rejected comes back, and only changes are compared.
+  4. After some decisions, open **How good are the proposals?**.
+  5. Optional: `node scripts/resolve-benchmark.mjs 1 7`.
+- **Backup reminder:** no database change; the project gains match data. Export a bundle before a first large run if you want to be able to go back.
+- **Known limitations:**
+  1. Quality is measured on synthetic data only. Real registers have their own name stock, places and habits; the weights and threshold may need your calibration.
+  2. Godparents, witnesses and informants without ages are rarely proposed: nothing corroborates them unless their associates are already linked.
+  3. Places help little until records carry place ids; the place key in blocking is off.
+  4. Groups are less reliable than proposals for tree persons (52–75% of grouped pairs right in the benchmark); review them with care.
+  5. A record person linked to the wrong person must be unlinked by rejecting the accepted link elsewhere (People / Legacy facts); Matches shows waiting proposals only.
+  6. The Phase 7 and 7b questions are still open.
+- **Review follow-up (2026-11-19, same PR #15):**
+  - **(b) Godparents, witnesses, informants** are proposed when the names agree and one detail agrees: a stated age, the same place, or the same work (new `occupation` signal against the person's roles, weight 0.05, taken from place). On the benchmark, extended with villages and occupations: godparents 0 → 119 right best proposals (26 wrong), witnesses 0 → 145 (30 wrong); overall right 85.8% → 85.0%, found 67.9% → 70.3%.
+  - **(c) Linked list with undo** in Matches: every accepted link, **Unlink (wrong)** (rejected for good) or **Back to waiting**; candidates rejected only because of that accept come back (`unlinkMatch`, `reopenLink`: user actions in the I6 rule).
+  - **(d) Julian/Gregorian helpers** (`src/evidence/domain/calendar.js`): conversion, the likely calendar (civil switch 31 Mar / 14 Apr 1919, church 1924), both calendars on record dates and under the manual date fields, a converter in **Settings & tools** (renamed from AI settings).
+  - **(d) Family editing**: a family panel from a person's name on the timeline (name, sex, father, mother, spouses, children, new people, no loops) through the existing family functions; **+ relative → Add new person**.
+  - **(d) Read with Transkribus**: the CORS check showed that the documented v2 API (api-staging.transkribus.org) refuses browser calls, but API v1 (transkribus.eu/processing/v1, "Metagrapho API" 1.13.1, same shape) and the READ-COOP sign-in accept them. Meridian signs in per session (password never stored), sends the page image (base64) with the model id, polls, fetches PAGE XML and imports it with the Phase 7b importer. Tested against a local stand-in for the servers only; **your first real use is the true test**.
+  - A browser check found and fixed a bug: saving the model id wiped a user name being typed in the Transkribus settings.
+  - Tests 537 → **555**.
+- **Questions for the reviewer** (answered 2026-11-19, see the follow-up above and the log):
+  - (a) On your data (for example after reading a register and importing your GEDCOM): are the proposals sensible, and is the 0.80 threshold right, or would you rather see more and reject more?
+  - (b) Should godparents and witnesses be proposed with names and dates alone (more proposals, more wrong ones), or stay as they are?
+  - (c) Should Matches also list accepted links, so a wrong accept can be undone there?
+  - (d) With all phases built: which backlog items next (place gazetteer import, Julian/Gregorian helpers, the Transkribus API, editing parents and spouses in the app)?
 
 ### Phase 8 report
 - **Built:** the graph projection, in memory, never stored (I7):

@@ -17,7 +17,7 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : "never");
 const int = (v) => (String(v).trim() === "" ? undefined : Number.isInteger(Number(v)) ? Number(v) : undefined);
 
 /** A crop of the hit's region from the cached page image (nothing if the page was never drawn). */
-function HitCrop({ library, hit }) {
+export function HitCrop({ library, hit }) {
   const [img, setImg] = useState(null);
   useEffect(() => {
     let url = null, live = true;

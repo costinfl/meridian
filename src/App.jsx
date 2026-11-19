@@ -3,6 +3,8 @@ import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifie
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin, displayName } from "./models/project.js";
 import { exportGedcom, parseGedcom, mergeGedcomImport } from "./gedcom.js";
+import PersonPanel from "./components/PersonPanel.jsx";
+import { createPerson } from "./models/personEdit.js";
 import { exportProjectZip, importProjectBundle } from "./share.js";
 import { storage } from "./storage/StorageService.js";
 import { useProject } from "./hooks/useProject.js";
@@ -269,6 +271,8 @@ export default function App() {
   const [legendOpen, setLegendOpen] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [addRelOpen, setAddRelOpen] = useState(false);
+  const [personPanelId, setPersonPanelId] = useState(null);   // the family panel of a person (Phase 9 review)
+  const [newPersonName, setNewPersonName] = useState("");
   const [toast, setToast] = useState(null);
   const [projectManagerOpen, setProjectManagerOpen] = useState(false);
   const [sourcesOpen, setSourcesOpen] = useState(false);
@@ -577,6 +581,11 @@ export default function App() {
   const laneFor = (key) => annotations.filter((a) => a.laneKey === key);
   const relColor = (i) => C.rel[i % C.rel.length];
 
+  const nameButton = (p, style) => (
+    <button onClick={() => setPersonPanelId(p.id)} title="Family: parents, spouses, children" aria-label={`Family of ${displayName(p)}`}
+      style={{ ...style, background: "none", border: "none", padding: 0, cursor: "pointer", textAlign: "left" }}>{displayName(p)}</button>
+  );
+
   const promote = (id) => {
     setRelativeIds((r) => [focusId, ...r.filter((q) => q !== id && q !== focusId)]);
     setFocusId(id);
@@ -773,7 +782,7 @@ export default function App() {
               <>
                 {headerCell(
                   <React.Fragment>
-                    <div style={{ font: "700 14px Fraunces, Georgia, serif", color: C.focus }}>{displayName(focus)}</div>
+                    <div>{nameButton(focus, { font: "700 14px Fraunces, Georgia, serif", color: C.focus })}</div>
                     <div style={{ font: "500 10px 'IBM Plex Mono', monospace", color: C.inkSoft }}>{focus.birth?.year}–{focus.death?.year || "…"}</div>
                     <div style={{ position: "absolute", bottom: 7, left: 12, font: "700 8.5px Archivo, sans-serif", letterSpacing: ".12em", color: C.paperHi, background: C.focus, padding: "2px 6px", borderRadius: 2 }}>FOCUS</div>
                   </React.Fragment>, FOCUS_H, "Focus"
@@ -800,7 +809,7 @@ export default function App() {
             <div key={p.id} style={{ display: "flex", position: "relative", zIndex: 1 }}>
               {headerCell(
                 <React.Fragment>
-                  <div style={{ font: "600 12.5px Fraunces, Georgia, serif", color: relColor(i) }}>{displayName(p)}</div>
+                  <div>{nameButton(p, { font: "600 12.5px Fraunces, Georgia, serif", color: relColor(i) })}</div>
                   <div style={{ font: "500 10px 'IBM Plex Mono', monospace", color: C.inkSoft }}>
                     {p.birth?.year}–{p.death?.year || "…"}
                     <span style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", marginLeft: 6 }}>{kin[p.id]}</span>
@@ -927,10 +936,27 @@ export default function App() {
               </button>
             ))}
             {people.filter((p) => p.id !== focusId && !relativeIds.includes(p.id)).length === 0 && (
-              <div style={{ font: "500 12px Archivo, sans-serif", color: C.inkSoft }}>Everyone is already on the board. Import a GEDCOM to add more people.</div>
+              <div style={{ font: "500 12px Archivo, sans-serif", color: C.inkSoft }}>Everyone is already on the board. Import a GEDCOM, or add a new person below.</div>
             )}
           </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 10, borderTop: `1px solid ${C.rule}`, paddingTop: 10 }}>
+            <input aria-label="New person's name" placeholder="New person: name" value={newPersonName} onChange={(e) => setNewPersonName(e.target.value)}
+              style={{ flex: 1, font: "500 12px Archivo, sans-serif", border: `1px solid ${C.rule}`, borderRadius: 3, padding: "4px 6px" }} />
+            <button style={btnStyle(false)} disabled={!newPersonName.trim() || !project} onClick={() => {
+              const { person } = createPerson(project, { name: newPersonName });
+              updateProject((prev) => ({ ...prev, people: [...(prev.people ?? []), person] }));
+              setRelativeIds((r) => [...r, person.id]);
+              setPersonPanelId(person.id);
+              setNewPersonName(""); setAddRelOpen(false);
+            }}>Add new person</button>
+          </div>
         </Modal>
+      )}
+
+      {/* family panel */}
+      {personPanelId && project && (
+        <PersonPanel key={personPanelId} project={project} personId={personPanelId} onClose={() => setPersonPanelId(null)}
+          onOpenPerson={(id) => setPersonPanelId(id)} onChange={(fn) => updateProject((prev) => fn(prev))} />
       )}
 
       {/* project manager */}

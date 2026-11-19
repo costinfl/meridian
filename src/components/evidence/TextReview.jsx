@@ -65,7 +65,7 @@ const when = (iso) => (iso ? new Date(iso).toLocaleString() : "");
 /**
  * @param {{ library, copy, loadImage: (page) => Promise<{bytes, mimeType}|null>, onClose: () => void }} props
  */
-export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, runReading, initialPageId = null, initialTab = "reading", initialRegionId = null, inline = false }) {
+export default function TextReview({ library, copy, loadImage, onClose, runExtraction, describeExtraction, runReading, runTranskribus = null, initialPageId = null, initialTab = "reading", initialRegionId = null, inline = false }) {
   const [pages, setPages] = useState([]);
   const [idx, setIdx] = useState(0);
   const [data, setData] = useState(null);        // { region, transcription, transcriptionRun, reading, history }
@@ -232,6 +232,30 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
       finally { setAiReading(null); }
     },
   });
+  // Transkribus API: the same confirmation step; it uses the researcher's Transkribus credits
+  const [tkReading, setTkReading] = useState(null);
+  const readWithTranskribus = async () => {
+    setMessage("");
+    try {
+      const est = await runTranskribus({ copy, pageIds: [page.id], dryRun: true });
+      setConfirmAi({
+        title: "Read this page with Transkribus?",
+        text: `The page image (${est.kb} kB) will be sent to Transkribus${est.user ? ` as ${est.user}` : ""}, with text recognition model ${est.model || "(not chosen)"}. It uses credits from your Transkribus plan.`,
+        missing: est.missing ?? "", charge: "",
+        send: async () => {
+          const ctl = new AbortController(); setTkReading(ctl); setMessage("Sending the page image to Transkribus…");
+          try {
+            const r = await runTranskribus({ copy, pageIds: [page.id], signal: ctl.signal, onProgress: (p) => setMessage(`Transkribus: ${p.stage}…`) });
+            await load(); setShownLayerId(null); setMessage(r.message);
+          } catch (e) { setMessage(`Failed: ${e.message}`); }
+          finally { setTkReading(null); }
+        },
+      });
+    } catch (e) { setMessage(`Failed: ${e.message}`); }
+  };
+  const tkButton = runTranskribus ? (tkReading
+    ? <button style={mini} onClick={() => tkReading.abort()}>Stop Transkribus</button>
+    : <button style={mini} onClick={readWithTranskribus} title="Send this page to Transkribus (your account, set in Settings & tools) and import its text as a new transcription. You confirm first.">Read with Transkribus</button>) : null;
   // prominent only when the earlier steps gave poor text: no text, OCR flagged, or a handwritten source
   const lowQuality = !data?.transcription || needsReview(data?.transcription) || source?.script === "handwritten";
   const aiButton = runReading ? (aiReading
@@ -242,7 +266,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
   const confirmPanel = confirmAi ? (
     <div data-testid="ai-confirm" role="alertdialog" aria-label={confirmAi.title} style={{ border: `1px solid ${C.focus}`, borderRadius: 3, padding: 8, margin: "0 0 8px", background: "#fff" }}>
       <div style={{ font: "700 12px Archivo, sans-serif", color: C.ink }}>{confirmAi.title}</div>
-      <div style={{ ...small, color: C.ink }}>{confirmAi.text} Your provider charges for it.</div>
+      <div style={{ ...small, color: C.ink }}>{confirmAi.text} {confirmAi.charge ?? "Your provider charges for it."}</div>
       {confirmAi.missing && <div style={{ ...small, color: C.focus }}>{confirmAi.missing}</div>}
       <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
         <button style={primary} disabled={!!confirmAi.missing} onClick={() => { const go = confirmAi.send; setConfirmAi(null); go(); }}>Send</button>
@@ -347,7 +371,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
                       {data.transcriptions.map((t, i) => <option key={t.layer.id} value={t.layer.id}>{t.run?.processor ?? "?"}{t.run?.modelId ? ` (${t.run.modelId.replace(/^\w+:/, "")})` : ""} · {when(t.layer.createdAt)}{i === 0 ? " · current" : ""}</option>)}
                     </select>
                   )}
-                  {aiButton}
+                  {tkButton}{aiButton}
                 </div>
                 <div style={{ ...mono, marginBottom: 6 }}>
                   {shown
@@ -373,7 +397,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
                 {doubtful && <div style={{ ...small, color: C.focus, marginTop: 6 }}>The transcription of this page looks doubtful (confidence {pct(data.transcription?.confidence)}).</div>}
                 <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
                   <button style={primary} disabled={busy} onClick={start}>Start reading from transcription</button>
-                  {aiButton}
+                  {tkButton}{aiButton}
                 </div>
                 {proposalPanel}
               </div>
