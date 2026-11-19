@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** reviewer: review Phase 8 (PR to master). Then Phase 9 (entity resolution).
-- **Last updated:** 2026-11-17 (Phase 8 review follow-up)
+- **Next action:** P9.T2: comparators.
+- **Last updated:** 2026-11-19 (P9.T1)
 
 ## Phase overview
 
@@ -22,8 +22,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
 | 7 Search | approved | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
 | 7b Transkribus import | approved | done on `ccr-adaa4345-wbnkkm` | 2026-11-17 |
-| 8 Graph projection | in review | evidence/p8 (done on `ccr-adaa4345-wbnkkm`) | |
-| 9 Entity resolution | not started | evidence/p9 | |
+| 8 Graph projection | approved | evidence/p8 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-19 |
+| 9 Entity resolution | in progress | evidence/p9 (done on `ccr-adaa4345-wbnkkm`) | |
 
 ## Task checklist
 
@@ -132,7 +132,7 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 9
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P9.T1 | todo | | |
+| P9.T1 | done | src/resolve/{profiles,blocking}.js, src/tests/{resolveHelpers.js,resolveBlocking.test.js}, src/tests/archRules.js | New automated module `src/resolve` (may import evidence and graph; architecture rule, and listed with the modules that may only propose). **Profiles:** a persona's name (the name assertion, confirmed before proposed, else as written), given names and surnames (folded), sex (stated, else from the role), birth window (stated date, else stated age at the event ± 1 year, else a window from the role: a baptised child 0–2 years before the event, a groom 14–70 years, a parent 14–75…), death (stated, or the event of a death/burial record), alive at the event, places, relatives in the record (relation assertions and the usual roles: parents of a baptised child, groom and bride), `usesProposed`. A child named without a surname takes the father's; a wife the husband's (kept as borrowed). A tree person's profile adds the names of personas already accepted for them, maiden names "(b. X)", parents, spouses and children from families. **Blocking:** Daitch–Mokotoff codes of the surnames (plus one step of your name variants); pairs whose birth windows are more than 10 years apart are dropped; places optional (off by default). Persona → person pairs for personas not accepted for anyone; persona ↔ persona pairs from different records. Counts per run (pooled, buckets, raw pairs, dropped by date/place, pairs). Fixture: an invented family over 6 records and 16 personas with known answers. 5 tests. |
 | P9.T2 | todo | | |
 | P9.T3 | todo | | |
 | P9.T4 | todo | | |
@@ -272,6 +272,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-19 | P9 start | Reviewer decisions: match personas to tree persons and also group unlinked personas that look like one person; run on demand (Find matches; incremental by default, Recheck everything); use confirmed and proposed values (candidates marked when they rest on proposed values; rejected never used); review in a new Matches section | Reviewer answers at the start of Phase 9 | Tree only; automatic runs; confirmed only; review inside People |
 | 2026-11-17 | P8 review | (a) Imported GEDCOM people all showed "relative": the import never read FAM records, so they had no parents or spouses (the labels were fine). The import now reads FAM (HUSB, WIFE, CHIL, MARR) into families; re-importing adds missing families without duplicating people. (b) Two steps follow candidate links too, marked "possible", after accepted ones. (c) No kinship filter on + relative: any person's life may give context to another, especially with name conflicts and uncertain years. Bug: life lines missing after the app started on #evidence (timeline width never measured); fixed with a callback ref | Reviewer feedback on PR #14 | Parents on people only (normalizeProject derives them from families and would drop them); a kinship filter |
 | 2026-11-17 | P8 start | Reviewer decisions: precise kinship labels on the timeline (today's labels unchanged); FAN view as a list by record; accepted links followed, candidate links shown as "possible", rejected never | Reviewer answers at the start of Phase 8 | Keep "relative"; a small graph; accepted links only |
 | 2026-11-17 | P8.T1 | The graph module takes its inputs as data (library snapshot; people, families, current persona links and relationships from the project): `src/graph` may import only evidence, so the caller resolves links with `currentLinks` | Architecture rule (graph imports evidence only) | Letting graph import conclusions/models |
