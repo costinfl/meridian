@@ -177,3 +177,11 @@ export function variantSuggestions(personaName, personName, known = []) {
   if (a.length > 1 && b.length > 1) consider(a[a.length - 1], b[b.length - 1], oa[oa.length - 1], ob[ob.length - 1]);   // surnames
   return out;
 }
+
+/** The researcher's choice of weights and threshold for later runs (null = the standard ones). */
+export function setMatchingWeights(project, choice) {
+  const matching = { ...(project.settings?.matching ?? {}) };
+  if (choice) { matching.weights = choice.weights; matching.threshold = choice.threshold; }
+  else { delete matching.weights; delete matching.threshold; }
+  return { ...project, settings: { ...(project.settings ?? {}), matching } };
+}

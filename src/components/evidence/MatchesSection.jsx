@@ -6,8 +6,10 @@ import { createResolveClient, runMatching } from "../../workers/resolveClient.js
 import { currentLinks } from "../../conclusions/personaLinks.js";
 import {
   waitingMatches, openGroups, matchingState, acceptMatch, rejectMatch, linkMatchTo, createPersonFromPersonas,
-  linkGroupTo, dismissGroup, removeFromGroup, variantSuggestions,
+  linkGroupTo, dismissGroup, removeFromGroup, variantSuggestions, setMatchingWeights,
 } from "../../conclusions/matching.js";
+import { calibrationReport, MIN_DECISIONS } from "../../resolve/calibration.js";
+import { DEFAULT_WEIGHTS, DEFAULT_THRESHOLD } from "../../resolve/score.js";
 import { displayName } from "../../models/project.js";
 import { HitCrop } from "./SearchSection.jsx";
 
@@ -36,6 +38,37 @@ function Signals({ signals, detail }) {
       {parts.join(" · ")}{rel.length ? ` · ${rel.join("; ")}` : ""}
       {signals?.usesProposed && <span style={{ color: C.rel[1] }}> · based on proposed values</span>}
     </div>
+  );
+}
+
+/** How good the proposals were, from your decisions; suggested weights only on request. */
+function Calibration({ project, onProjectChange }) {
+  const report = useMemo(() => calibrationReport(currentLinks(project), { weights: matchingState(project)?.weights ?? DEFAULT_WEIGHTS }), [project]);
+  const custom = matchingState(project)?.weights;
+  const th = { textAlign: "left", font: "600 11px Archivo, sans-serif", color: C.inkSoft, padding: "1px 8px 1px 0" };
+  const td = { ...mono, padding: "1px 8px 1px 0" };
+  return (
+    <details data-testid="calibration" style={{ ...small, margin: "6px 0" }}>
+      <summary style={{ cursor: "pointer" }}>How good are the proposals? ({report.decisions} decided: {report.accepted} accepted, {report.rejected} rejected)</summary>
+      {report.decisions === 0 ? <div>Accept or reject some proposals first.</div> : (
+        <div style={{ display: "flex", gap: 24, flexWrap: "wrap", marginTop: 4 }}>
+          <table><thead><tr><th style={th}>Score</th><th style={th}>Decided</th><th style={th}>Accepted</th></tr></thead>
+            <tbody>{report.bands.map((b) => <tr key={b.label}><td style={td}>{b.label}</td><td style={td}>{b.n}</td><td style={td}>{b.rate == null ? "—" : `${Math.round(b.rate * 100)}%`}</td></tr>)}</tbody></table>
+          <table><thead><tr><th style={th}>Signal</th><th style={th}>Accepted (mean)</th><th style={th}>Rejected (mean)</th></tr></thead>
+            <tbody>{report.signals.map((x) => <tr key={x.signal}><td style={td}>{SIGNAL_LABELS[x.signal]}</td><td style={td}>{x.accepted ?? "—"}</td><td style={td}>{x.rejected ?? "—"}</td></tr>)}</tbody></table>
+        </div>
+      )}
+      {report.suggestion ? (
+        <div data-testid="calibration-suggestion" style={{ marginTop: 4 }}>
+          Suggested from your decisions: {Object.entries(report.suggestion.weights).map(([k, v]) => `${SIGNAL_LABELS[k]} ${v.toFixed(2)}`).join(" · ")}; propose from {report.suggestion.threshold.toFixed(2)}.{" "}
+          <button style={mini} onClick={() => onProjectChange((p) => setMatchingWeights(p, report.suggestion))}>Use these weights</button>
+        </div>
+      ) : report.decisions > 0 && <div style={{ marginTop: 4 }}>Weights can be suggested after {MIN_DECISIONS} decisions with both accepts and rejects.</div>}
+      {custom && (
+        <div style={{ marginTop: 4 }}>Your weights are in use (propose from {(matchingState(project)?.threshold ?? DEFAULT_THRESHOLD).toFixed(2)}).{" "}
+          <button style={mini} onClick={() => onProjectChange((p) => setMatchingWeights(p, null))}>Back to the standard weights</button></div>
+      )}
+    </details>
   );
 }
 
@@ -157,6 +190,7 @@ export default function MatchesSection({ library, project, onProjectChange, onOp
         <span role="status" data-testid="matches-status" style={small}>{busy || message || (last ? `Last run ${when(last.at)}: ${last.counts.proposed} proposed, ${last.counts.groups} groups (${last.scope === "all" ? "everything" : "changes only"}).` : "Not run yet.")}</span>
       </div>
       {error && <div role="alert" style={{ ...small, color: C.focus }}>{error}</div>}
+      <Calibration project={project} onProjectChange={onProjectChange} />
 
       {suggest.length > 0 && (
         <div data-testid="variant-suggestions" style={{ ...card, background: C.paperHi }}>
