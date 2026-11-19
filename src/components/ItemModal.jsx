@@ -13,6 +13,8 @@ const KIND_META = {
   media:      { label: "Media pin",          point: true,  titleField: "label", needsSource: true },
   birth:      { label: "Birth",             point: true,  titleField: "place", fact: true },
   death:      { label: "Death",             point: true,  titleField: "place", fact: true },
+  ctxEvent:   { label: "Context event",     point: true,  titleField: "label", context: true },
+  ctxPeriod:  { label: "Context period",    point: false, titleField: "label", context: true },
 };
 
 // Evidence of a fact (Phase 6, behind the evidence flag); loaded only when shown, so the timeline stays small.
@@ -22,7 +24,7 @@ const FactEvidence = lazy(() => import("./evidence/FactEvidence.jsx"));
 const VERIFIABLE = new Set(["event", "period", "group", "birth", "death"]);
 
 const PERSON_KINDS = ["event", "period", "group", "annotation", "era", "media"];
-const CONTEXT_KINDS = ["era"];
+const CONTEXT_KINDS = ["ctxEvent", "ctxPeriod", "era"];   // on a context lane: your own context event or period, or an era band
 
 const fieldStyle = {
   width: "100%", boxSizing: "border-box",
@@ -47,6 +49,7 @@ function initForm(kind, item) {
     sourceId: item?.sourceId ?? "",
     verified: !!item?.verified,
     place: item?.place ?? "",
+    chip: item?.chip ?? "",
   };
 }
 
@@ -91,7 +94,7 @@ function SourceView({ source, storage }) {
 
 export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete, onClose, evidence = null }) {
   const [kind, setKind] = useState(descriptor.kind);
-  const [form, setForm] = useState(() => initForm(descriptor.kind, descriptor.item));
+  const [form, setForm] = useState(() => initForm(descriptor.kind, descriptor.scopes?.length && !descriptor.item?.chip ? { ...descriptor.item, chip: descriptor.scopes[0].value } : descriptor.item));
 
   const meta = KIND_META[kind];
   const mode = descriptor.mode; // 'create' | 'edit' | 'view'
@@ -115,6 +118,7 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
     const values = { [meta2.titleField]: form.title.trim(), note: form.note.trim() || "", color: form.color, sourceId: form.sourceId || null };
     if (meta2.hasType) values.type = form.type;
     if (PLACED.has(kind)) values.place = form.place.trim();
+    if (meta2.context) values.chip = form.chip || null;
     if (VERIFIABLE.has(kind)) values.verified = form.verified;
     if (meta2.point) {
       values.year = num(form.year);
@@ -196,6 +200,16 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
 
       <label style={labelStyle}>{meta.fact ? "Place" : meta.titleField === "title" ? "Title" : "Label"}{kind === "media" ? " (optional)" : ""}</label>
       <input autoFocus value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder={meta.fact ? "Place" : meta.label} style={fieldStyle} />
+
+      {meta.context && descriptor.scopes?.length > 0 && (
+        <>
+          <label style={labelStyle}>Where</label>
+          <select aria-label="Where" value={form.chip} onChange={(e) => set({ chip: e.target.value })} style={fieldStyle}>
+            {!descriptor.scopes.some((o) => o.value === form.chip) && <option value={form.chip}>{form.chip || "—"}</option>}
+            {descriptor.scopes.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+        </>
+      )}
 
       {PLACED.has(kind) && (
         <>

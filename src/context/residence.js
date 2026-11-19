@@ -6,7 +6,9 @@
 import { searchKey } from "../evidence/domain/normalize.js";
 
 const THIS_YEAR = new Date().getFullYear();
-export const placeKey = (text) => searchKey(String(text ?? "").split(",")[0]);   // "Cluj, Transilvania" groups with "Cluj"
+const NOT_A_PLACE = new Set(["unknown", "necunoscut", "necunoscuta", "n a", "na", "nedefinit", "x"]);
+/** The grouping key of a place text ("Cluj, Transilvania" groups with "Cluj"); "" for a placeholder such as "unknown". */
+export const placeKey = (text) => { const k = searchKey(String(text ?? "").split(",")[0]); return NOT_A_PLACE.has(k) ? "" : k; };
 
 /** @returns {{ place, key, from, to }[]} sorted by `from`, neighbouring spans of one place merged */
 export function placeSpans(person, { thisYear = THIS_YEAR } = {}) {

@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense, lazy } from "react";
 import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifiedBorderStyle, verifiedMarker, VERIFIED_MARK } from "./theme.js";
-import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
+import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS } from "./sampleData.js";
+import { LANES } from "./context/lanes.js";
+import { useContextLanes } from "./hooks/useContextLanes.js";
+import PlacesPanel from "./components/PlacesPanel.jsx";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin, displayName } from "./models/project.js";
 import { exportGedcom, parseGedcom, mergeGedcomImport } from "./gedcom.js";
 import PersonPanel from "./components/PersonPanel.jsx";
@@ -211,32 +214,43 @@ function PersonLane({ person, color, height, x, ppy, viewRange, crosshairYear, a
   );
 }
 
-function ContextLane({ lane, x, ppy, viewRange, focusLife, onHover, onLeave }) {
+function ContextLane({ lane, x, ppy, viewRange, onHover, onLeave, onOpenOwn }) {
+  // items come computed from the board (src/context/lanes.js): each with its opacity (there then / not / chip off);
+  // your own context events are drawn in the focus colour and open in the editor
   const visible = (s, e) => e >= viewRange[0] && s <= viewRange[1];
-  const dim = (s, e) => (focusLife && e >= focusLife[0] && s <= focusLife[1] ? 1 : 0.38);
   const showLabels = ppy >= 3.4;
-  const { placed } = useMemo(() => packRows(lane.periods || [], 2), [lane]);
+  const periods = useMemo(() => lane.items.filter((i) => i.end && i.end > i.year).map((i) => ({ ...i, start: i.year })), [lane]);
+  const points = lane.items.filter((i) => !(i.end && i.end > i.year));
+  const { placed } = useMemo(() => packRows(periods, 2), [periods]);
+  const tone = (it) => (it.own ? C.focus : C.slate);
+  const open = (it) => (it.own && onOpenOwn ? (e) => { e.stopPropagation(); onOpenOwn(it); } : undefined);
   return (
     <React.Fragment>
-      {placed.filter((p) => visible(p.start, p.end)).map((p, i) => (
-        <div key={"p" + i} title={`${p.label} · ${p.start}–${p.end}`} style={{
+      {placed.filter((p) => visible(p.start, p.end)).map((p) => (
+        <div key={"p" + p.id} title={`${p.label} · ${p.start}–${p.end}${p.chipLabel ? ` · ${p.chipLabel}` : ""}`} onPointerDown={p.own ? stopPD : undefined} onClick={open(p)} style={{
           position: "absolute", left: x(p.start), top: 6 + p.row * 15, width: Math.max(2, (p.end - p.start) * ppy), height: 12,
-          background: hexA(C.slate, 0.18), borderLeft: `2px solid ${C.slate}`, borderRight: `2px solid ${C.slate}`,
-          font: "600 9px Archivo, sans-serif", color: C.inkSoft, lineHeight: "12px", padding: "0 4px",
-          overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", opacity: dim(p.start, p.end),
+          background: hexA(tone(p), 0.18), borderLeft: `2px solid ${tone(p)}`, borderRight: `2px solid ${tone(p)}`,
+          font: "600 9px Archivo, sans-serif", color: C.inkSoft, lineHeight: "12px", padding: "0 4px", cursor: p.own ? "pointer" : "default",
+          overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis", opacity: p.opacity, pointerEvents: p.own ? "auto" : undefined,
         }}>{(p.end - p.start) * ppy > 50 ? p.label : ""}</div>
       ))}
-      {(lane.events || []).filter((e) => visible(e.year, e.year)).map((e, i) => (
-        <React.Fragment key={"e" + i}>
-          <div onMouseEnter={(ev) => onHover(ev, [e.label, String(e.year)])} onMouseLeave={onLeave}
-            style={{ position: "absolute", left: x(e.year) - 3, top: CTX_H - 17, width: 6, height: 6, borderRadius: "50%", background: C.slate, opacity: dim(e.year, e.year), zIndex: 2 }} />
+      {points.filter((e) => visible(e.year, e.year)).map((e) => (
+        <React.Fragment key={"e" + e.id}>
+          <div data-testid="ctx-event" onMouseEnter={(ev) => onHover(ev, [e.label, String(e.year), e.source === "wikidata" ? "Wikidata" : e.own ? "your event" : ""])} onMouseLeave={onLeave}
+            onPointerDown={e.own ? stopPD : undefined} onClick={open(e)}
+            style={{ position: "absolute", left: x(e.year) - 3, top: CTX_H - 17, width: 6, height: 6, borderRadius: "50%", background: tone(e), opacity: e.opacity, zIndex: 2, cursor: e.own ? "pointer" : "default" }} />
           {showLabels && (
-            <div style={{ position: "absolute", left: x(e.year) + 6, top: CTX_H - 21, font: "500 9px Archivo, sans-serif", color: C.inkSoft, whiteSpace: "nowrap", opacity: dim(e.year, e.year) }}>
-              <span style={{ font: "500 8.5px 'IBM Plex Mono', monospace", color: C.slate, marginRight: 3 }}>{e.year}</span>{e.label}
+            <div style={{ position: "absolute", left: x(e.year) + 6, top: CTX_H - 21, font: "500 9px Archivo, sans-serif", color: e.own ? C.focus : C.inkSoft, whiteSpace: "nowrap", opacity: e.opacity, pointerEvents: "none" }}>
+              <span style={{ font: "500 8.5px 'IBM Plex Mono', monospace", color: tone(e), marginRight: 3 }}>{e.year}</span>{e.label}
             </div>
           )}
         </React.Fragment>
       ))}
+      {lane.empty && !lane.items.length && (
+        <div style={{ position: "absolute", left: 12, top: 18, font: "italic 500 11px Fraunces, Georgia, serif", color: C.inkSoft, pointerEvents: "none" }}>
+          Add birth places, or places on life events and roles, to see their local history here.
+        </div>
+      )}
     </React.Fragment>
   );
 }
@@ -309,7 +323,17 @@ export default function App() {
   // how each person is related to the focus person (Phase 8 kinship: today's labels kept, precise ones added)
   const kin = useMemo(() => Object.fromEntries(people.map((p) => [p.id, kinshipLabel(byId, focus, p)])), [people, byId, focus]);
   const relatives = relativeIds.map((id) => byId[id]).filter(Boolean);
-  const ctxLanes = CONTEXT_LANES.filter((l) => ctxOn[l.id]);
+  // context lanes from the people on the board: their places, the countries at the time, the world (Wikidata, the
+  // built-in sample and your own events)
+  const ctx = useContextLanes({ project, people: [focus, ...relatives], storage, updateProject });
+  const ctxLanes = ctx.lanes.filter((l) => ctxOn[l.id]);
+  const [placesOpen, setPlacesOpen] = useState(false);
+  const setCtxSetting = (key, value) => updateProject((p) => ({ ...p, settings: { ...p.settings, [key]: typeof value === "function" ? value(p.settings?.[key]) : value } }));
+  const toggleChip = (laneId, chip) => setCtxSetting("ctxFilters", (f = {}) => ({ ...f, [laneId]: { ...(f[laneId] ?? {}), [chip]: f[laneId]?.[chip] === false } }));
+  const ctxScopes = (laneId) => {
+    const l = ctx.lanes.find((x) => x.id === laneId);
+    return laneId === "global" ? [{ value: "world", label: "World" }] : [...(l?.chips ?? []).map((c) => ({ value: c.key, label: c.label })), { value: "", label: laneId === "local" ? "no particular place" : "no particular country" }];
+  };
 
   const x = (year) => (year - view.left) * view.ppy;
   const yearAt = (px) => view.left + px / view.ppy;
@@ -414,9 +438,14 @@ export default function App() {
       const laneKey = d.laneKey;
       const laneIsPerson = laneKey.startsWith("p:");
       const laneId = laneIsPerson ? laneKey.slice(2) : null;
+      const ctxLane = laneKey.startsWith("ctx:") ? laneKey.slice(4) : null;
       if (draft && draft.end - draft.start > 0.75) {
         const start = Math.round(draft.start), end = Math.round(draft.end);
-        setItemModal({ mode: "create", kind: laneIsPerson ? "group" : "era", laneKey, laneId, laneIsPerson, item: { start, end } });
+        if (ctxLane) setItemModal({ mode: "create", kind: "ctxPeriod", altKind: "era", laneKey, laneId: ctxLane, laneIsPerson: false, scopes: ctxScopes(ctxLane), item: { start, end } });
+        else setItemModal({ mode: "create", kind: laneIsPerson ? "group" : "era", laneKey, laneId, laneIsPerson, item: { start, end } });
+      } else if (ctxLane) {
+        const year = Math.round(d.startYear);
+        setItemModal({ mode: "create", kind: "ctxEvent", laneKey, laneId: ctxLane, laneIsPerson: false, scopes: ctxScopes(ctxLane), item: { year, start: year, end: year } });
       } else if (laneIsPerson) {
         // a click on empty person-lane space → new point event at that year
         const year = Math.round(d.startYear);
@@ -470,6 +499,11 @@ export default function App() {
     }
     if (kind === "birth" || kind === "death") {
       updatePerson(laneId, (p) => ({ ...p, [kind]: { ...p[kind], ...values } }));
+    } else if (kind === "ctxEvent" || kind === "ctxPeriod") {
+      const item = { lane: laneId, chip: values.chip || null, label: values.label, note: values.note ?? "", year: kind === "ctxEvent" ? values.year : values.start, end: kind === "ctxPeriod" ? values.end : null };
+      updateProject((p) => ({ ...p, contextEvents: mode === "edit"
+        ? (p.contextEvents ?? []).map((x) => (x.id === id ? { ...x, ...item } : x))
+        : [...(p.contextEvents ?? []), { id: crypto.randomUUID(), ...item }] }));
     } else if (kind === "era") {
       if (mode === "edit") setEras((es) => es.map((x) => (x.id === id ? { ...x, ...values } : x)));
       else setEras((es) => [...es, createEra(values)]);
@@ -490,7 +524,8 @@ export default function App() {
   };
 
   const deleteItem = ({ kind, id, laneId }) => {
-    if (kind === "era") setEras((es) => es.filter((x) => x.id !== id));
+    if (kind === "ctxEvent" || kind === "ctxPeriod") updateProject((p) => ({ ...p, contextEvents: (p.contextEvents ?? []).filter((x) => x.id !== id) }));
+    else if (kind === "era") setEras((es) => es.filter((x) => x.id !== id));
     else if (kind === "annotation") setAnnotations((as) => as.filter((x) => x.id !== id));
     else updatePerson(laneId, (p) => ({ ...p, [ARR_KEY[kind]]: (p[ARR_KEY[kind]] ?? []).filter((x) => x.id !== id) }));
     setItemModal(null);
@@ -662,10 +697,9 @@ export default function App() {
         <span style={{ flex: 1 }} />
 
         <label style={{ font: "600 11px Archivo, sans-serif", color: C.inkSoft }}>Context source</label>
-        <select defaultValue="sample" style={{ font: "600 12px Archivo, sans-serif", background: C.paperHi, color: C.ink, border: `1px solid ${C.ink}`, borderRadius: 3, padding: "4px 6px" }}>
-          <option value="sample">Built-in sample</option>
-          <option disabled>Wikidata — coming soon</option>
-          <option disabled>time.graphics — coming soon</option>
+        <select aria-label="Context source" value={ctx.source} onChange={(e) => setCtxSetting("ctxSource", e.target.value)} title="Where the Local, National and Global history comes from" style={{ font: "600 12px Archivo, sans-serif", background: C.paperHi, color: C.ink, border: `1px solid ${C.ink}`, borderRadius: 3, padding: "4px 6px" }}>
+          <option value="wikidata">Wikidata + built-in</option>
+          <option value="builtin">Built-in only (offline)</option>
         </select>
 
         <button style={btnStyle(false)} onClick={() => fileRef.current?.click()} title="Import a Meridian bundle (.zip) or a GEDCOM (.ged)">Import</button>
@@ -754,12 +788,29 @@ export default function App() {
             <div key={lane.id} style={{ display: "flex", position: "relative", zIndex: 1 }}>
               {headerCell(
                 <React.Fragment>
-                  <div style={{ font: "700 13px Fraunces, Georgia, serif" }}>{lane.label}</div>
-                  <div style={{ font: "500 9.5px Archivo, sans-serif", color: C.inkSoft }}>{lane.sub}</div>
+                  <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                    <span style={{ font: "700 13px Fraunces, Georgia, serif" }}>{lane.label}</span>
+                    {lane.id === "local" && <button onClick={() => setPlacesOpen(true)} title="Which places these are, and their countries over time" style={{ ...btnStyle(false), padding: "0 5px", fontSize: 9 }}>Places</button>}
+                    {ctx.loading && lane.id !== "global" && <span style={{ font: "italic 500 9px Archivo, sans-serif", color: C.inkSoft }}>looking up…</span>}
+                  </div>
+                  {lane.chips.length > 0 ? (
+                    <div data-testid={`ctx-chips-${lane.id}`} style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 2, maxHeight: 30, overflow: "hidden" }}>
+                      {lane.chips.map((c) => (
+                        <button key={c.key} onClick={() => toggleChip(lane.id, c.key)} aria-pressed={c.on}
+                          title={`${c.title || c.label}${c.people.length ? ` · ${c.people.join(", ")}` : ""} · ${c.count} item${c.count === 1 ? "" : "s"} · click to ${c.on ? "fade" : "show"}`}
+                          style={{ font: "600 9px Archivo, sans-serif", padding: "0 5px", borderRadius: 8, cursor: "pointer", lineHeight: "13px",
+                            border: `1px solid ${c.on ? C.slate : C.rule}`, background: c.on ? hexA(C.slate, 0.12) : "transparent", color: c.on ? C.ink : C.inkSoft, textDecoration: c.on ? "none" : "line-through" }}>
+                          {c.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : <div style={{ font: "500 9.5px Archivo, sans-serif", color: C.inkSoft }}>{lane.id === "global" ? "World" : "no places yet"}</div>}
                 </React.Fragment>, CTX_H, i === 0 ? "Context" : null
               )}
               {track("ctx:" + lane.id, CTX_H,
-                <ContextLane lane={lane} x={x} ppy={view.ppy} viewRange={viewRange} focusLife={focusLife} onHover={showTip} onLeave={hideTip} />
+                <ContextLane lane={lane} x={x} ppy={view.ppy} viewRange={viewRange} onHover={showTip} onLeave={hideTip}
+                  onOpenOwn={(it) => openItem({ kind: it.end && it.end > it.year ? "ctxPeriod" : "ctxEvent", laneKey: "ctx:" + lane.id, laneId: lane.id, scopes: ctxScopes(lane.id),
+                    item: { ...it, start: it.year, end: it.end ?? it.year } })} />
               )}
             </div>
           ))}
@@ -856,7 +907,7 @@ export default function App() {
         <span>{research ? "research mode: drag a lane to add · click an item to edit" : "click any item for details · hover for the year & ages"}</span>
         <span style={{ flex: 1 }} />
         <label style={{ display: "flex", gap: 10 }}>
-          {CONTEXT_LANES.map((l) => (
+          {LANES.map((l) => (
             <span key={l.id} onClick={() => setCtxOn((c) => ({ ...c, [l.id]: !c[l.id] }))}
               style={{ cursor: "pointer", textDecoration: ctxOn[l.id] ? "none" : "line-through", color: ctxOn[l.id] ? C.ink : C.inkSoft }}>
               {l.label.toLowerCase()}
@@ -951,6 +1002,12 @@ export default function App() {
             }}>Add new person</button>
           </div>
         </Modal>
+      )}
+
+      {/* places of the context lanes */}
+      {placesOpen && project && (
+        <PlacesPanel lanes={ctx.lanes} resolved={ctx.resolved} wikidata={ctx.wikidata} error={ctx.error} onClose={() => setPlacesOpen(false)}
+          onChoose={(key, choice) => setCtxSetting("contextPlaces", (m = {}) => ({ ...m, [key]: choice }))} />
       )}
 
       {/* family panel */}
