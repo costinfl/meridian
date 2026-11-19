@@ -26,6 +26,15 @@ describe("Scoring and matching runs (P9.T3)", () => {
     expect(scorePair({ signals: { given: 0.5, surname: 1, date: 1, sex: 1 } })).toBeLessThan(0.5);
     expect(scorePair({ signals: { given: 1, surname: 1, date: 1 }, veto: "different sex" })).toBe(0);
     expect(scorePair({ signals: {} })).toBe(0);
+    // names and a vague date alone are capped below the threshold; a close date, two relatives, a dated or linked
+    // relative, or a shared associate lift the cap
+    const base = { given: 1, surname: 1, date: 0.6, sex: 1, relatives: 0.95, place: null, fan: null };
+    expect(scorePair({ signals: { ...base, relativesStrong: 1 } })).toBe(0.65);
+    expect(scorePair({ signals: { ...base, relativesStrong: 2 } })).toBeGreaterThan(0.8);
+    expect(scorePair({ signals: { ...base, relativesStrong: 1, relativesDated: 1 } })).toBeGreaterThan(0.8);
+    expect(scorePair({ signals: { ...base, date: 0.95, relatives: null } })).toBeGreaterThan(0.8);
+    expect(scorePair({ signals: { ...base, relatives: null, fan: 1 } })).toBeGreaterThan(0.8);
+    expect(scorePair({ signals: { ...base, relatives: 0.3, relativesStrong: 2 } })).toBeLessThan(0.6);   // relatives named differently
     expect(Object.values(DEFAULT_WEIGHTS).reduce((a, b) => a + b, 0)).toBeCloseTo(1, 6);
   });
 

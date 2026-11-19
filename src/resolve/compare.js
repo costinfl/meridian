@@ -106,15 +106,19 @@ export function comparePlaces(p, q, placeAncestors = new Map()) {
   return 0.3;
 }
 
+const narrowWindow = (r) => !!r && (r[1] - r[0]) <= 5 * YEAR_DAYS;
 const MATCHING_RELATION = { father: ["father", "parent"], mother: ["mother", "parent"], parent: ["father", "mother", "parent"], spouse: ["spouse"], child: ["child"] };
 
 /** A profile's relatives as [{ relation, given, surnames, personId }], for a persona (from its record) or a person (from families). */
 export function relativesOf(profile, ctx) {
   if (profile.relatives) {
-    return profile.relatives.map((r) => ({ relation: r.relation, given: r.given, surnames: r.surnames, personId: ctx.acceptedPersonOf?.get(r.personaId) ?? null }));
+    return profile.relatives.map((r) => {
+      const o = ctx.personas?.get(r.personaId);
+      return { relation: r.relation, given: r.given, surnames: r.surnames, personId: ctx.acceptedPersonOf?.get(r.personaId) ?? null, birth: o?.birth ?? null, narrow: narrowWindow(o?.birth) };
+    });
   }
   const out = [];
-  const add = (relation, id) => { const x = ctx.persons?.get(id); if (x) out.push({ relation, given: x.given, surnames: x.surnames, personId: id }); };
+  const add = (relation, id) => { const x = ctx.persons?.get(id); if (x) out.push({ relation, given: x.given, surnames: x.surnames, personId: id, birth: x.birth, narrow: x.birthFrom === "stated" }); };
   for (const id of profile.parents ?? []) { const x = ctx.persons?.get(id); add(x?.sex === "F" ? "mother" : x?.sex === "M" ? "father" : "parent", id); }
   for (const id of profile.spouses ?? []) add("spouse", id);
   for (const id of profile.children ?? []) add("child", id);
@@ -135,14 +139,22 @@ export function compareRelatives(p, q, ctx = {}) {
     let best = null;
     for (const b of options) {
       let v;
-      if (a.personId && b.personId) v = a.personId === b.personId ? 1 : 0;
+      let linked = false, dated = false;
+      if (a.personId && b.personId) { v = a.personId === b.personId ? 1 : 0; linked = v === 1; }
       else {
         const g = nameSimilarity(a.given, b.given, ctx.variants);
         const s = nameSimilarity(a.surnames, b.surnames, ctx.variants);
         const parts = [g, a.relation === "mother" || a.relation === "spouse" ? (s != null && s >= 0.8 ? s : null) : s].filter((x) => x != null);
         v = parts.length ? parts.reduce((x, y) => x + y, 0) / parts.length : null;
+        // the relative's own dates: a baptised child born within a year or two of the tree child's birth year is a
+        // strong sign; born far apart, the same name means little
+        if (v != null && a.birth && b.birth && (a.narrow || b.narrow)) {
+          const gap = distYears(a.birth, b.birth);
+          if (a.narrow && b.narrow && gap <= 2) dated = true;
+          else if (gap > 5) v *= 0.3;
+        }
       }
-      if (v != null && (!best || v > best.value)) best = { relation: a.relation, a: [...a.given, ...a.surnames].join(" "), b: [...b.given, ...b.surnames].join(" "), value: Math.round(v * 1000) / 1000 };
+      if (v != null && (!best || v > best.value)) best = { relation: a.relation, a: [...a.given, ...a.surnames].join(" "), b: [...b.given, ...b.surnames].join(" "), value: Math.round(v * 1000) / 1000, linked, dated };
     }
     if (best) matches.push(best);
   }
@@ -182,6 +194,10 @@ export function comparePair(p, q, ctx = {}) {
     signals: {
       given: compareGiven(p, q, ctx.variants), surname: compareSurname(p, q, ctx.variants), date: date.value, sex: sex.value,
       place: comparePlaces(p, q, ctx.placeAncestors), relatives: relatives.value, fan: fan.value,
+      // how many relatives agree strongly (names of relatives are common: one alone corroborates little)
+      relativesStrong: relatives.matches.filter((m) => m.value >= 0.9).length,
+      relativesLinked: relatives.matches.some((m) => m.value === 1 && m.linked) ? 1 : 0,
+      relativesDated: relatives.matches.filter((m) => m.value >= 0.9 && m.dated).length,
     },
     veto: sex.veto ?? date.veto ?? null,
     detail: { relatives: relatives.matches, fanShared: fan.shared },

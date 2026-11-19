@@ -26,7 +26,7 @@ export async function resolveFixture() {
   const age = (value) => ({ value, unit: "years", asWritten: `${value} ani` });
   await record("b1850", "baptism", { year: 1850, month: 5, day: 2 }, [
     ["child", { nameAsWritten: "Ion", role: "child" }], ["father", { nameAsWritten: "Dumitru Hariton", role: "father" }],
-    ["mother", { nameAsWritten: "Maria", role: "mother" }], ["godparent", { nameAsWritten: "Ana Popescu", role: "godparent" }]]);
+    ["mother", { nameAsWritten: "Maria", role: "mother" }], ["godparent", { nameAsWritten: "Ana Popescu", role: "godparent", statedAge: age(23) }]]);
   await record("m1875", "marriage", { year: 1875, month: 10, day: 12 }, [
     ["groom", { nameAsWritten: "Ioan Haritonu", role: "groom", statedAge: age(25) }], ["bride", { nameAsWritten: "Elena Băltăceanu", role: "bride", statedAge: age(20) }],
     ["witness", { nameAsWritten: "Ana Popescu", role: "witness", statedAge: age(48) }]]);

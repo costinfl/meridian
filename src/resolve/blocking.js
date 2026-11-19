@@ -20,13 +20,20 @@ export function variantKeys(nameVariants = []) {
   return m;
 }
 
-/** Block keys of a profile: DM codes of its surnames and of their paired variants. */
+/**
+ * Block keys of a profile: each DM code of its surnames (and of their paired variants), combined with the first letter
+ * of each of its given names (and of their variants: Ion ~ Iohannes share "i", Constantin ~ Costandin "c"). Two people
+ * named Ion Popescu and Maria Popescu are not compared; Ion and Ioan Popescu are.
+ */
 export function blockKeys(profile, variants = new Map()) {
-  const names = new Set(profile.surnames);
-  for (const s of profile.surnames) for (const v of variants.get(s) ?? []) names.add(v);
-  const out = new Set();
-  for (const n of names) for (const c of dmCodesOfName(n)) out.add(c);
-  return [...out];
+  const expand = (list) => { const out = new Set(list); for (const x of list) for (const v of variants.get(x) ?? []) out.add(v); return [...out]; };
+  const codes = new Set();
+  for (const n of expand(profile.surnames)) for (const c of dmCodesOfName(n)) codes.add(c);
+  const initials = new Set(expand(profile.given ?? []).map((g) => g[0]).filter(Boolean));
+  if (!initials.size) initials.add("*");
+  const out = [];
+  for (const c of codes) for (const i of initials) out.push(`${c}:${i}`);
+  return out;
 }
 
 export function datesCompatible(a, b, marginYears = DEFAULT_BLOCKING.marginYears) {

@@ -158,12 +158,19 @@ export function personProfiles({ people = [], families = [], links = [], persona
     const alt = (accepted.get(p.id) ?? []).map((id) => pp.get(id)).filter(Boolean);
     const tokens = [...new Set([...n.tokens, ...alt.flatMap((a) => a.tokens)])];
     const given = [...new Set([...n.given, ...alt.flatMap((a) => a.given)])];
-    const surnames = [...new Set([...n.surnames, ...alt.flatMap((a) => a.surnames)])];
+    // a married woman is written under her husband's surname in many records
+    const spouseIds = spouses.get(p.id) ?? (p.spouseIds ?? []);
+    // (the husband's, or else the children's when the husband is not in the tree)
+    const married = SEX_OF[p.sex] === "F"
+      ? [...spouseIds, ...(children.get(p.id) ?? [])].map((id) => byId.get(id)).filter(Boolean).flatMap((h) => splitName(displayName(h)).surnames.slice(0, 1))
+      : [];
+    const surnames = [...new Set([...n.surnames, ...alt.flatMap((a) => a.surnames), ...married])];
     const by = p.birth?.year, dy = p.death?.year;
     const birth = by ? yearRange(by) : dy ? [yearRange(dy)[0] - years(110), yearRange(dy)[1]] : null;
     const death = dy ? yearRange(dy) : null;
+    const birthFrom = by ? "stated" : dy ? "death" : null;
     out.set(p.id, {
-      id: p.id, name, given, surnames, tokens, sex: SEX_OF[p.sex] ?? null, birth, death,
+      id: p.id, name, given, surnames, tokens, sex: SEX_OF[p.sex] ?? null, birth, death, birthFrom,
       places: [p.birth?.place, p.death?.place].filter(Boolean),
       parents: parents.get(p.id) ?? [p.fatherId, p.motherId].filter((x) => x && byId.has(x)),
       spouses: spouses.get(p.id) ?? (p.spouseIds ?? []).filter((x) => byId.has(x)),
@@ -171,6 +178,23 @@ export function personProfiles({ people = [], families = [], links = [], persona
       linkedPersonaIds: accepted.get(p.id) ?? [],
       dm: dmOf(tokens), surnameDm: dmOf(surnames),
     });
+  }
+  // no birth year: a window from the relatives' years (a parent 15–50 years older, a child 15–50 younger, a spouse
+  // within 15 years), so a person without dates can still be told from a namesake born a century apart
+  for (const q of out.values()) {
+    if (q.birthFrom === "stated") continue;
+    const by = (id) => byId.get(id)?.birth?.year;
+    const lo = [], hi = [];
+    for (const id of q.parents) if (by(id)) { lo.push(by(id) + 15); hi.push(by(id) + 50); }
+    for (const id of q.children) if (by(id)) { lo.push(by(id) - 50); hi.push(by(id) - 15); }
+    for (const id of q.spouses) if (by(id)) { lo.push(by(id) - 15); hi.push(by(id) + 15); }
+    if (!lo.length) continue;
+    let a = Math.max(...lo), b = Math.min(...hi);
+    if (a > b) { a = Math.min(...lo); b = Math.max(...hi); }              // relatives disagree: the widest window
+    const r = [toJdn(a, 1, 1), toJdn(b, 12, 31)];
+    q.birth = q.birth ? [Math.max(q.birth[0], r[0]), Math.min(q.birth[1], r[1])] : r;
+    if (q.birth[0] > q.birth[1]) q.birth = r;
+    q.birthFrom = "relatives";
   }
   return out;
 }
