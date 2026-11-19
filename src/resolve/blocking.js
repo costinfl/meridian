@@ -53,11 +53,13 @@ export function placesCompatible(a, b, placeAncestors = new Map()) {
 /**
  * @param {Map} personas  personaProfiles(...)
  * @param {Map} persons   personProfiles(...)
- * @param {object} opts   { acceptedPersonaIds: Set, onlyPersonaIds?: Set (incremental), nameVariants, marginYears, place, placeAncestors }
+ * @param {object} opts   { acceptedPersonaIds: Set, onlyPersonaIds?: Set, onlyPersonIds?: Set (incremental: a pair is kept when
+ *                         its persona, or its person, is in these sets; with neither set, everything), nameVariants,
+ *                         marginYears, place, placeAncestors }
  * @returns {{ personPairs: [personaId, personId][], personaPairs: [personaId, personaId][], counts }}
  */
 export function blockPairs(personas, persons, opts = {}) {
-  const { acceptedPersonaIds = new Set(), onlyPersonaIds = null, nameVariants = [], marginYears = DEFAULT_BLOCKING.marginYears, place = DEFAULT_BLOCKING.place, placeAncestors } = opts;
+  const { acceptedPersonaIds = new Set(), onlyPersonaIds = null, onlyPersonIds = null, nameVariants = [], marginYears = DEFAULT_BLOCKING.marginYears, place = DEFAULT_BLOCKING.place, placeAncestors } = opts;
   const variants = variantKeys(nameVariants);
   const pool = [...personas.values()].filter((p) => !acceptedPersonaIds.has(p.id));
   const counts = { personas: personas.size, pooled: pool.length, persons: persons.size, noSurname: 0, buckets: 0, comparedBlocks: 0, rawPairs: 0, personPairs: 0, personaPairs: 0, droppedByDate: 0, droppedByPlace: 0 };
@@ -71,7 +73,9 @@ export function blockPairs(personas, persons, opts = {}) {
   for (const q of persons.values()) for (const k of blockKeys(q, variants)) put(k, "persons", q.id);
   counts.buckets = buckets.size;
 
-  const wanted = (id) => !onlyPersonaIds || onlyPersonaIds.has(id);
+  const incremental = !!(onlyPersonaIds || onlyPersonIds);
+  const wanted = (id) => !incremental || !!onlyPersonaIds?.has(id);
+  const wantedPerson = (id) => !incremental || !!onlyPersonIds?.has(id);
   const seen = new Set();
   const personPairs = [], personaPairs = [];
   const keep = (a, b) => {
@@ -83,9 +87,9 @@ export function blockPairs(personas, persons, opts = {}) {
   for (const { personas: ps, persons: qs } of buckets.values()) {
     if (ps.length) counts.comparedBlocks++;
     for (const pid of ps) {
-      if (!wanted(pid)) continue;
       const a = personas.get(pid);
       for (const qid of qs) {
+        if (!wanted(pid) && !wantedPerson(qid)) continue;
         const k = `${pid}>${qid}`;
         if (seen.has(k)) continue;
         seen.add(k);
