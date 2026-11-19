@@ -241,7 +241,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
       setConfirmAi({
         title: "Read this page with Transkribus?",
         text: `The page image (${est.kb} kB) will be sent to Transkribus${est.user ? ` as ${est.user}` : ""}, with text recognition model ${est.model || "(not chosen)"}. It uses credits from your Transkribus plan.`,
-        missing: est.missing ?? "", charge: "Transkribus counts it against your plan.",
+        missing: est.missing ?? "", charge: "",
         send: async () => {
           const ctl = new AbortController(); setTkReading(ctl); setMessage("Sending the page image to Transkribus…");
           try {

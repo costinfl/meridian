@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** reviewer: review Phase 9 (PR to master). All planned phases are then built; the backlog is for the reviewer to prioritise.
-- **Last updated:** 2026-11-19 (Phase 9 report)
+- **Next action:** reviewer: review PR #15 (Phase 9 and the follow-up). Then: context lanes that follow the people (next PR).
+- **Last updated:** 2026-11-19 (Phase 9 review follow-up)
 
 ## Phase overview
 
@@ -390,7 +390,15 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
   4. Groups are less reliable than proposals for tree persons (52–75% of grouped pairs right in the benchmark); review them with care.
   5. A record person linked to the wrong person must be unlinked by rejecting the accepted link elsewhere (People / Legacy facts); Matches shows waiting proposals only.
   6. The Phase 7 and 7b questions are still open.
-- **Questions for the reviewer:**
+- **Review follow-up (2026-11-19, same PR #15):**
+  - **(b) Godparents, witnesses, informants** are proposed when the names agree and one detail agrees: a stated age, the same place, or the same work (new `occupation` signal against the person's roles, weight 0.05, taken from place). On the benchmark, extended with villages and occupations: godparents 0 → 119 right best proposals (26 wrong), witnesses 0 → 145 (30 wrong); overall right 85.8% → 85.0%, found 67.9% → 70.3%.
+  - **(c) Linked list with undo** in Matches: every accepted link, **Unlink (wrong)** (rejected for good) or **Back to waiting**; candidates rejected only because of that accept come back (`unlinkMatch`, `reopenLink`: user actions in the I6 rule).
+  - **(d) Julian/Gregorian helpers** (`src/evidence/domain/calendar.js`): conversion, the likely calendar (civil switch 31 Mar / 14 Apr 1919, church 1924), both calendars on record dates and under the manual date fields, a converter in **Settings & tools** (renamed from AI settings).
+  - **(d) Family editing**: a family panel from a person's name on the timeline (name, sex, father, mother, spouses, children, new people, no loops) through the existing family functions; **+ relative → Add new person**.
+  - **(d) Read with Transkribus**: the CORS check showed that the documented v2 API (api-staging.transkribus.org) refuses browser calls, but API v1 (transkribus.eu/processing/v1, "Metagrapho API" 1.13.1, same shape) and the READ-COOP sign-in accept them. Meridian signs in per session (password never stored), sends the page image (base64) with the model id, polls, fetches PAGE XML and imports it with the Phase 7b importer. Tested against a local stand-in for the servers only; **your first real use is the true test**.
+  - A browser check found and fixed a bug: saving the model id wiped a user name being typed in the Transkribus settings.
+  - Tests 537 → **555**.
+- **Questions for the reviewer** (answered 2026-11-19, see the follow-up above and the log):
   - (a) On your data (for example after reading a register and importing your GEDCOM): are the proposals sensible, and is the 0.80 threshold right, or would you rather see more and reject more?
   - (b) Should godparents and witnesses be proposed with names and dates alone (more proposals, more wrong ones), or stay as they are?
   - (c) Should Matches also list accepted links, so a wrong accept can be undone there?

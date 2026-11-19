@@ -68,7 +68,8 @@ Zoom and position are remembered per project.
 - Click **+ relative** to add someone to **Compare**. The list shows everyone not yet on the board, with their relationship to the focus person and their years: father, mother, spouse, child, sibling, grandparent, grandchild as before, and more precise labels for everyone else: great-grandfather (2× great-…), uncle, aunt, nephew, niece, first cousin once removed, father-in-law, brother-in-law, son-in-law, stepmother, "wife of the nephew", "husband of the aunt", and ", related twice" when someone is related through two lines (for example double first cousins, or cousins who married). "relative" is left only when no line is found in the tree.
 - Each comparison lane has **⌖ focus** (make this person the focus; the previous focus moves to Compare) and **×** (remove the lane; the person stays in the project).
 
-People cannot be created in the app yet. They come from the sample project, a GEDCOM import, or a bundle import (see [Limits](#limits-you-should-know-about)).
+- Click a person's **name** in their lane to open their **family**: change the name and sex, set or change the **father** and **mother**, add or remove **spouses**, and add **children**. Each list lets you pick someone already in the project or type a **new person**. Click a relative's name to open their family. A person cannot become their own ancestor, and you confirm before a parent is replaced. Kinship labels and Matches follow at once; GEDCOM export writes the new families.
+- **+ relative** also has **Add new person**: type a name; the person is added to the board and their family opens.
 
 ## Reading a lane
 
@@ -264,9 +265,13 @@ A document already read is not read again unless you click **Read again**. **Can
 
 A page with a reading counts as **reviewed** in the document list.
 
-### AI settings
+### Settings & tools
 
-AI is a **last resort, used on demand**: it costs money, and handwriting tools such as Transkribus are trained for this work (importing Transkribus results is planned). There is no button that sends a whole document; every AI call is for one page or one box, and you see the estimate before anything is sent.
+The **Settings & tools** section holds the AI provider (below), your **Transkribus account**, and a **Julian / Gregorian** date converter.
+
+#### AI settings
+
+AI is a **last resort, used on demand**: it costs money, and handwriting tools such as Transkribus are trained for this work (see Importing text from Transkribus and Read with Transkribus). There is no button that sends a whole document; every AI call is for one page or one box, and you see the estimate before anything is sent.
 
 **Read with AI** and **Extract with AI** use an AI provider: **Anthropic Claude** or **OpenAI**, with your own API key (you pay the provider for what you use). In the Evidence panel, under **AI settings**:
 
@@ -333,6 +338,20 @@ The search index lives in this browser. It is brought up to date each time you o
 
 Nothing on this page is saved: it is worked out from your records and tree each time it opens and kept up to date while it is open.
 
+### Read with Transkribus (your account)
+
+Instead of exporting from Transkribus, Meridian can send a page to Transkribus and bring the text back:
+
+1. In **Settings & tools → Transkribus account**, type your Transkribus user name and the **text recognition model id** (find models on [transkribus.org/models](https://www.transkribus.org/models); for example a model trained on Romanian Cyrillic or Latin handwriting of the period). Tick **use the model's language model** if the model has one.
+2. Type your password and **Sign in**. The password is never stored; the sign-in lasts until you close the browser tab.
+3. Open a page (Documents → **Review text**) and click **Read with Transkribus**. You see what will be sent (the page image, the model) and confirm; Transkribus counts it against your plan's credits.
+
+The text arrives as a new **Transkribus** transcription with positioned lines, exactly as with an imported export. Your account must include the Transkribus processing API (Scholar plan or above). Meridian talks to Transkribus directly from your browser; nothing goes through another server.
+
+### Julian and Gregorian dates
+
+Romanian civil records used the **Julian** calendar until 31 March 1919; the next day was 14 April 1919 (Gregorian). Church registers changed in October 1924. Meridian keeps each date in the calendar it was written in and shows the other one beside it: **28 Mar 1866 (Julian) = 9 Apr 1866 (Gregorian)**. When you type a record by hand with the calendar on **automatic**, dates before April 1919 are taken as Julian, and the line under the date shows both. **Settings & tools** has a converter for any date.
+
 ### Matches: who in the records is who in your tree
 
 **Matches** (on the Evidence page, when the project has people) proposes which person named in a record is which person of your tree, and which people named in several records look like one person who is not in your tree yet. It runs on this device, without AI and at no cost.
@@ -340,6 +359,8 @@ Nothing on this page is saved: it is worked out from your records and tree each 
 - **Find matches** compares what changed since the last time (new or edited records, people you added or edited). **Recheck everything** compares all again. The line next to the buttons says how many pairs were compared and what was proposed.
 - Each proposal shows the record side (a crop of the entry, the name as written, the role, the date, the birth years it implies, the relatives named) next to the person of your tree (years, places, parents, spouse), with a score and what it rests on: given name, surname, dates, sex, place, relatives (e.g. *father Dumitru Hariton ↔ Dumitru Hariton*), people around them. **Based on proposed values** means it uses values the AI read that you have not confirmed yet.
 - **Accept** links the record person to the tree person (other proposals for the same record person are then rejected: they are one person). **Reject**: it is never proposed again. **Someone else…** links them to the person you choose instead. **Create new person** adds a person to your tree from the record (name, sex, a birth year only when the record states an age or date, a death year from a death record).
+- **Godparents, witnesses and informants** are proposed when the names agree and **one detail of their own** agrees too: a stated age, the same place (where they lived), or the same work (their occupation against the person's roles). Their relatives are rarely named, so this is what tells them apart.
+- **Linked to people of your tree** lists every record person you linked (here, in Legacy facts or by hand), newest first. **Unlink (wrong)** removes a wrong link for good; **Back to waiting** puts it back among the proposals. Proposals that were rejected only because of that link come back.
 - **Same person in several records**: **Create new person from these**, **Link all to…** a person of your tree, **Not the same** (never grouped again), or **Not this one** for one of the records.
 - When an accepted record spells a name differently from your tree (Iohannes and Ion, Haritonu and Hariton), you are offered **Add name variant**; it is added only if you click it, and then search and matching treat the spellings as one name. A maiden or married name is not offered as a variant.
 - What makes a proposal: the names must sound alike and start alike (Ion, Ioan and Iohannes do; your name variants count), the birth years must be possible, and names are not enough on their own: there must also be a close date (a stated age or date), relatives that agree (for a parent in a baptism, the baptised child with a matching birth year), or someone they both stood beside. A woman is also looked for under her husband's surname. Someone named in a record after a person's death, or before their birth, is never proposed for them.
@@ -353,8 +374,7 @@ With the evidence layer on, the editor of a birth, death, event, role or group s
 
 ## Limits you should know about
 
-- **No way to add or delete a person by hand.** Use GEDCOM or bundle import, or create one from records in **Matches**.
-- **No way to edit parents and spouses in the app.** Relationships come from the sample, a Meridian bundle or a GEDCOM import.
+- **No way to delete a person.** People can be added (+ relative → Add new person, the family panel, Matches) but not deleted.
 - **Dates are years.** Days and months are not stored on the timeline.
 - **Context lanes are fixed** to the built-in Romanian sample; the other "Context source" options are placeholders.
 - **One browser, one device.** There is no sync. Move data with bundles.

@@ -17,7 +17,8 @@ export default function TranskribusSettings({ storage, client: clientProp = null
   useEffect(() => { getTranskribusSettings(storage).then(setS).catch((e) => setMsg(e.message)); }, [storage]);
   if (!s) return null;
   const client = clientProp ?? sessionClient(s.baseUrl || DEFAULT_BASE_URL);
-  const save = async (patch) => setS(await saveTranskribusSettings(storage, patch));
+  // save one field; keep whatever else is being typed (a reload from storage would wipe it)
+  const save = async (patch) => { await saveTranskribusSettings(storage, patch); setS((cur) => ({ ...cur, ...patch })); };
   const signIn = async () => {
     setBusy(true); setMsg("");
     try { await save({ username: s.username }); await client.signIn(s.username.trim(), password); setPassword(""); setMsg(`Signed in as ${s.username.trim()} for this browser session.`); }

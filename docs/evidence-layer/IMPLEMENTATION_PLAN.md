@@ -247,7 +247,7 @@ AI reading is a costly last resort; Transkribus (and similar HTR tools) are trai
 
 - **Local ingest companion (separate repo)** — only if Phase 5/6 show in-browser OCR, HTR or external APIs are impractical. A small local program (Java is fine) that watches the documents folder, runs Tesseract/Transkribus/Arcanum, and writes bundle-format `evidence.json` for Meridian to import. Requires a new ADR.
 - Arcanum Newspaper Segmentation processor (rotated coordinates → normalised boxes).
-- Julian → Gregorian conversion helpers.
+- ~~Julian → Gregorian conversion helpers.~~ Done 2026-11-19 (Phase 9 review follow-up).
 - Cyrillic and transitional-alphabet transliteration.
 - In-browser embeddings and semantic search.
 - Place gazetteer import (GeoNames/Wikidata) and historical administrative units.

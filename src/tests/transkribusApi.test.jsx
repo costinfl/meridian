@@ -119,6 +119,13 @@ describe("Read pages with Transkribus", () => {
     const client = createTranskribusClient({ fetchImpl: f.fetchImpl, now: f.now, sleep: f.sleep });
     render(<TranskribusSettings storage={storage} client={client} />);
     const pw = await screen.findByLabelText("Transkribus password");
+    // a user name being typed survives saving another field
+    fireEvent.change(screen.getByLabelText("Transkribus user name"), { target: { value: "ana2" } });
+    fireEvent.change(screen.getByLabelText("Transkribus model id"), { target: { value: "38230" } });
+    fireEvent.blur(screen.getByLabelText("Transkribus model id"));
+    await waitFor(async () => expect((await storage.getSetting("transkribus")).htrId).toBe("38230"));
+    expect(screen.getByLabelText("Transkribus user name").value).toBe("ana2");
+    fireEvent.change(screen.getByLabelText("Transkribus user name"), { target: { value: "ana" } });
     fireEvent.change(pw, { target: { value: "secret" } });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
     await waitFor(() => expect(screen.getByTestId("transkribus-status").textContent).toBe("Signed in as ana"));
