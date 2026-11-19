@@ -161,8 +161,11 @@ export function personProfiles({ people = [], families = [], links = [], persona
     // a married woman is written under her husband's surname in many records
     const spouseIds = spouses.get(p.id) ?? (p.spouseIds ?? []);
     // (the husband's, or else the children's when the husband is not in the tree)
+    // (a child's birth surname: a married daughter's maiden name in brackets, not her married name)
+    const birthSurname = (x) => { const sn = splitName(displayName(x)).surnames; return sn.length > 1 ? sn[sn.length - 1] : sn[0]; };
     const married = SEX_OF[p.sex] === "F"
-      ? [...spouseIds, ...(children.get(p.id) ?? [])].map((id) => byId.get(id)).filter(Boolean).flatMap((h) => splitName(displayName(h)).surnames.slice(0, 1))
+      ? [...spouseIds.map((id) => byId.get(id)).filter(Boolean).map((h) => splitName(displayName(h)).surnames[0]),
+         ...(children.get(p.id) ?? []).map((id) => byId.get(id)).filter(Boolean).map(birthSurname)].filter(Boolean)
       : [];
     const surnames = [...new Set([...n.surnames, ...alt.flatMap((a) => a.surnames), ...married])];
     const by = p.birth?.year, dy = p.death?.year;

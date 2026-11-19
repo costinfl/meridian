@@ -164,18 +164,43 @@ export function removeFromGroup(project, groupId, personaId, { decidedBy } = {})
  * `known`: the name variants already in the library. Returns [{ canonical, variant }].
  */
 export function variantSuggestions(personaName, personName, known = []) {
-  const fold = (s) => String(s ?? "").normalize("NFD").replace(/\p{M}+/gu, "").toLowerCase().replace(/[^\p{L}\s]+/gu, " ").trim();
-  const words = (s) => fold(String(s ?? "").replace(/\([^)]*\)/g, " ")).split(/\s+/).filter((w) => w.length >= 2);
+  const fold = (x) => String(x ?? "").normalize("NFD").replace(/\p{M}+/gu, "").toLowerCase().replace(/[^\p{L}]+/gu, "");
+  const words = (x) => String(x ?? "").replace(/\([^)]*\)/g, " ").trim().split(/\s+/).filter((w) => fold(w).length >= 2);
+  // the tree person's surnames: the last word and every name in brackets ("(b. Băltăceanu)": a maiden name)
+  const maiden = [...String(personName ?? "").matchAll(/\((?:b|n|născută|nascuta|née|nee)\.?\s+([^)]+)\)/gi)].flatMap((m) => words(m[1]));
   const a = words(personaName), b = words(personName);
   if (!a.length || !b.length) return [];
   const have = new Set(known.flatMap((v) => [`${fold(v.canonical)}|${fold(v.variant)}`, `${fold(v.variant)}|${fold(v.canonical)}`]));
   const out = [];
-  const consider = (x, y, cx, cy) => { if (x && y && x !== y && !have.has(`${x}|${y}`) && !out.some((o) => fold(o.canonical) === y && fold(o.variant) === x)) out.push({ canonical: cy, variant: cx }); };
-  const orig = (s) => String(s ?? "").replace(/\([^)]*\)/g, " ").trim().split(/\s+/).filter((w) => fold(w).length >= 2);
-  const oa = orig(personaName), ob = orig(personName);
-  consider(a[0], b[0], oa[0], ob[0]);                                                   // first given names
-  if (a.length > 1 && b.length > 1) consider(a[a.length - 1], b[b.length - 1], oa[oa.length - 1], ob[ob.length - 1]);   // surnames
+  const consider = (x, y) => {
+    const fx = fold(x), fy = fold(y);
+    if (!fx || !fy || fx === fy || have.has(`${fx}|${fy}`) || out.some((o) => fold(o.canonical) === fy && fold(o.variant) === fx)) return;
+    out.push({ canonical: y, variant: x });
+  };
+  consider(a[0], b[0]);                                                                 // first given names (Ion / Iohannes)
+  if (a.length > 1 && b.length > 1) {
+    // a surname spelled differently (Hariton / Haritonu), not a different surname (a maiden or married name)
+    const sur = a[a.length - 1];
+    const theirs = [b[b.length - 1], ...maiden];
+    if (!theirs.some((t) => fold(t) === fold(sur))) {
+      const close = theirs.find((t) => similar(fold(t), fold(sur)));
+      if (close) consider(sur, close);
+    }
+  }
   return out;
+}
+
+/** Close spellings: one starts with the other, or at most two letters differ (edit distance). */
+function similar(x, y) {
+  if (x.startsWith(y) || y.startsWith(x)) return Math.abs(x.length - y.length) <= 3;
+  if (Math.abs(x.length - y.length) > 2) return false;
+  let prev = Array.from({ length: y.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= x.length; i++) {
+    const cur = [i];
+    for (let j = 1; j <= y.length; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (x[i - 1] === y[j - 1] ? 0 : 1));
+    prev = cur;
+  }
+  return prev[y.length] <= 2;
 }
 
 /** The researcher's choice of weights and threshold for later runs (null = the standard ones). */

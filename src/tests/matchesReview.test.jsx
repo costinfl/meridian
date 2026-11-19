@@ -78,7 +78,9 @@ describe("Matches review logic (P9.T4)", () => {
     expect(variantSuggestions("Iohannes Hariton", "Ion Hariton", [])).toEqual([{ canonical: "Ion", variant: "Iohannes" }]);
     expect(variantSuggestions("Ioan Haritonu", "Ion Hariton", [{ canonical: "Ion", variant: "Ioan" }])).toEqual([{ canonical: "Hariton", variant: "Haritonu" }]);
     expect(variantSuggestions("Ion Hariton", "Ion Hariton", [])).toEqual([]);
-    expect(variantSuggestions("Elena Băltăceanu", "Elena Hariton (b. Băltăceanu)", [])).toEqual([{ canonical: "Hariton", variant: "Băltăceanu" }]);
+    expect(variantSuggestions("Elena Băltăceanu", "Elena Hariton (b. Băltăceanu)", [])).toEqual([]);        // her maiden name
+    expect(variantSuggestions("Elena Hariton", "Elena Băltăceanu", [])).toEqual([]);                          // another surname, not a spelling
+    expect(variantSuggestions("Elena Baltaceanul", "Elena Hariton (b. Băltăceanu)", [])).toEqual([{ canonical: "Băltăceanu", variant: "Baltaceanul" }]);
   });
 });
 

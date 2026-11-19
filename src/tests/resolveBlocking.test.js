@@ -60,6 +60,10 @@ describe("Entity resolution profiles and blocking (P9.T1)", () => {
     expect(q2.get("w")).toMatchObject({ birthFrom: "relatives" });
     expect([yearOf(q2.get("w").birth[0]), yearOf(q2.get("w").birth[1])]).toEqual([1800, 1835]);
     expect(q2.get("h").birth).toBeNull();
+    // a daughter's married name is not her mother's surname
+    const q3 = personProfiles({ people: [{ id: "m", name: "Elena Hariton (b. Băltăceanu)", sex: "F", birth: {} }, { id: "d", name: "Ana Ionescu (b. Hariton)", sex: "F", birth: { year: 1885 } }],
+      families: [{ id: "f", partner1Id: null, partner2Id: "m", children: [{ personId: "d" }], status: "accepted" }], links: [] });
+    expect(q3.get("m").surnames).toEqual(["hariton", "baltaceanu"]);
   });
 
   it("block keys extend one step through name variants; dates and places", () => {
