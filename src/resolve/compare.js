@@ -107,6 +107,23 @@ export function comparePlaces(p, q, placeAncestors = new Map()) {
 }
 
 const narrowWindow = (r) => !!r && (r[1] - r[0]) <= 5 * YEAR_DAYS;
+/**
+ * Occupation: the work named in the record (a witness's "plugar", "preot", "învățător") against the roles of the tree
+ * person. 1 when they share a word of 4 letters or more, else the best Jaro–Winkler between words; unknown when
+ * either side names none.
+ */
+export function compareOccupation(p, q) {
+  const words = (list) => [...new Set((list ?? []).flatMap((x) => String(x).toLowerCase().normalize("NFD").replace(/\p{M}+/gu, "").split(/[^\p{L}]+/u).filter((w) => w.length >= 4)))];
+  const a = words(p.occupations), b = words(q.occupations);
+  if (!a.length || !b.length) return null;
+  let best = 0;
+  for (const x of a) for (const y of b) best = Math.max(best, x === y ? 1 : jaroWinkler(x, y));
+  return Math.round(best * 1000) / 1000;
+}
+
+/** Roles whose value is in their details (age, place, work) rather than in relatives named in the record. */
+export const DETAIL_ROLES = new Set(["godparent", "witness", "informant"]);
+
 const MATCHING_RELATION = { father: ["father", "parent"], mother: ["mother", "parent"], parent: ["father", "mother", "parent"], spouse: ["spouse"], child: ["child"] };
 
 /** A profile's relatives as [{ relation, given, surnames, personId }], for a persona (from its record) or a person (from families). */
@@ -194,6 +211,8 @@ export function comparePair(p, q, ctx = {}) {
     signals: {
       given: compareGiven(p, q, ctx.variants), surname: compareSurname(p, q, ctx.variants), date: date.value, sex: sex.value,
       place: comparePlaces(p, q, ctx.placeAncestors), relatives: relatives.value, fan: fan.value,
+      occupation: compareOccupation(p, q),
+      detailRole: DETAIL_ROLES.has(p.role) || DETAIL_ROLES.has(q.role) ? 1 : 0,
       // how many relatives agree strongly (names of relatives are common: one alone corroborates little)
       relativesStrong: relatives.matches.filter((m) => m.value >= 0.9).length,
       relativesLinked: relatives.matches.some((m) => m.value === 1 && m.linked) ? 1 : 0,

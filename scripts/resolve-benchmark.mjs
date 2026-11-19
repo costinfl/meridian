@@ -21,7 +21,10 @@ const noisy = (given, sur) => {
 };
 // population: generations of couples
 const people = []; let pid = 0;
-const mk = (sex, sur, by, father = null, mother = null) => { const p = { id: "q" + pid++, sex, given: sex === "M" ? pick(GM) : pick(GF), sur, by, dy: by + 25 + Math.floor(rnd() * 55), father, mother, spouse: null, kids: [] }; people.push(p); return p; };
+const VILLAGES = ["Săhăteni","Ploiești","Mizil","Urlați","Vălenii de Munte","Buzău","Tohani","Gura Vadului","Ceptura","Fântânele","Pietroasele","Merei"];
+const WORK = ["plugar","preot","învățător","cârciumar","fierar","morar","negustor","primar","dascăl","cizmar","croitor","moașă"];
+const mk = (sex, sur, by, father = null, mother = null) => { const p = { id: "q" + pid++, sex, given: sex === "M" ? pick(GM) : pick(GF), sur, by, dy: by + 25 + Math.floor(rnd() * 55), father, mother, spouse: null, kids: [], village: father ? P0.get(father)?.village ?? pick(VILLAGES) : pick(VILLAGES), work: pick(WORK) }; people.push(p); P0.set(p.id, p); return p; };
+const P0 = new Map();
 let gen = [];
 for (let i = 0; i < 40 * SCALE; i++) { const h = mk("M", pick(SUR), 1760 + Math.floor(rnd() * 20)); const w = mk("F", pick(SUR), h.by + Math.floor(rnd() * 8)); h.spouse = w.id; w.spouse = h.id; gen.push([h, w]); }
 for (let g = 0; g < 4; g++) {
@@ -55,7 +58,9 @@ const record = (kind, year, ps) => {
     if (!person) continue;
     const [g, n] = noisy(person.given, opts.noSurname ? "" : opts.surname ?? person.sur);
     const id = `pa${aid++}`;
-    snap.personas.push({ id, recordId: r, nameAsWritten: `${g}${n ? " " + n : ""}`, role, statedAge: opts.age != null ? { value: opts.age, unit: "years", slack: 0, asWritten: "" } : null, createdAt: T });
+    const detail = (role === "godparent" || role === "witness") && rnd() < 0.5;
+    snap.personas.push({ id, recordId: r, nameAsWritten: `${g}${n ? " " + n : ""}`, role, statedAge: opts.age != null ? { value: opts.age, unit: "years", slack: 0, asWritten: "" } : null,
+      residence: detail && rnd() < 0.7 ? person.village : "", occupation: detail && rnd() < 0.6 ? person.work : "", createdAt: T });
     truth.set(id, person.id);
   }
 };
@@ -70,7 +75,8 @@ for (const p of people) {
 }
 // the tree: 60% of the population (the rest are people the researcher has not found)
 const inTree = new Set(people.filter(() => rnd() < 0.6).map((p) => p.id));
-const treePeople = people.filter((p) => inTree.has(p.id)).map((p) => ({ id: p.id, name: `${p.given} ${p.sur}`, sex: p.sex, birth: rnd() < 0.85 ? { year: p.by } : {}, death: p.dy < 1900 && rnd() < 0.6 ? { year: p.dy } : {} }));
+const treePeople = people.filter((p) => inTree.has(p.id)).map((p) => ({ id: p.id, name: `${p.given} ${p.sur}`, sex: p.sex, birth: rnd() < 0.85 ? { year: p.by, place: rnd() < 0.7 ? p.village : undefined } : {}, death: p.dy < 1900 && rnd() < 0.6 ? { year: p.dy } : {},
+  periods: rnd() < 0.5 ? [{ id: "w" + p.id, start: p.by + 20, end: Math.min(p.dy, p.by + 60), label: p.work }] : [] }));
 const families = [];
 for (const p of people) if (p.sex === "M" && p.spouse) {
   const a = inTree.has(p.id) ? p.id : null, b = inTree.has(p.spouse) ? p.spouse : null;
@@ -126,6 +132,13 @@ if (process.env.MISS) {
     add(pa.role + ":low" + (sc === 0.65 ? ":uncorroborated" : ""));
   }
   console.log(JSON.stringify(Object.fromEntries(Object.entries(why).sort((x, y) => y[1] - x[1]))));
+}
+{
+  const roleOf = new Map(snap.personas.map((x) => [x.id, x.role]));
+  const per = {};
+  for (const pa of snap.personas) { const role = roleOf.get(pa.id); if (role !== "godparent" && role !== "witness") continue; const t = truth.get(pa.id); if (!inTree.has(t)) continue;
+    per[role] ??= [0, 0, 0]; per[role][0]++; const b = best.get(pa.id); if (b) { if (b.personId === t) per[role][1]++; else per[role][2]++; } }
+  console.log("godparents/witnesses in the tree: [n, right best, wrong best]", JSON.stringify(per));
 }
 // groups: are grouped personas the same person?
 let gPairs = 0, gGood = 0;

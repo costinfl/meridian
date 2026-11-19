@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { compareOccupation } from "../resolve/compare.js";
+import { scorePair } from "../resolve/score.js";
 import { jaroWinkler, nameSimilarity, compareGiven, compareSurname, compareDates, compareSex, comparePlaces, compareRelatives, compareFan, comparePair } from "../resolve/compare.js";
 import { variantKeys } from "../resolve/blocking.js";
 import { personaProfiles, personProfiles } from "../resolve/profiles.js";
@@ -91,5 +93,34 @@ describe("Comparators (P9.T2)", () => {
     expect(bad.veto).toBe("different sex");
     const dead = comparePair(pp.get(fx.personas["d1890.informant"].id), { ...persons.get("t3"), death: [toJdn(1880, 1, 1), toJdn(1880, 12, 31)] }, ctx);
     expect(dead.veto).toBe("named alive after the death");
+  });
+});
+
+describe("Godparents and witnesses: one agreeing detail (Phase 9 review)", () => {
+  it("occupation: shared word, close spelling, unknown when missing", () => {
+    expect(compareOccupation({ occupations: ["plugar"] }, { occupations: ["Plugar în Săhăteni"] })).toBe(1);
+    expect(compareOccupation({ occupations: ["învățător"] }, { occupations: ["Invatator"] })).toBe(1);
+    expect(compareOccupation({ occupations: ["preot"] }, { occupations: ["Primar"] })).toBeLessThan(0.85);
+    expect(compareOccupation({ occupations: [] }, { occupations: ["Primar"] })).toBeNull();
+  });
+
+  const pair = (persona, person) => scorePair(comparePair(persona, person, { persons: new Map(), personas: new Map(), acceptedPersonOf: new Map() }));
+  const godmother = (extra = {}) => ({ id: "g", recordId: "r", role: "godparent", given: ["ana"], surnames: ["popescu"], tokens: ["ana", "popescu"], sex: null,
+    birth: [toJdn(1760, 1, 1), toJdn(1836, 12, 31)], death: null, alive: yr(1850), places: [], occupations: [], relatives: [], others: [], ...extra });
+  const ana = (extra = {}) => ({ id: "t", given: ["ana"], surnames: ["popescu"], tokens: ["ana", "popescu"], sex: "F", birth: yr(1820), death: null,
+    places: ["Craiova"], occupations: [], parents: [], spouses: [], children: [], linkedPersonaIds: [], ...extra });
+
+  it("a godparent with names alone is not proposed; with the same place, or the same work, it is", () => {
+    expect(pair(godmother(), ana())).toBeLessThan(0.8);
+    expect(pair(godmother({ places: ["Craiova"] }), ana())).toBeGreaterThanOrEqual(0.8);
+    expect(pair(godmother({ occupations: ["moașă"] }), ana({ occupations: ["Moașă comunală"] }))).toBeGreaterThanOrEqual(0.8);
+    expect(pair(godmother({ places: ["Ploiești"] }), ana())).toBeLessThan(0.8);            // a different place does not help
+  });
+
+  it("a witness with an agreeing stated age is proposed; the same place does not lift other roles", () => {
+    const witness = godmother({ role: "witness", birth: [toJdn(1819, 6, 1), toJdn(1821, 6, 1)], alive: yr(1868) });
+    expect(pair(witness, ana())).toBeGreaterThanOrEqual(0.8);
+    const father = godmother({ role: "father", places: ["Craiova"] });
+    expect(pair(father, ana({ sex: null }))).toBeLessThan(0.8);
   });
 });

@@ -23,7 +23,7 @@ const mini = { ...btnStyle(false), padding: "2px 8px", fontSize: 11 };
 const primary = { ...btnStyle(true), padding: "2px 8px", fontSize: 11 };
 const input = { font: "500 12px Archivo, sans-serif", color: C.ink, background: "#fff", border: `1px solid ${C.rule}`, borderRadius: 3, padding: "2px 6px" };
 const card = { border: `1px solid ${C.rule}`, borderRadius: 3, background: "#fff", padding: 8, marginBottom: 8 };
-const SIGNAL_LABELS = { given: "given name", surname: "surname", date: "dates", sex: "sex", place: "place", relatives: "relatives", fan: "people around" };
+const SIGNAL_LABELS = { given: "given name", surname: "surname", date: "dates", sex: "sex", place: "place", occupation: "work", relatives: "relatives", fan: "people around" };
 const BANDS = [["", "any score"], ["0.9", "0.90 and up"], ["0.8", "0.80–0.90"], ["0.7", "0.70–0.80"]];
 const inBand = (s, b) => !b || (b === "0.9" ? s >= 0.9 : b === "0.8" ? s >= 0.8 && s < 0.9 : s < 0.8);
 const yearOf = (day) => Math.round(1 + (day - 1721426) / YEAR_DAYS);

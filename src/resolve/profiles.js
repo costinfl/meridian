@@ -83,9 +83,10 @@ export function personaProfiles(snapshot) {
       if (!death && p.role === "deceased" && e0 != null) death = rec.kind === "burial" ? [e0 - 30, e1] : [e0 - 3, e1];
       const alive = p.role !== "deceased" && e0 != null ? [e0, e1] : null;      // named as present: alive at the event
       const places = [part.record.placeText, pick("residence")?.originalValue, p.residence, pick("birth.place")?.originalValue].filter(Boolean);
+      const occupation = pick("occupation")?.originalValue || p.occupation || "";
       const n = splitName(name);
       base.set(p.id, {
-        id: p.id, recordId: rec.id, kind: rec.kind, role: p.role, nameAsWritten: p.nameAsWritten, name,
+        id: p.id, recordId: rec.id, kind: rec.kind, role: p.role, nameAsWritten: p.nameAsWritten, name, occupations: occupation ? [occupation] : [],
         given: n.given, surnames: n.surnames, tokens: n.tokens, sex, birth, death, alive,
         placeId: rec.placeId ?? null, places, usesProposed: proposed, relatives: [], others: personas.filter((x) => x.id !== p.id).map((x) => x.id),
         _as: as,
@@ -175,6 +176,7 @@ export function personProfiles({ people = [], families = [], links = [], persona
     out.set(p.id, {
       id: p.id, name, given, surnames, tokens, sex: SEX_OF[p.sex] ?? null, birth, death, birthFrom,
       places: [p.birth?.place, p.death?.place].filter(Boolean),
+      occupations: (p.periods ?? []).map((r) => r.label).filter(Boolean),
       parents: parents.get(p.id) ?? [p.fatherId, p.motherId].filter((x) => x && byId.has(x)),
       spouses: spouses.get(p.id) ?? (p.spouseIds ?? []).filter((x) => byId.has(x)),
       children: children.get(p.id) ?? [],
