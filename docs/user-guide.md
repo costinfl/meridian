@@ -333,15 +333,28 @@ The search index lives in this browser. It is brought up to date each time you o
 
 Nothing on this page is saved: it is worked out from your records and tree each time it opens and kept up to date while it is open.
 
+### Matches: who in the records is who in your tree
+
+**Matches** (on the Evidence page, when the project has people) proposes which person named in a record is which person of your tree, and which people named in several records look like one person who is not in your tree yet. It runs on this device, without AI and at no cost.
+
+- **Find matches** compares what changed since the last time (new or edited records, people you added or edited). **Recheck everything** compares all again. The line next to the buttons says how many pairs were compared and what was proposed.
+- Each proposal shows the record side (a crop of the entry, the name as written, the role, the date, the birth years it implies, the relatives named) next to the person of your tree (years, places, parents, spouse), with a score and what it rests on: given name, surname, dates, sex, place, relatives (e.g. *father Dumitru Hariton ↔ Dumitru Hariton*), people around them. **Based on proposed values** means it uses values the AI read that you have not confirmed yet.
+- **Accept** links the record person to the tree person (other proposals for the same record person are then rejected: they are one person). **Reject**: it is never proposed again. **Someone else…** links them to the person you choose instead. **Create new person** adds a person to your tree from the record (name, sex, a birth year only when the record states an age or date, a death year from a death record).
+- **Same person in several records**: **Create new person from these**, **Link all to…** a person of your tree, **Not the same** (never grouped again), or **Not this one** for one of the records.
+- When an accepted record spells a name differently from your tree (Iohannes and Ion, Haritonu and Hariton), you are offered **Add name variant**; it is added only if you click it, and then search and matching treat the spellings as one name. A maiden or married name is not offered as a variant.
+- What makes a proposal: the names must sound alike and start alike (Ion, Ioan and Iohannes do; your name variants count), the birth years must be possible, and names are not enough on their own: there must also be a close date (a stated age or date), relatives that agree (for a parent in a baptism, the baptised child with a matching birth year), or someone they both stood beside. A woman is also looked for under her husband's surname. Someone named in a record after a person's death, or before their birth, is never proposed for them.
+- **How good are the proposals?** shows, from your own decisions, how many proposals you accepted in each score band and which signals told right from wrong. After 20 decisions it suggests weights and a score from which to propose; **Use these weights** applies them to later runs (**Back to the standard weights** undoes it).
+
+People created here are added to your tree; add them to the timeline with **+ relative**. Nothing is linked unless you decide it.
+
 ### Evidence on the timeline
 
 With the evidence layer on, the editor of a birth, death, event, role or group shows an **Evidence** section: the evidence attached to that fact, where it was read, and a crop of the page. In research mode, **Attach evidence…** searches confirmed values by a person's name as written (for example "Loti") and attaches the one that supports the fact. Attaching does not change the fact itself.
 
 ## Limits you should know about
 
-- **No way to add or delete a person in the app.** Use GEDCOM or bundle import.
-- **No way to edit parents and spouses in the app.** Relationships come from the sample or a Meridian bundle.
-- **GEDCOM import ignores family links.**
+- **No way to add or delete a person by hand.** Use GEDCOM or bundle import, or create one from records in **Matches**.
+- **No way to edit parents and spouses in the app.** Relationships come from the sample, a Meridian bundle or a GEDCOM import.
 - **Dates are years.** Days and months are not stored on the timeline.
 - **Context lanes are fixed** to the built-in Romanian sample; the other "Context source" options are placeholders.
 - **One browser, one device.** There is no sync. Move data with bundles.
