@@ -41,7 +41,7 @@ describe("Evidence page", () => {
     await waitFor(() => expect(screen.getByTestId("evidence-page")).toBeInTheDocument());
     expect(window.location.hash).toBe("#evidence");
     expect(screen.queryByText(/scroll · zoom/)).toBeNull();                         // the timeline board is not shown
-    expect(screen.getByRole("navigation", { name: "Evidence sections" }).textContent).toMatch(/Documents.*AI settings/);
+    expect(screen.getByRole("navigation", { name: "Evidence sections" }).textContent).toMatch(/Documents.*Settings & tools/);
     fireEvent.click(screen.getByRole("button", { name: "← Timeline" }));
     await waitFor(() => expect(screen.queryByTestId("evidence-page")).toBeNull());
     expect(window.location.hash).toBe("");

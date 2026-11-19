@@ -1,5 +1,6 @@
 import React from "react";
 import { C, btnStyle } from "../../theme.js";
+import { otherCalendarNote } from "../../evidence/domain/calendar.js";
 
 // Records on this page (P6.T2 listing, P6.T4 review): one card per record with its people and every claim.
 
@@ -45,6 +46,7 @@ export default function RecordsTab({ items, selectedRegionId, onSelectRegion, re
             <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" }}>
               <span style={{ font: "700 12.5px Archivo, sans-serif", color: C.ink }}>
                 {item.record.kind}{ev ? ` · ${ev.earliest === ev.latest ? ev.earliest : `${ev.earliest ?? "…"} – ${ev.latest ?? "…"}`} (${ev.calendar})` : ""}
+                {otherCalendarNote(ev) && <span style={{ font: "400 11px Archivo, sans-serif", color: C.inkSoft }}> = {otherCalendarNote(ev)}</span>}
               </span>
               <span style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <span style={mono}>{item.counts.proposed} proposed · {item.counts.confirmed} confirmed{item.counts.rejected ? ` · ${item.counts.rejected} rejected` : ""}</span>

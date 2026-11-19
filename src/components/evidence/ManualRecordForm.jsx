@@ -2,6 +2,7 @@ import React, { useMemo, useState } from "react";
 import { C, btnStyle } from "../../theme.js";
 import { RECORD_KINDS, ROLES } from "../../evidence/repositories/recordStore.js";
 import { suggestRelations, saveManualRecord } from "../../evidence/index.js";
+import { CalendarLine } from "./DateConverter.jsx";
 
 // Manual record entry (P6.T2): what the researcher reads in the selected region, typed as written.
 // Saving confirms every claim (the researcher states it); the record cites the region.
@@ -62,6 +63,7 @@ export default function ManualRecordForm({ library, regionId, regionLabel, onSav
           <option value="">calendar: automatic</option><option value="julian">Julian</option><option value="gregorian">Gregorian</option>
         </select>
       </div>
+      <CalendarLine year={date.year} month={date.month} day={date.day} calendar={date.calendar} />
 
       <div style={{ font: "600 11.5px Archivo, sans-serif", color: C.ink, marginTop: 4 }}>People</div>
       {people.map((p, i) => (

@@ -1,6 +1,7 @@
 import Ajv from "ajv";
 import schema from "./extraction-v1.schema.json";
 import { fuzzyDate } from "../domain/fuzzyDate.js";
+import { likelyCalendar } from "../domain/calendar.js";
 
 // Extraction contract v1 (P6.T1): what an extractor returns for one page or region, how it is checked, and how
 // a valid result becomes store inputs (a record, its personas, and proposed assertions). Pure: nothing is stored here.
@@ -12,7 +13,7 @@ export const EXTRACTION_SCHEMA = schema;
  * Calendar of a date that does not state one. Romania used the Julian calendar for civil and church records
  * until 1919 (the Gregorian calendar was adopted on 1 April 1919), so older dates default to Julian.
  */
-export const defaultCalendar = (year) => (year < 1919 ? "julian" : "gregorian");
+export const defaultCalendar = (year, month = null, day = null) => likelyCalendar(year, month, day);
 export const MIN_YEAR = 1000;
 
 let compiled = null;
@@ -31,7 +32,7 @@ function checkDate(d, where, errors, maxYear) {
   if (d.year < MIN_YEAR || d.year > maxYear) errors.push(`${where}: year ${d.year} is not plausible`);
   if (d.day != null && d.month == null) errors.push(`${where}: day without a month`);
   if (d.year >= MIN_YEAR && d.year <= maxYear) {
-    try { fuzzyDate({ year: d.year, month: d.month ?? null, day: d.day ?? null, calendar: d.calendar ?? defaultCalendar(d.year), modifier: d.modifier ?? null }); }
+    try { fuzzyDate({ year: d.year, month: d.month ?? null, day: d.day ?? null, calendar: d.calendar ?? defaultCalendar(d.year, d.month ?? null, d.day ?? null), modifier: d.modifier ?? null }); }
     catch (e) { errors.push(`${where}: ${e.message}`); }
   }
 }
@@ -67,7 +68,7 @@ export function validateExtraction(output, { maxYear = new Date().getFullYear() 
 
 const toFuzzy = (d) => fuzzyDate({
   asWritten: d.asWritten, year: d.year, month: d.month ?? null, day: d.day ?? null,
-  calendar: d.calendar ?? defaultCalendar(d.year), modifier: d.modifier ?? null,
+  calendar: d.calendar ?? defaultCalendar(d.year, d.month ?? null, d.day ?? null), modifier: d.modifier ?? null,
 });
 const text = (s) => (typeof s === "string" ? s.trim() : "");
 

@@ -18,7 +18,7 @@ export function normalizedCorrection(property, { asWritten = "", year, month, da
   if (DATE_PROPERTIES.has(property)) {
     const y = int(year);
     if (!Number.isInteger(y)) throw invalid("a corrected date needs at least the year");
-    return fuzzyDate({ asWritten, year: y, month: int(month), day: int(day), calendar: calendar || defaultCalendar(y) });
+    return fuzzyDate({ asWritten, year: y, month: int(month), day: int(day), calendar: calendar || defaultCalendar(y, int(month), int(day)) });
   }
   if (property === "age") {
     const n = int(value);
