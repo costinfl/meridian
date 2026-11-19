@@ -136,3 +136,47 @@ describe("Matches section (P9.T4)", () => {
     await waitFor(() => expect(screen.getByTestId("matches-status").textContent).toMatch(/· 0 proposed/));
   });
 });
+
+describe("Undo an accepted link (Phase 9 review)", () => {
+  it("Unlink rejects it and restores the candidates rejected only because of it; Back to waiting reopens it", async () => {
+    const { fx, project, id } = await setup();
+    const { addLink } = await import("../conclusions/personaLinks.js");
+    const { unlinkMatch, acceptedLinks } = await import("../conclusions/matching.js");
+    let p = (await runMatching({ library: fx.library, project })).apply(project).project;
+    // a second candidate for the 1850 child, then accept the first: the second is rejected as "another person accepted"
+    p = addLink(p, { personId: "t6", personaId: id("b1850.child"), method: "manual" }).project;
+    const first = currentLinks(p).find((l) => l.personaId === id("b1850.child") && l.personId === "t3");
+    p = acceptMatch(p, first.id, { decidedBy: "me" }).project;
+    expect(statusOf(p, id("b1850.child"))).toEqual(["t3:accepted", "t6:rejected"]);
+    const accepted = acceptedLinks(p)[0];
+    expect(accepted.personaId).toBe(id("b1850.child"));
+    // unlink (wrong): t3 rejected for good, t6 back to waiting
+    const u = unlinkMatch(p, accepted.id, { decidedBy: "me" });
+    expect(u.reopened).toBe(1);
+    expect(statusOf(u.project, id("b1850.child"))).toEqual(["t3:rejected", "t6:candidate"]);
+    const again = await runMatching({ library: fx.library, project: u.project, full: true });
+    expect(again.result.proposals.some((x) => x.personaId === id("b1850.child") && x.personId === "t3")).toBe(false);
+    // history kept: every decision is a new link
+    expect(u.project.personaLinks.length).toBeGreaterThan(p.personaLinks.length);
+    // back to waiting instead
+    const w = unlinkMatch(p, accepted.id, { decidedBy: "me", wrong: false });
+    expect(statusOf(w.project, id("b1850.child"))).toEqual(["t3:candidate", "t6:candidate"]);
+    expect(() => unlinkMatch(w.project, accepted.id, { decidedBy: "me" })).toThrow(/No accepted link/);
+    expect(() => unlinkMatch(p, accepted.id, {})).toThrow(/decidedBy/);
+  });
+
+  it("the Linked list in Matches unlinks", async () => {
+    const { fx, project } = await setup();
+    render(<Harness library={fx.library} initial={project} />);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Find matches" }).disabled).toBe(false));
+    fireEvent.click(screen.getByRole("button", { name: "Find matches" }));
+    await waitFor(() => expect(screen.getAllByTestId("match-candidate")).toHaveLength(11));
+    fireEvent.click(within(screen.getAllByTestId("match-candidate")[0]).getByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(screen.getAllByTestId("match-candidate")).toHaveLength(10));
+    const list = screen.getByTestId("linked-list");
+    expect(list.querySelector("summary").textContent).toMatch(/\(1\)/);
+    fireEvent.click(within(list).getByRole("button", { name: "Back to waiting" }));
+    await waitFor(() => expect(screen.getAllByTestId("match-candidate")).toHaveLength(11));
+    expect(screen.getByTestId("linked-list").querySelector("summary").textContent).toMatch(/\(0\)/);
+  });
+});

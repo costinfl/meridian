@@ -60,6 +60,23 @@ export function decideLink(project, linkId, status, { decidedBy, rationale } = {
   return { project: next, link };
 }
 
+/**
+ * USER ACTION: put a decided link back to waiting (a new `candidate` link superseding it), e.g. to undo an accept the
+ * researcher is no longer sure of, or to reopen a pair rejected only because another person was accepted.
+ */
+export function reopenLink(project, linkId, { decidedBy, rationale } = {}) {
+  if (!decidedBy || !String(decidedBy).trim()) throw new Error("decidedBy is required");
+  const current = currentLinks(project).find((l) => l.id === linkId);
+  if (!current) throw new Error(`No current link ${linkId} (unknown or already superseded)`);
+  if (current.status === "candidate") return { project, link: current };
+  const link = { ...current, id: crypto.randomUUID(), status: "candidate", rationale: rationale ?? current.rationale, decidedBy: null, decidedAt: null, reopenedBy: String(decidedBy).trim(), supersedesId: current.id, createdAt: isoNow() };
+  let next = { ...project, personaLinks: [...own(project), link] };
+  if (current.status === "accepted") {
+    next = { ...next, people: (next.people ?? []).map((p) => (p.id === current.personId && p.displayNameChoice?.personaId === current.personaId ? { ...p, displayNameChoice: null } : p)) };
+  }
+  return { project: next, link };
+}
+
 /** Personas accepted for a person, earliest decision first (this order defines the "first name identified"). */
 export function acceptedLinksInOrder(project, personId) {
   return linksOfPerson(project, personId)

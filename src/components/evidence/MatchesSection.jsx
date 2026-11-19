@@ -6,7 +6,7 @@ import { createResolveClient, runMatching } from "../../workers/resolveClient.js
 import { currentLinks } from "../../conclusions/personaLinks.js";
 import {
   waitingMatches, openGroups, matchingState, acceptMatch, rejectMatch, linkMatchTo, createPersonFromPersonas,
-  linkGroupTo, dismissGroup, removeFromGroup, variantSuggestions, setMatchingWeights,
+  linkGroupTo, dismissGroup, removeFromGroup, variantSuggestions, setMatchingWeights, unlinkMatch, acceptedLinks,
 } from "../../conclusions/matching.js";
 import { calibrationReport, MIN_DECISIONS } from "../../resolve/calibration.js";
 import { DEFAULT_WEIGHTS, DEFAULT_THRESHOLD } from "../../resolve/score.js";
@@ -122,6 +122,8 @@ export default function MatchesSection({ library, project, onProjectChange, onOp
   const [error, setError] = useState("");
   const [filter, setFilter] = useState({ personId: "", band: "" });
   const [suggest, setSuggest] = useState([]);           // name variant suggestions after accepts
+  const [linkedFilter, setLinkedFilter] = useState("");
+  const [linkedShown, setLinkedShown] = useState(20);
   const clientRef = useRef(null);
   useEffect(() => () => { clientRef.current?.close(); clientRef.current = null; }, []);
 
@@ -143,6 +145,9 @@ export default function MatchesSection({ library, project, onProjectChange, onOp
   const waiting = useMemo(() => (project ? waitingMatches(currentLinks(project)) : []).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)), [project]);
   const shown = waiting.filter((l) => (!filter.personId || l.personId === filter.personId) && inBand(l.score ?? 0, filter.band));
   const groups = openGroups(project);
+  const linked = useMemo(() => (project ? acceptedLinks(project) : []), [project]);
+  const linkedList = linked.filter((l) => !linkedFilter || l.personId === linkedFilter);
+  const METHOD = { "entity-resolution": "from Matches", manual: "by hand", "legacy-import": "from a legacy fact" };
   const last = matchingState(project)?.lastRun;
 
   const find = async (full) => {
@@ -237,6 +242,38 @@ export default function MatchesSection({ library, project, onProjectChange, onOp
           );
         })}
       </ul>
+
+      <details data-testid="linked-list" style={{ margin: "10px 0 4px" }}>
+        <summary style={{ font: "700 12px Archivo, sans-serif", color: C.ink, cursor: "pointer" }}>Linked to people of your tree ({linked.length})</summary>
+        <div style={{ ...small, margin: "4px 0" }}>
+          Every record person you linked, newest first. <strong>Unlink</strong> if a link was wrong (it will not be proposed again);
+          <strong> Back to waiting</strong> if you are no longer sure. Proposals rejected only because of that link come back.
+        </div>
+        {linked.length > 0 && (
+          <label style={{ ...small, display: "block", marginBottom: 6 }}>Person <select aria-label="Linked person" value={linkedFilter} onChange={(e) => { setLinkedFilter(e.target.value); setLinkedShown(20); }} style={input}>
+            <option value="">anyone</option>{people.filter((p) => linked.some((l) => l.personId === p.id)).map((p) => <option key={p.id} value={p.id}>{displayName(p)}</option>)}
+          </select></label>
+        )}
+        <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+          {linkedList.slice(0, linkedShown).map((l) => {
+            const prof = profiles.get(l.personaId), rec = prof ? records.byId.get(prof.recordId) : null;
+            return (
+              <li key={l.id} data-testid="linked-item" style={card}>
+                <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "flex-start" }}>
+                  <PersonaSide library={library} prof={prof} rec={rec} box={prof ? records.boxOf(l.personaId, rec) : null} onOpen={onOpen} />
+                  <div style={{ ...small, alignSelf: "center" }}>linked {METHOD[l.method] ?? l.method}{l.decidedAt ? ` · ${new Date(l.decidedAt).toLocaleDateString()}` : ""} →</div>
+                  <PersonSide person={byId[l.personId]} byId={byId} />
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+                  <button style={mini} onClick={() => decide((p) => unlinkMatch(p, l.id, { decidedBy: DECIDED_BY }), "Unlinked; this pair will not be proposed again.")}>Unlink (wrong)</button>
+                  <button style={mini} onClick={() => decide((p) => unlinkMatch(p, l.id, { decidedBy: DECIDED_BY, wrong: false }), "Back to waiting.")}>Back to waiting</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+        {linkedList.length > linkedShown && <button style={mini} onClick={() => setLinkedShown((n) => n + 50)}>Show more ({linkedList.length - linkedShown})</button>}
+      </details>
 
       <div style={{ font: "700 12px Archivo, sans-serif", color: C.ink, margin: "10px 0 4px" }}>Same person in several records, not in your tree ({groups.length})</div>
       {!groups.length && <div style={small}>No groups.</div>}

@@ -9,7 +9,7 @@
  *   project.matchDismissed: ["personaA|personaB"]   pairs you said are not the same person
  *   project.settings.matching: { mark, prints, lastRun: { runId, at, scope, counts } , weights?, threshold? }
  */
-import { addLink, currentLinkFor, currentLinks, decideLink } from "./personaLinks.js";
+import { addLink, currentLinkFor, currentLinks, decideLink, reopenLink } from "./personaLinks.js";
 
 export const MATCH_METHOD = "entity-resolution";
 const isoNow = () => new Date().toISOString();
@@ -55,6 +55,8 @@ export const openGroups = (project) => (project?.matchGroups ?? []).filter((g) =
 
 const need = (decidedBy) => { if (!decidedBy || !String(decidedBy).trim()) throw new Error("decidedBy is required"); };
 
+export const ANOTHER_ACCEPTED = "Another person was accepted for this record";
+
 /** Reject every other waiting candidate of the persona (a persona is one person), keeping `exceptLinkId`. */
 function rejectOthers(project, personaId, exceptLinkId, decidedBy, rationale) {
   let next = project;
@@ -70,7 +72,7 @@ export function acceptMatch(project, linkId, { decidedBy } = {}) {
   const link = currentLinks(project).find((l) => l.id === linkId);
   if (!link) throw new Error(`No current link ${linkId}`);
   const next = decideLink(project, linkId, "accepted", { decidedBy }).project;
-  return { project: rejectOthers(next, link.personaId, null, decidedBy, "Another person was accepted for this record") };
+  return { project: rejectOthers(next, link.personaId, null, decidedBy, ANOTHER_ACCEPTED) };
 }
 
 /** USER ACTION: reject a proposed match (it is never proposed again). */
@@ -91,7 +93,7 @@ function acceptPair(project, personId, personaId, decidedBy, rationale) {
     link = currentLinkFor(next, personId, personaId);
   }
   next = decideLink(next, link.id, "accepted", { decidedBy, rationale }).project;
-  return rejectOthers(next, personaId, null, decidedBy, "Another person was accepted for this record");
+  return rejectOthers(next, personaId, null, decidedBy, ANOTHER_ACCEPTED);
 }
 
 /** USER ACTION: the proposal is wrong, the persona is someone else: reject it and link the persona to `personId`. */
@@ -210,3 +212,26 @@ export function setMatchingWeights(project, choice) {
   else { delete matching.weights; delete matching.threshold; }
   return { ...project, settings: { ...(project.settings ?? {}), matching } };
 }
+
+/**
+ * USER ACTION: undo an accepted link. `wrong` (default): it becomes rejected and is never proposed again; otherwise it
+ * goes back to waiting. Either way, the record person's candidates that were rejected only because this link was
+ * accepted go back to waiting. Returns { project, reopened } (the number of candidates restored).
+ */
+export function unlinkMatch(project, linkId, { decidedBy, wrong = true } = {}) {
+  need(decidedBy);
+  const link = currentLinks(project).find((l) => l.id === linkId);
+  if (!link || link.status !== "accepted") throw new Error(`No accepted link ${linkId}`);
+  let next = wrong
+    ? decideLink(project, linkId, "rejected", { decidedBy, rationale: "Unlinked: not this person" }).project
+    : reopenLink(project, linkId, { decidedBy, rationale: "Back to waiting" }).project;
+  let reopened = 0;
+  for (const l of currentLinks(next).filter((x) => x.personaId === link.personaId && x.status === "rejected" && x.rationale === ANOTHER_ACCEPTED && (x.decidedAt ?? "") >= (link.decidedAt ?? ""))) {
+    next = reopenLink(next, l.id, { decidedBy, rationale: "Reopened: the accepted link was undone" }).project;
+    reopened++;
+  }
+  return { project: next, reopened };
+}
+
+/** Accepted links (any method), newest decision first. */
+export const acceptedLinks = (project) => currentLinks(project).filter((l) => l.status === "accepted").sort((a, b) => ((b.decidedAt ?? "") < (a.decidedAt ?? "") ? -1 : (b.decidedAt ?? "") > (a.decidedAt ?? "") ? 1 : 0));
