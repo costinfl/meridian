@@ -63,18 +63,18 @@ export const displayName = (person) => person?.displayNameChoice?.name || person
    Every timeline item carries a stable `id` so it can be edited/deleted, plus
    optional `color`, `note`, and `sourceId` (a reference into project.sources). */
 
-export function createEvent({ year, label = "", type = "note", note = "", color = null, sourceId = null, verified = false } = {}) {
-  return { id: crypto.randomUUID(), year, label, type, note, color, sourceId, verified };
+export function createEvent({ year, label = "", type = "note", note = "", color = null, sourceId = null, verified = false, place = "" } = {}) {
+  return { id: crypto.randomUUID(), year, label, type, note, color, sourceId, verified, ...(place ? { place } : {}) };
 }
 
 // Role / occupation bar (person.periods) — e.g. "Mayor of Ploiești".
-export function createPeriod({ start, end, label = "", note = "", color = null, sourceId = null, verified = false } = {}) {
-  return { id: crypto.randomUUID(), start, end, label, note, color, sourceId, verified };
+export function createPeriod({ start, end, label = "", note = "", color = null, sourceId = null, verified = false, place = "" } = {}) {
+  return { id: crypto.randomUUID(), start, end, label, note, color, sourceId, verified, ...(place ? { place } : {}) };
 }
 
 // Event-group band (person.groups) — e.g. "Communist regime", "Săhăteni estate".
-export function createGroup({ start, end, label = "", note = "", color = null, sourceId = null, verified = false } = {}) {
-  return { id: crypto.randomUUID(), start, end, label, note, color, sourceId, verified };
+export function createGroup({ start, end, label = "", note = "", color = null, sourceId = null, verified = false, place = "" } = {}) {
+  return { id: crypto.randomUUID(), start, end, label, note, color, sourceId, verified, ...(place ? { place } : {}) };
 }
 
 // Accolade bracket (project.annotations) — spans a lane, not tied to a group/events.

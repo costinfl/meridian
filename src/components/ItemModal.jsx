@@ -46,8 +46,11 @@ function initForm(kind, item) {
     color: item?.color ?? null,
     sourceId: item?.sourceId ?? "",
     verified: !!item?.verified,
+    place: item?.place ?? "",
   };
 }
+
+const PLACED = new Set(["event", "period", "group"]);   // items that can say where they happened (context lanes)
 
 /* Read + open a source attachment (blob) as a temporary object URL. */
 function SourceView({ source, storage }) {
@@ -111,6 +114,7 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
     }
     const values = { [meta2.titleField]: form.title.trim(), note: form.note.trim() || "", color: form.color, sourceId: form.sourceId || null };
     if (meta2.hasType) values.type = form.type;
+    if (PLACED.has(kind)) values.place = form.place.trim();
     if (VERIFIABLE.has(kind)) values.verified = form.verified;
     if (meta2.point) {
       values.year = num(form.year);
@@ -192,6 +196,13 @@ export function ItemModal({ descriptor, sources = [], storage, onSave, onDelete,
 
       <label style={labelStyle}>{meta.fact ? "Place" : meta.titleField === "title" ? "Title" : "Label"}{kind === "media" ? " (optional)" : ""}</label>
       <input autoFocus value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder={meta.fact ? "Place" : meta.label} style={fieldStyle} />
+
+      {PLACED.has(kind) && (
+        <>
+          <label style={labelStyle}>Place (optional)</label>
+          <input aria-label="Place" value={form.place} onChange={(e) => set({ place: e.target.value })} placeholder="where it happened, e.g. București" style={fieldStyle} />
+        </>
+      )}
 
       {meta.point ? (
         <>
