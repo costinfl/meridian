@@ -1,8 +1,8 @@
-import React, { useState, useRef, useEffect, useMemo, Suspense, lazy } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback, Suspense, lazy } from "react";
 import { C, hexA, clamp, btnStyle, EVENT_TYPES, eventType, verifiedTick, verifiedBorderStyle, verifiedMarker, VERIFIED_MARK } from "./theme.js";
 import { SAMPLE_PEOPLE, SAMPLE_ANNOTATIONS, SAMPLE_ERAS, CONTEXT_LANES } from "./sampleData.js";
 import { createEvent, createPeriod, createGroup, createAnnotation, createEra, createMediaPin, displayName } from "./models/project.js";
-import { exportGedcom, parseGedcom } from "./gedcom.js";
+import { exportGedcom, parseGedcom, mergeGedcomImport } from "./gedcom.js";
 import { exportProjectZip, importProjectBundle } from "./share.js";
 import { storage } from "./storage/StorageService.js";
 import { useProject } from "./hooks/useProject.js";
@@ -12,6 +12,7 @@ import { ProjectManager } from "./components/ProjectManager.jsx";
 import { SourcesPanel } from "./components/SourcesPanel.jsx";
 import { isEvidenceEnabled } from "./evidenceFlag.js";
 import { requestPersistence } from "./storage/persistence.js";
+import { kinshipLabel } from "./graph/kinship.js";
 
 // Evidence UI is code-split: nothing is downloaded unless the flag is on and the panel is opened.
 const EvidencePage = lazy(() => import("./components/evidence/EvidencePage.jsx"));
@@ -61,20 +62,6 @@ function pickStep(ppy) {
   const steps = [1, 2, 5, 10, 20, 25, 50, 100, 200, 500];
   for (const s of steps) if (s * ppy >= 76) return s;
   return 500;
-}
-
-function relationTo(p, f, byId) {
-  if (!f || p.id === f.id) return "";
-  if (p.id === f.fatherId) return "father";
-  if (p.id === f.motherId) return "mother";
-  if ((f.spouseIds || []).includes(p.id)) return "spouse";
-  if (p.fatherId === f.id || p.motherId === f.id) return "child";
-  if ((p.fatherId && p.fatherId === f.fatherId) || (p.motherId && p.motherId === f.motherId)) return "sibling";
-  const fF = byId[f.fatherId], fM = byId[f.motherId];
-  if ((fF && (p.id === fF.fatherId || p.id === fF.motherId)) || (fM && (p.id === fM.fatherId || p.id === fM.motherId))) return "grandparent";
-  const pF = byId[p.fatherId], pM = byId[p.motherId];
-  if ((pF && (pF.fatherId === f.id || pF.motherId === f.id)) || (pM && (pM.fatherId === f.id || pM.motherId === f.id))) return "grandchild";
-  return "relative";
 }
 
 /* ---------------- lane sub-components ---------------- */
@@ -302,6 +289,10 @@ export default function App() {
   useEffect(() => { if (evidenceOn) requestPersistence(); }, [evidenceOn]);
 
   const contentRef = useRef(null);
+  // the timeline area as state too: it unmounts while the Evidence page is shown, and sizing / wheel listeners must
+  // attach to the element that is actually mounted (a page opened at #evidence used to leave the width at 0)
+  const [contentEl, setContentEl] = useState(null);
+  const contentRefCb = useCallback((el) => { contentRef.current = el; setContentEl(el); }, []);
   const viewRef = useRef(view);
   viewRef.current = view;
   const dragRef = useRef(null);
@@ -311,6 +302,8 @@ export default function App() {
   const byId = useMemo(() => Object.fromEntries(people.map((p) => [p.id, p])), [people]);
   const sourcesById = useMemo(() => Object.fromEntries(sources.map((s) => [s.id, s])), [sources]);
   const focus = byId[focusId] || people[0];
+  // how each person is related to the focus person (Phase 8 kinship: today's labels kept, precise ones added)
+  const kin = useMemo(() => Object.fromEntries(people.map((p) => [p.id, kinshipLabel(byId, focus, p)])), [people, byId, focus]);
   const relatives = relativeIds.map((id) => byId[id]).filter(Boolean);
   const ctxLanes = CONTEXT_LANES.filter((l) => ctxOn[l.id]);
 
@@ -319,15 +312,15 @@ export default function App() {
   const viewRange = [view.left, view.left + trackW / view.ppy];
   const focusLife = focus?.birth?.year ? [focus.birth.year, focus.death?.year || 2026] : null;
 
-  /* sizing — depends on isLoading so the observer attaches after the content div mounts */
+  /* sizing — whenever the timeline area mounts (first load, or back from the Evidence page) */
   useEffect(() => {
-    const el = contentRef.current;
+    const el = contentEl;
     if (!el) return;
     setTrackW(el.clientWidth - HEADER_W);
     const ro = new ResizeObserver(() => setTrackW(el.clientWidth - HEADER_W));
     ro.observe(el);
     return () => ro.disconnect();
-  }, [isLoading]);
+  }, [contentEl]);
 
   /* initial view fit — only when ppy is still default (8) */
   useEffect(() => {
@@ -365,7 +358,7 @@ export default function App() {
 
   /* wheel zoom (native, non-passive) */
   useEffect(() => {
-    const el = contentRef.current;
+    const el = contentEl;
     if (!el) return;
     const onWheel = (e) => {
       const rect = el.getBoundingClientRect();
@@ -381,7 +374,7 @@ export default function App() {
     el.addEventListener("wheel", onWheel, { passive: false });
     return () => el.removeEventListener("wheel", onWheel);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [contentEl]);
 
   /* pointer: pan / research-drag / crosshair */
   const onPointerDown = (e) => {
@@ -548,12 +541,17 @@ export default function App() {
         const ev = evidence && !evidence.skipped ? ` Evidence: ${sum(evidence.added)} entries added, ${sum(evidence.skipped)} already in your library.` : "";
         flash(`Imported project "${proj.name}".${ev}`);
       } else {
-        const { people: imp, sources: impSrc } = parseGedcom(await f.text());
+        const parsed = parseGedcom(await f.text());
+        const { people: imp, sources: impSrc } = parsed;
         if (!imp.length) { flash("No individuals found in that file."); }
         else {
-          setPeople((ps) => [...ps, ...imp.filter((p) => !ps.some((q) => q.id === p.id))]);
+          // people and their families (parents, spouses) together; a re-import adds missing families only
+          const counts = mergeGedcomImport(project ?? { people, families: [] }, parsed);
+          updateProject((prev) => mergeGedcomImport(prev, parsed).project);
           impSrc.forEach((s) => addSource(s));
-          flash(`Imported ${imp.length} people${impSrc.length ? ` and ${impSrc.length} source${impSrc.length === 1 ? "" : "s"}` : ""} — add them from "+ relative".`);
+          const fams = counts.addedFamilies + counts.updatedFamilies;
+          const known = imp.length - counts.addedPeople;
+          flash(`Imported ${counts.addedPeople} people${known ? ` (${known} already here)` : ""}, ${fams} famil${fams === 1 ? "y" : "ies"}${impSrc.length ? ` and ${impSrc.length} source${impSrc.length === 1 ? "" : "s"}` : ""} — add them from "+ relative".`);
         }
       }
     } catch (err) {
@@ -718,7 +716,7 @@ export default function App() {
       {/* ------- board ------- */}
       {!(evidenceOn && page === "evidence") && <>
       <div style={{ flex: 1, overflowY: "auto", overflowX: "hidden", position: "relative" }}>
-        <div ref={contentRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
+        <div ref={contentRefCb} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
           onPointerLeave={() => { setCrosshair(null); }}
           style={{ position: "relative", minHeight: "100%", touchAction: "none", userSelect: "none" }}>
 
@@ -805,7 +803,7 @@ export default function App() {
                   <div style={{ font: "600 12.5px Fraunces, Georgia, serif", color: relColor(i) }}>{displayName(p)}</div>
                   <div style={{ font: "500 10px 'IBM Plex Mono', monospace", color: C.inkSoft }}>
                     {p.birth?.year}–{p.death?.year || "…"}
-                    <span style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", marginLeft: 6 }}>{relationTo(p, focus, byId)}</span>
+                    <span style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", marginLeft: 6 }}>{kin[p.id]}</span>
                   </div>
                   <div style={{ position: "absolute", bottom: 6, left: 12, display: "flex", gap: 6 }}>
                     <button style={{ ...btnStyle(false), padding: "1px 6px", fontSize: 10 }} onClick={() => promote(p.id)} title="Make this person the focus">⌖ focus</button>
@@ -924,7 +922,7 @@ export default function App() {
             {people.filter((p) => p.id !== focusId && !relativeIds.includes(p.id)).map((p) => (
               <button key={p.id} onClick={() => { setRelativeIds((r) => [...r, p.id]); setAddRelOpen(false); }}
                 style={{ ...btnStyle(false), textAlign: "left", display: "flex", justifyContent: "space-between", gap: 10 }}>
-                <span>{displayName(p)} <em style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", color: C.inkSoft }}>{relationTo(p, focus, byId)}</em></span>
+                <span>{displayName(p)} <em style={{ font: "italic 500 10.5px Fraunces, Georgia, serif", color: C.inkSoft }}>{kin[p.id]}</em></span>
                 <span style={{ font: "400 11px 'IBM Plex Mono', monospace", color: C.inkSoft }}>{p.birth?.year}–{p.death?.year || "…"}</span>
               </button>
             ))}

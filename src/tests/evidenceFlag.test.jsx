@@ -70,4 +70,21 @@ describe("Evidence page", () => {
     fireEvent.click(screen.getByRole("checkbox", { name: /Evidence layer/ }));
     await waitFor(() => expect(screen.getByRole("button", { name: /^Evidence$/ })).toBeInTheDocument());
   });
+
+  it("the timeline measures its width when it appears after the Evidence page (life lines are drawn; review fix)", async () => {
+    const desc = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get() { return 1400; } });
+    try {
+      window.history.pushState({}, "", "/#evidence");
+      const { default: App } = await import("../App.jsx");
+      render(<App />);
+      await waitFor(() => expect(screen.getByTestId("evidence-page")).toBeInTheDocument());
+      fireEvent.click(screen.getByRole("button", { name: "← Timeline" }));
+      await waitFor(() => expect(screen.queryByTestId("evidence-page")).toBeNull());
+      const lifeLines = () => [...document.querySelectorAll("div[title]")].filter((d) => / · \d{3,4}–/.test(d.title)).length;
+      await waitFor(() => expect(lifeLines()).toBeGreaterThan(1));
+    } finally {
+      if (desc) Object.defineProperty(HTMLElement.prototype, "clientWidth", desc); else delete HTMLElement.prototype.clientWidth;
+    }
+  });
 });

@@ -4,10 +4,10 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 ## Current status
 
-- **Current phase:** 7b — Transkribus import
-- **Phase status:** awaiting review  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** Wait for review of Phase 7b.
-- **Last updated:** 2026-11-17 (Phase 7b complete)
+- **Current phase:** 8 — Graph projection
+- **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
+- **Next action:** reviewer: review Phase 8 (PR to master). Then Phase 9 (entity resolution).
+- **Last updated:** 2026-11-17 (Phase 8 review follow-up)
 
 ## Phase overview
 
@@ -21,8 +21,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 | 5 Ingestion v1 | approved | evidence/p5 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-14 |
 | 6 Extraction and review | approved | evidence/p6 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
 | 7 Search | approved | evidence/p7 (done on `ccr-adaa4345-wbnkkm`) | 2026-11-17 |
-| 7b Transkribus import | awaiting review | done on `ccr-adaa4345-wbnkkm` | |
-| 8 Graph projection | not started | evidence/p8 | |
+| 7b Transkribus import | approved | done on `ccr-adaa4345-wbnkkm` | 2026-11-17 |
+| 8 Graph projection | in review | evidence/p8 (done on `ccr-adaa4345-wbnkkm`) | |
 | 9 Entity resolution | not started | evidence/p9 | |
 
 ## Task checklist
@@ -123,11 +123,11 @@ Status values: `todo`, `in progress`, `done`, `blocked`, `deferred`.
 ### Phase 8
 | ID | Status | Files touched | Notes |
 | --- | --- | --- | --- |
-| P8.T1 | todo | | |
-| P8.T2 | todo | | |
-| P8.T3 | todo | | |
-| P8.T4 | todo | | |
-| P8.T5 | todo | | |
+| P8.T1 | done | src/graph/{projection,index}.js, src/tests/{graphProjection.test.js,graphHelpers.js} | `buildGraph({ snapshot, people, families, links, relationships })` in plain Maps: records (kind, date bounds from the event or event.date values, place id and place as written, source, copy, page, region, personas), personas (role, house number, age), co-occurrence edges between every pair of personas of a record with the relation assertions stated between them (status kept; rejected and superseded left out) and a same-house flag; persons, parents/children and partners from accepted families; persona↔person links (accepted and candidate, rejected left out, score kept); accepted relationships. Record-level parts (`recordPart`, `addRecordPart`, `removeRecord`) for updates; `canonical(g)` for comparisons. 3 tests. |
+| P8.T2 | done | src/graph/{update,index}.js, src/evidence/domain/snapshotMark.js (markOf moved here from src/search/indexer.js), src/search/indexer.js, src/tests/graphIncremental.test.js | `updateGraph(g, inputs)`: record parts are rebuilt only for records touched since the graph was built (new records, personas, assertions and the ones they supersede, decisions, and records on a changed copy or source), found with the exact "seen" mark now shared with the search index (`src/evidence/domain/snapshotMark.js`); the person layer is rebuilt when a fingerprint of people, families, links and relationships changes. **I7 test:** a new record with relations, a confirmation, a rejection, a relation added to an old record, a new person, a link accepted and a new family: the updated graph equals a full rebuild; a second update with no changes does nothing. 1 test (search tests unchanged). |
+| P8.T3 | done | src/graph/{fan,index}.js, src/tests/graphFan.test.js | `fanOf(g, { personId | personaId, hops 1-2, roles, fromYear, toYear })`: one entry per record of the person (through accepted links, and candidate links counted as "possible") or of the persona, newest first: the record, the person's own role, and every other persona of the record with role, the relations stated between them (with the words as written and their direction), same house, and the persons they are linked to (accepted first, candidates marked). Filters: role of the others, year range. Two steps add the records of the associates' accepted persons, each record shown once, bounded by a visited set and a record cap. `candidateClusters`: connected components of personas and persons over candidate links (union-find). 5 tests. |
+| P8.T4 | done | src/graph/{kinship,index}.js, src/App.jsx (relationTo replaced by kinshipLabel, memoised per focus), src/tests/kinship.test.js | `ancestors` (generations and number of paths), `descendants`, `commonAncestors` (nearest, with the generation on each side) walk generation by generation with a 30-generation limit, so endogamy and even a person entered as their own ancestor terminate. `kinshipLabel(byId, focus, person)`: today's labels first, unchanged (father, mother, spouse, child, sibling, grandparent, grandchild: identical for every pair of the sample family, tested against a copy of the old function); then great-…grandparent/grandchild, uncle/aunt and great-uncle/aunt, nephew/niece and great-…, nth cousin m times removed, ", related twice" (or N ways) when the nearest common ancestors are on different lines (couples count as one line), stepfather/stepmother/stepchild, in-laws (parent-, child-, sibling-in-law), "husband/wife of <blood relative>", gendered when the sex is known; "relative" when no line is found. The timeline shows these labels (computed once per focus). Main bundle +3 kB. 4 tests (sample parity, precise labels, endogamy with path counts and double first cousins, a looped ancestry). |
+| P8.T5 | done | src/components/evidence/{PeopleSection,EvidencePage}.jsx, src/graph/projection.js (record date label), src/tests/peopleSection.test.jsx | A **People** entry on the Evidence page (shown when the project has people). Person picker (default: the timeline's focus person); the **list by record**, newest first: kind, date, place, source and page with **Open page** (opens the box in Documents → Records, like a search hit); the person's role ("possible" when reached through a candidate link); the other people with their roles, the relations the record states (with the words as written, "proposed" when not confirmed) and "same house"; each linked person is a button that switches to them ("possible: …" for candidates; rejected links never shown). Filters: records with a role, years, 1 or 2 steps (2 = the records of the linked associates, each record once). A Kinship line gives the person's relation to the timeline focus and the nearest common ancestors. The graph is built when the section opens and updated (updateGraph) when the project or the library changes. 3 tests. |
 
 ### Phase 9
 | ID | Status | Files touched | Notes |
@@ -272,6 +272,9 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-17 | P8 review | (a) Imported GEDCOM people all showed "relative": the import never read FAM records, so they had no parents or spouses (the labels were fine). The import now reads FAM (HUSB, WIFE, CHIL, MARR) into families; re-importing adds missing families without duplicating people. (b) Two steps follow candidate links too, marked "possible", after accepted ones. (c) No kinship filter on + relative: any person's life may give context to another, especially with name conflicts and uncertain years. Bug: life lines missing after the app started on #evidence (timeline width never measured); fixed with a callback ref | Reviewer feedback on PR #14 | Parents on people only (normalizeProject derives them from families and would drop them); a kinship filter |
+| 2026-11-17 | P8 start | Reviewer decisions: precise kinship labels on the timeline (today's labels unchanged); FAN view as a list by record; accepted links followed, candidate links shown as "possible", rejected never | Reviewer answers at the start of Phase 8 | Keep "relative"; a small graph; accepted links only |
+| 2026-11-17 | P8.T1 | The graph module takes its inputs as data (library snapshot; people, families, current persona links and relationships from the project): `src/graph` may import only evidence, so the caller resolves links with `currentLinks` | Architecture rule (graph imports evidence only) | Letting graph import conclusions/models |
 | 2026-11-17 | P7b start | Reviewer decisions: match exported pages by image file name, or by page order for a document the user picks (PDF); keep lines as positioned words of one page transcription, no boxes drawn | Reviewer answers at the start of Phase 7b | Match by file name only; one region per text block |
 | 2026-11-17 | P7 start | Reviewer decisions: proposed values are searchable (marked as proposed; rejected never found; a confirmed-only filter); the default scope is the whole library (a switch narrows to the open project's sources) | Reviewer answers at the start of Phase 7 | Confirmed only; project scope by default |
 | 2026-11-17 | P7.T1 | IndexedDB **v6** adds `evSearchIndex` (one row, the serialised MiniSearch index; derived data). The indexer reads one snapshot of the library (`library.searchIndex.snapshot()`, a repository method, so search code never calls db*). Regions that a corrected box replaced stay indexed while evidence still cites them. The worker client lives in `src/workers/` (search may not import workers) | The plan names `evSearchIndex`; the snapshot makes full and incremental builds see the same data (I7) | Keeping the index in `settings` (device-only, not derived); per-region reads (slow) |
@@ -321,6 +324,54 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 
 ## Phase reports
 
+### Phase 8 report
+- **Built:** the graph projection, in memory, never stored (I7):
+  - *P8.T1* `src/graph/projection.js`: records (date, place, source, page), personas (role, house), co-occurrence with the relations the records state and "same house", persons, parents/children/partners from families, persona links (accepted and candidate; rejected left out), accepted relationships;
+  - *P8.T2* incremental updates: only records touched since the last build are recomputed (the exact snapshot mark, now shared with search in `src/evidence/domain/snapshotMark.js`); the person layer is rebuilt when its fingerprint changes; tested equal to a full rebuild after new records, confirmations, rejections, new links and family edits;
+  - *P8.T3* `fanOf` (list by record, 1 or 2 steps, role and year filters, candidates marked "possible") and `candidateClusters` (input for Phase 9);
+  - *P8.T4* kinship: `ancestors`, `descendants`, `commonAncestors` bounded at 30 generations (endogamy and looped data terminate); `kinshipLabel` with today's labels unchanged and precise ones otherwise (reviewer decision); the timeline uses it; ancestors and siblings cached per tree;
+  - *P8.T5* **People** on the Evidence page: person picker (focus by default), the records with the person's role and the others with roles, relations, same house and linked persons (click to switch; "possible" for candidates), **Open page**, filters, and a Kinship line with the nearest common ancestors.
+- **IndexedDB version / stores added:** none (still 6).
+- **New dependencies:** none. Main bundle 339 kB (+3 kB, the kinship labels); the People section is in the lazily loaded Evidence chunk.
+- **Deviations:** the role filter keeps records in which someone has that role (it does not hide people inside a record), labelled "Records with a". Otherwise as planned; reviewer decisions in the log (2026-11-17).
+- **Invariants:** I7 the graph is a projection, rebuildable, incremental = rebuild (tested). I6 `src/graph` makes no user decisions (architecture rule) and imports only `src/evidence`. Rejected assertions and rejected links never appear.
+- **Tests:** 489 → **505**. `npm test -- --run` and `npm run build` pass.
+- **Timing (Node, synthetic tree):** 5,000 people over 10 generations (heavily intermarried: every generation of 500 descends from the one before), 8,000 records, 32,000 personas and links:
+  - full build 220–250 ms; update after one new record ~85 ms;
+  - `fanOf` at 2 steps 0.07 ms;
+  - candidate clusters 14 ms;
+  - kinship labels for all 5,000 people against one focus: 0.5–1.1 s the first time, ~0.33 s when the focus changes after that (caches warm). Before the per-tree cache this was 28 ms per pair (minutes for a full relabel), so the cache was added in this phase. Ordinary trees with little intermarriage are much faster.
+- **Real-browser check (headless Chromium, dev server, fresh database, sample project):** I added the 1866 page (32) and entered the death record (Șfatu Loti, deceased; informants Alecsandru Drăgoiescu "nepotu mortei" and Constandin Cristescu "vecin cu morta"). The record was entered through the app's own evidence modules, not by typing in Records. I linked Loti to Maria Hariton (accepted) and Drăgoiescu to Gheorghe D. Hariton (candidate).
+  - Evidence → People opened in 74 ms;
+  - for Maria: "1 record"; the card showed death · 1866-03-28 (julian), page 1 (32), As deceased ("Șfatu Loti"), both informants with "informant for" and the words as written, and Drăgoiescu → "possible: Gheorghe D. Hariton";
+  - the Kinship line said "Maria Hariton (b. Văleanu) is the mother of Dumitru D. Hariton";
+  - clicking Gheorghe switched to him: "1 record (1 through possible links)", and the line said "child of Dumitru D. Hariton";
+  - **Open page** opened Documents on the record;
+  - the timeline labels for the sample family were unchanged (father, child);
+  - no page errors.
+- **How to verify:**
+  1. Open a page with a record you entered (Records) and accept the link of one of its people to a person of your tree (Legacy facts → link, or enter the record for a linked person).
+  2. Evidence → **People**, choose that person: the record, the others in it and their relations.
+  3. Click a linked name, try **Steps 2**, **Records with a** godparent, and **Years**.
+  4. On the timeline, **+ relative**: check the labels of cousins, in-laws and great-grandparents in your tree.
+- **Backup reminder:** no database change in this phase; a bundle backup is still good practice.
+- **Known limitations:**
+  1. Records reach the view only through persona links. Today links come from legacy facts or from your own linking; Phase 9 will propose links.
+  2. Two steps follow accepted links only (candidates are shown but not followed further).
+  3. Kinship uses the tree's parents and spouses; relationships entered in Sources (godparent, etc.) are in the graph but not in the labels.
+  4. There is no drawn graph (a decision: list by record).
+  5. The Phase 7 and 7b questions are still open.
+- **Review follow-up (2026-11-17, same PR):**
+  - **GEDCOM families.** Your imported people all showed "relative" because the GEDCOM import ignored FAM records. It now reads them: partners, children in order, marriage date and place. Families are merged on re-import: people already present are kept, missing families are added, and a child who already has parents keeps them. Test with a 5.5.1 file shaped like a desktop-app export (custom `_` tags, FAMC/FAMS, MARR). In the browser: father, mother, grandparent, aunt, "husband of the aunt", sibling, first cousin; a re-import added 0 people and 0 families. **Please import your MyFamilyTree file again** to add the families to your project.
+  - **Life lines.** When the app started on the Evidence page (#evidence), the timeline width was never measured once the timeline was shown, so only birth and death markers appeared until a reload. The cause was in Meridian, not Chrome. The timeline now measures itself whenever it appears (wheel zoom too). Reproduced in the browser before the fix (18 life lines vs 1) and checked after (18 and 18); a regression test fails without the fix.
+  - **Two steps** now follow possible links too, marked "Records of possible: …" and listed after accepted ones.
+  - Spouse labels read "husband/wife of the …" for every relation.
+  - Questions (a)–(c) answered (see log). Tests 505 → **512**.
+- **Questions for the reviewer** (answered, see the follow-up above):
+  - (a) On your tree, are the new labels right and readable (e.g. "first cousin once removed", "wife of the nephew", "related twice")?
+  - (b) Should two steps also follow candidate ("possible") links, marked, or stay with accepted links only?
+  - (c) Should the timeline's **+ relative** list be sortable or filterable by kinship (e.g. only blood relatives)?
+
 ### Phase 7b report
 - **Built:** import of Transkribus exports (PAGE XML), as files:
   - *P7b.T1* a PAGE XML reader (any PAGE version or prefix): page size, metadata and recognition model, lines in reading order with 0–1 boxes (I4);
@@ -358,7 +409,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
   - (c) Should the Transkribus API be planned (it needs your account and key), or is file import enough?
 
 **Review**
-- Approved: no
+- Approved: yes (PR #13 merged 2026-11-17; questions (a)-(c) not answered yet, kept open)
 - Reviewer notes:
 
 ### Phase 7 report
