@@ -72,13 +72,13 @@ export function checkDbMethodUse(files) {
 }
 
 // I6: automated modules must never confirm/reject assertions or enter claims as the user.
-const USER_ACTION = /\b(confirmAssertion|rejectAssertion|enterAsUser|supersedeAsUser|decideLink|convertLegacyFacts|confirmLegacyVerified|setFactVerified|applyFactEdit|startReading|correctReading|rewriteReading|saveManualRecord|correctAssertion|attachAssertionToFact|adoptProposedReading)\s*\(/;
+const USER_ACTION = /\b(confirmAssertion|rejectAssertion|enterAsUser|supersedeAsUser|decideLink|convertLegacyFacts|confirmLegacyVerified|setFactVerified|applyFactEdit|startReading|correctReading|rewriteReading|saveManualRecord|correctAssertion|attachAssertionToFact|adoptProposedReading|acceptMatch|rejectMatch|linkMatchTo|createPersonFromPersonas|linkGroupTo|dismissGroup|removeFromGroup)\s*\(/;
 const AUTOMATED = ["ingest/", "extract/", "search/", "graph/", "resolve/", "workers/"];
 export function checkUserActionOnly(files) {
   const violations = [];
   for (const [file, source] of Object.entries(files)) {
     if (AUTOMATED.some((d) => file.startsWith(d)) && USER_ACTION.test(source)) {
-      violations.push(`${file} calls a user-action function (confirmAssertion, rejectAssertion, enterAsUser, supersedeAsUser, decideLink, convertLegacyFacts, confirmLegacyVerified, setFactVerified, applyFactEdit, startReading, correctReading, rewriteReading, saveManualRecord, correctAssertion, attachAssertionToFact, adoptProposedReading); automated code may only propose`);
+      violations.push(`${file} calls a user-action function (confirmAssertion, rejectAssertion, enterAsUser, supersedeAsUser, decideLink, convertLegacyFacts, confirmLegacyVerified, setFactVerified, applyFactEdit, startReading, correctReading, rewriteReading, saveManualRecord, correctAssertion, attachAssertionToFact, adoptProposedReading, acceptMatch, rejectMatch, linkMatchTo, createPersonFromPersonas, linkGroupTo, dismissGroup, removeFromGroup); automated code may only propose`);
     }
   }
   return violations;

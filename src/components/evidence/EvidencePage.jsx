@@ -9,9 +9,11 @@ import DocumentsSection from "./DocumentsSection.jsx";
 import AiSettings from "./AiSettings.jsx";
 import SearchSection from "./SearchSection.jsx";
 import PeopleSection from "./PeopleSection.jsx";
+import MatchesSection from "./MatchesSection.jsx";
+import { waitingMatches, openGroups } from "../../conclusions/matching.js";
 
 // The Evidence page (its own page beside the timeline; loaded lazily from App.jsx; on unless the project turns it off).
-// Sections: Search, Documents (with the page workspace and the review queue), People (FAN and kinship, Phase 8), AI settings, Legacy facts (Phase 4).
+// Sections: Search, Documents (with the page workspace and the review queue), People (FAN and kinship, Phase 8), Matches (Phase 9), AI settings, Legacy facts (Phase 4).
 export default function EvidencePage({ onClose, storage, project, onProjectChange, initialSection = "search" }) {
   const [section, setSection] = useState(initialSection);
   const [openAt, setOpenAt] = useState(null);   // a search hit to open in the page workspace
@@ -92,6 +94,7 @@ export default function EvidencePage({ onClose, storage, project, onProjectChang
         {navItem("search", "Search")}
         {navItem("documents", "Documents")}
         {project?.people?.length > 0 && navItem("people", "People")}
+        {project?.people?.length > 0 && navItem("matches", "Matches", waitingMatches(currentLinks(project)).length + openGroups(project).length > 0 ? <span aria-label="matches waiting">•</span> : null)}
         {navItem("ai", "AI settings")}
         {report && navItem("legacy", "Legacy facts", pending > 0 || candidates.length > 0 ? <span aria-label="needs attention">•</span> : null)}
         <span style={{ flex: 1 }} />
@@ -100,6 +103,7 @@ export default function EvidencePage({ onClose, storage, project, onProjectChang
       </nav>
       <div style={{ flex: 1, minWidth: 0, overflowY: "auto", padding: "14px 18px" }}>
         {section === "search" && library && <SearchSection library={library} project={project} onOpen={openHit} />}
+        {section === "matches" && library && <MatchesSection library={library} project={project} onProjectChange={onProjectChange} onOpen={openRecord} />}
         {section === "people" && library && <PeopleSection library={library} project={project} onOpen={openRecord} />}
         {section === "documents" && library && <DocumentsSection storage={storage} library={library} inlineWorkspace openAt={openAt} />}
         {section === "ai" && library && storage?.getSetting && <AiSettings storage={storage} />}

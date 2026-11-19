@@ -174,3 +174,25 @@ export function personProfiles({ people = [], families = [], links = [], persona
   }
   return out;
 }
+
+/**
+ * A draft tree person from one or more persona profiles (for "Create new person"): the fullest name (one with a
+ * surname, most words), the sex if they agree, a birth year when some window is narrow (5 years or less: its middle),
+ * a death year from a death record. Nothing is invented beyond that.
+ */
+export function personDraft(profiles) {
+  const list = profiles.filter(Boolean);
+  const named = [...list].sort((a, b) => (b.surnames.length && !b.surnameFrom) - (a.surnames.length && !a.surnameFrom) || b.tokens.length - a.tokens.length);
+  const best = named[0];
+  let name = best?.name ?? "";
+  if (best && best.tokens.length === 1 && best.surnames[0]) name = `${best.name} ${best.surnames[0].charAt(0).toUpperCase()}${best.surnames[0].slice(1)}`;
+  const sexes = new Set(list.map((p) => p.sex).filter(Boolean));
+  const yearOf = (day) => Math.round(1 + (day - toJdn(1, 1, 1)) / YEAR_DAYS);
+  const narrow = list.map((p) => p.birth).filter((b) => b && b[1] - b[0] <= 5 * YEAR_DAYS).sort((a, b) => (a[1] - a[0]) - (b[1] - b[0]))[0];
+  const death = list.map((p) => (p.role === "deceased" ? p.death : null)).find(Boolean);
+  return {
+    name, sex: sexes.size === 1 ? [...sexes][0] : "U",
+    birthYear: narrow ? yearOf((narrow[0] + narrow[1]) / 2) : null,
+    deathYear: death ? yearOf(death[1]) : null,
+  };
+}
