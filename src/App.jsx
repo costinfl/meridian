@@ -221,6 +221,21 @@ function ContextLane({ lane, x, ppy, viewRange, onHover, onLeave, onOpenOwn }) {
   const showLabels = ppy >= 3.4;
   const periods = useMemo(() => lane.items.filter((i) => i.end && i.end > i.year).map((i) => ({ ...i, start: i.year })), [lane]);
   const points = lane.items.filter((i) => !(i.end && i.end > i.year));
+  // labels only where they fit: your own events first, then the most notable (Wikidata sitelinks), then the rest;
+  // a label that would overlap one already placed is left out (its dot stays, the label shows on hover)
+  const labelled = useMemo(() => {
+    if (!showLabels) return new Set();
+    const order = points.filter((e) => visible(e.year, e.year) && e.opacity > 0.2)
+      .sort((a, b) => (b.own ? 1 : 0) - (a.own ? 1 : 0) || (b.opacity - a.opacity) || (b.links ?? (b.source === "builtin" ? 50 : 0)) - (a.links ?? (a.source === "builtin" ? 50 : 0)));
+    const taken = [];
+    const out = new Set();
+    for (const e of order) {
+      const x0 = x(e.year) + 6, x1 = x0 + 24 + e.label.length * 4.6;
+      if (taken.some(([a, b]) => x0 < b + 6 && a < x1 + 6)) continue;
+      taken.push([x0, x1]); out.add(e.id);
+    }
+    return out;
+  }, [points, x, showLabels, viewRange[0], viewRange[1]]); // eslint-disable-line react-hooks/exhaustive-deps
   const { placed } = useMemo(() => packRows(periods, 2), [periods]);
   const tone = (it) => (it.own ? C.focus : C.slate);
   const open = (it) => (it.own && onOpenOwn ? (e) => { e.stopPropagation(); onOpenOwn(it); } : undefined);
@@ -239,7 +254,7 @@ function ContextLane({ lane, x, ppy, viewRange, onHover, onLeave, onOpenOwn }) {
           <div data-testid="ctx-event" onMouseEnter={(ev) => onHover(ev, [e.label, String(e.year), e.source === "wikidata" ? "Wikidata" : e.own ? "your event" : ""])} onMouseLeave={onLeave}
             onPointerDown={e.own ? stopPD : undefined} onClick={open(e)}
             style={{ position: "absolute", left: x(e.year) - 3, top: CTX_H - 17, width: 6, height: 6, borderRadius: "50%", background: tone(e), opacity: e.opacity, zIndex: 2, cursor: e.own ? "pointer" : "default" }} />
-          {showLabels && (
+          {labelled.has(e.id) && (
             <div style={{ position: "absolute", left: x(e.year) + 6, top: CTX_H - 21, font: "500 9px Archivo, sans-serif", color: e.own ? C.focus : C.inkSoft, whiteSpace: "nowrap", opacity: e.opacity, pointerEvents: "none" }}>
               <span style={{ font: "500 8.5px 'IBM Plex Mono', monospace", color: tone(e), marginRight: 3 }}>{e.year}</span>{e.label}
             </div>
