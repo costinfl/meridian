@@ -791,7 +791,8 @@ export default function App() {
                   <div style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
                     <span style={{ font: "700 13px Fraunces, Georgia, serif" }}>{lane.label}</span>
                     {lane.id === "local" && <button onClick={() => setPlacesOpen(true)} title="Which places these are, and their countries over time" style={{ ...btnStyle(false), padding: "0 5px", fontSize: 9 }}>Places</button>}
-                    {ctx.loading && lane.id !== "global" && <span style={{ font: "italic 500 9px Archivo, sans-serif", color: C.inkSoft }}>looking up…</span>}
+                    {ctx.loading && lane.id === "local" && <span data-testid="ctx-progress" style={{ font: "italic 500 9px Archivo, sans-serif", color: C.inkSoft }}>looking up…{ctx.progress?.total ? ` ${ctx.progress.done}/${ctx.progress.total}` : ""}</span>}
+                    {!ctx.loading && ctx.error && lane.id === "local" && <span title={ctx.error} style={{ font: "italic 500 9px Archivo, sans-serif", color: C.focus }}>partly offline</span>}
                   </div>
                   {lane.chips.length > 0 ? (
                     <div data-testid={`ctx-chips-${lane.id}`} style={{ display: "flex", flexWrap: "wrap", gap: 3, marginTop: 2, maxHeight: 30, overflow: "hidden" }}>

@@ -27,45 +27,46 @@ export function useContextLanes({ project, people, storage, updateProject, wikid
     let alive = true;
     const wd = wikidata ?? wikidataFor(storage);
     const fresh = (key) => !done.current.has(key);
-    const made = [];   // marked done only once their results are kept (a cancelled run retries, from the cache)
-    const mark = () => { for (const k of made) done.current.add(k); };
     const timer = setTimeout(async () => {
       const need = lookupsFor(board, { resolved, histories });
       const pending = [...need.unresolved.map((u) => `search:${u.key}`), ...need.history.map((q) => `history:${q}`), ...need.placeEvents.map((q) => `place:${q.qid}:${q.from}:${q.to}`),
         ...need.stateEvents.map((q) => `state:${q.qid}:${q.from}:${q.to}`), ...(need.global ? [`global:${need.global.from}:${need.global.to}`] : [])].filter(fresh);
       if (!pending.length) return;
-      setStatus({ loading: true, error: "" });
-      try {
-        // 1. places not chosen yet: the best settlement Wikidata finds (you can change it in Places)
-        const choices = {};
-        for (const u of need.unresolved) {
-          if (!fresh(`search:${u.key}`)) continue;
-          made.push(`search:${u.key}`);
-          const best = (await wd.searchPlace(u.place))[0];
+      setStatus({ loading: true, error: "", done: 0, total: pending.length });
+      let failed = 0, count = 0;
+      // one lookup at a time; each answer shows as soon as it arrives; a failed lookup (Wikidata busy) does not stop
+      // the others and is tried again next time (from the cache, if it arrived meanwhile)
+      const step = async (key, fn, apply) => {
+        if (!alive || !fresh(key)) return;
+        try { const v = await fn(); if (!alive) return; done.current.add(key); apply(v); }
+        catch { failed++; }
+        count++;
+        if (alive) setStatus((st) => ({ ...st, done: count }));
+      };
+      // 1. places not chosen yet: the best settlement Wikidata finds (you can change it in Places)
+      const choices = {};
+      for (const u of need.unresolved) {
+        await step(`search:${u.key}`, () => wd.searchPlace(u.place), (found) => {
+          const best = found[0];
           choices[u.key] = best ? { qid: best.qid, label: best.label, description: best.description, country: best.country ?? "", auto: true } : "none";
-        }
-        if (Object.keys(choices).length && alive) {
-          mark();
-          updateProject((p) => ({ ...p, settings: { ...p.settings, contextPlaces: { ...(p.settings?.contextPlaces ?? {}), ...choices } } }));
-          return;   // the new choices re-run this effect
-        }
-        // 2. their states over time
-        const hist = {};
-        for (const qid of need.history) if (fresh(`history:${qid}`)) { hist[qid] = await wd.placeHistory(qid); made.push(`history:${qid}`); }
-        if (Object.keys(hist).length && alive) { mark(); setHistories((h) => ({ ...h, ...hist })); return; }
-        // 3. events
-        const place = {}, state = {};
-        for (const q of need.placeEvents) { const k = `place:${q.qid}:${q.from}:${q.to}`; if (fresh(k)) { place[q.qid] = await wd.placeEvents(q.qid, q.from, q.to); made.push(k); } }
-        for (const q of need.stateEvents) { const k = `state:${q.qid}:${q.from}:${q.to}`; if (fresh(k)) { state[q.qid] = await wd.stateEvents(q.qid, q.from, q.to); made.push(k); } }
-        const gk = need.global ? `global:${need.global.from}:${need.global.to}` : null;
-        const global = gk && fresh(gk) ? await wd.globalEvents(need.global.from, need.global.to) : null;
-        if (gk && global) made.push(gk);
-        if (alive) mark();
-        if (alive) setFetched((f) => ({ place: { ...f.place, ...place }, state: { ...f.state, ...state }, global: global ?? f.global }));
-        if (alive) setStatus({ loading: false, error: "" });
-      } catch (e) {
-        if (alive) setStatus({ loading: false, error: `Wikidata could not be reached (${e.message}); showing what is cached and the built-in history.` });
+        });
       }
+      if (Object.keys(choices).length && alive) {
+        updateProject((p) => ({ ...p, settings: { ...p.settings, contextPlaces: { ...(p.settings?.contextPlaces ?? {}), ...choices } } }));
+        return;   // the new choices re-run this effect
+      }
+      // 2. their states over time
+      const hist = {};
+      for (const qid of need.history) await step(`history:${qid}`, () => wd.placeHistory(qid), (h) => { hist[qid] = h; });
+      if (Object.keys(hist).length && alive) { setHistories((h) => ({ ...h, ...hist })); return; }
+      // 3. events, each shown as it comes
+      const put = (kind, qid) => (events) => setFetched((f) => ({ ...f, [kind]: { ...f[kind], [qid]: events } }));
+      for (const q of need.placeEvents) await step(`place:${q.qid}:${q.from}:${q.to}`, () => wd.placeEvents(q.qid, q.from, q.to), put("place", q.qid));
+      if (need.global) await step(`global:${need.global.from}:${need.global.to}`, () => wd.globalEvents(need.global.from, need.global.to), (g) => setFetched((f) => ({ ...f, global: g })));
+      // today's Romania (Q218) has so many items that its query is the slowest: it comes last
+      const states = [...need.stateEvents].sort((a, b) => (a.qid === "Q218") - (b.qid === "Q218"));
+      for (const q of states) await step(`state:${q.qid}:${q.from}:${q.to}`, () => wd.stateEvents(q.qid, q.from, q.to), put("state", q.qid));
+      if (alive) setStatus({ loading: false, error: failed ? `Wikidata did not answer ${failed} lookup${failed === 1 ? "" : "s"} (busy or offline); they are tried again next time. Showing what arrived, the cache and the built-in history.` : "", done: count, total: pending.length });
     }, debounceMs);
     return () => { alive = false; clearTimeout(timer); };
   }, [source, boardKey, resolved, histories]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -73,5 +74,5 @@ export function useContextLanes({ project, people, storage, updateProject, wikid
   const lanes = useMemo(() => buildLanes({
     people: board, resolved, histories, fetched, own: project?.contextEvents ?? [], filters: project?.settings?.ctxFilters ?? {}, source,
   }), [boardKey, resolved, histories, fetched, project?.contextEvents, project?.settings?.ctxFilters, source]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { lanes, source, resolved, loading: status.loading, error: status.error, wikidata: source === "wikidata" ? (wikidata ?? wikidataFor(storage)) : null };
+  return { lanes, source, resolved, loading: status.loading, error: status.error, progress: status.loading ? { done: status.done ?? 0, total: status.total ?? 0 } : null, wikidata: source === "wikidata" ? (wikidata ?? wikidataFor(storage)) : null };
 }

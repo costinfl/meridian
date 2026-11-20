@@ -43,10 +43,25 @@ describe("Context lanes looked up from the board (B3)", () => {
     await waitFor(() => expect(screen.getByTestId("lane-national").textContent).toMatch(/\[Austria-Hungary\]\[Romania\].*Hungarian law@1/));
     expect(screen.getByTestId("lane-global").textContent).toMatch(/First World War@1/);
     expect(screen.getByTestId("lane-local").textContent).not.toMatch(/Săhăteni/);
-    expect(wd.calls.map((c) => c[0])).toEqual(["search", "history", "place", "state", "state", "global"]);
+    expect(wd.calls.map((c) => c[0])).toEqual(["search", "history", "place", "global", "state", "state"]);
     // nothing new: no more calls
     await new Promise((r) => setTimeout(r, 30));
     expect(wd.calls).toHaveLength(6);
+  });
+
+  it("a failing lookup does not stop the others; answers show as they come; the failure is retried next time", async () => {
+    const wd = fakeWikidata();
+    let failState = true;
+    const stateEvents = wd.stateEvents;
+    wd.stateEvents = async (q, f, t) => { if (q === "Q28513" && failState) { wd.calls.push(["state-fail", q]); throw new Error("Wikidata answered 502"); } return stateEvents(q, f, t); };
+    const initial = { ...createProject("T"), people: [{ id: "a", name: "Ana Pop", birth: { year: 1880, place: "Cluj" }, death: { year: 1950 } }] };
+    const { rerender } = render(<Harness initial={initial} wikidata={wd} />);
+    await waitFor(() => expect(screen.getByTestId("lane-national").textContent).toMatch(/Great Union \(wd\)@1/));
+    expect(screen.getByTestId("lane-local").textContent).toMatch(/Cluj bombing@1/);              // kept despite the failure
+    expect(screen.getByTestId("lane-national").textContent).not.toMatch(/Hungarian law/);
+    expect(screen.getByTestId("loading").textContent).toBe("false");
+    expect(wd.calls.filter((c) => c[0] === "state-fail")).toHaveLength(1);
+    void rerender;
   });
 
   it("Built-in only makes no calls", async () => {
