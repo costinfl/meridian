@@ -25,7 +25,7 @@ From top to bottom:
 | Area | What it shows |
 | --- | --- |
 | **Toolbar** | Project name, focus person, and the main actions |
-| **Context** | History lanes: Local, National, Global. Events and periods outside the focus person's lifetime are dimmed; a soft tint marks the years the focus person was alive |
+| **Context** | History lanes that follow the people on the board: **Local** (the places they lived in), **National** (the countries those places belonged to at the time), **Global** (the world over their combined lifetimes). See [Context lanes](#context-lanes) |
 | **Years** | The time axis, shared by every lane |
 | **Focus** | The person you are studying |
 | **Compare** | Relatives you have added, one lane each |
@@ -40,7 +40,7 @@ Toolbar buttons, left to right:
 | **+ relative** | Adds a comparison lane |
 | **research mode** | Switches editing on and off |
 | **Legend** | Explains the event markers |
-| **Context source** | Only "Built-in sample" for now |
+| **Context source** | **Wikidata + built-in** (looks up history on Wikidata) or **Built-in only (offline)** |
 | **Import** | Loads a Meridian bundle (`.zip`) or a GEDCOM file (`.ged`) |
 | **Export ▾** | Saves a Meridian bundle or a GEDCOM file |
 | **Sources** | Opens the sources panel; the number is how many sources the project has |
@@ -87,6 +87,20 @@ Zoom and position are remembered per project.
 
 Solid, filled marks are **verified**; dashed, hollow marks are **unverified** (see below).
 
+## Context lanes
+
+The three lanes at the top follow the people on the board (the focus person and everyone in Compare):
+
+- **Local**: the history of every place they lived in. A place comes from a birth or death place, or from the **Place** of a life event, role or event group (open the item, fill **Place**). A place holds from its year until the next place; a role with a place (e.g. *Student*, 1870–1874, București) holds for its years. Add a relative born in another city and that city's history joins the lane.
+- **National**: the history of the countries those places belonged to **at the time**: Ploiești was in the Principality of Wallachia until 1859, the United Principalities until 1881, then the Kingdom of Romania; Cluj was in Austria-Hungary until 1918. States of one line (Wallachia → … → Romania) make one chip.
+- **Global**: the world's wars, revolutions, treaties, disasters and epidemics over the combined lifetimes on the board.
+
+Each place or country is a **chip** in the lane's header; click it to fade its events (click again to bring them back). Events from the years when nobody on the board was there are dimmed: a protest in Cluj shows clearly only for the years someone on the board lived in Cluj. Hover a dot for its label when there is no room to write it.
+
+**Places** (in the Local header) shows how each place was matched on Wikidata and the countries it belonged to; **Change…** picks another match, **None** keeps it off Wikidata. In research mode, click a context lane to add **your own context event** (or drag for a period) and choose its place or country; your events are drawn in the focus colour.
+
+**Where the history comes from.** With **Wikidata + built-in** (the default), Meridian looks the places up on Wikidata: only place names and years are sent, never anything about your people. Answers are kept on this device for 30 days, so the second time is instant and works offline. The first look-up can take a minute or two (Wikidata is slow for big countries); events appear as they arrive, with "looking up… 3/14" in the Local header, and "partly offline" if Wikidata did not answer (it is tried again next time). **Built-in only (offline)** uses no network: the built-in Romanian history (Ploiești, Săhăteni, Romania, the world) and your own events.
+
 ## Editing: research mode
 
 Click **research mode**. The button shows a ✓ while it is on, and dragging no longer pans the board.
@@ -98,7 +112,8 @@ Click **research mode**. The button shows a ✓ while it is on, and dragging no 
 | Change an era | Click its label at the top of the board |
 | Add an event | Click empty space in a person's lane at the right year |
 | Add a role, group, bracket, era or media pin | Drag across a person's lane over the years it covers, then pick the type in the editor |
-| Add an era from a context lane | Drag across a context lane |
+| Add your own context event | Click a context lane |
+| Add a context period, or an era band | Drag across a context lane, then choose **Context period** or **Era band** |
 | Edit birth or death | Click the birth circle or death square |
 
 The editor has these fields, depending on the type:
@@ -376,7 +391,7 @@ With the evidence layer on, the editor of a birth, death, event, role or group s
 
 - **No way to delete a person.** People can be added (+ relative → Add new person, the family panel, Matches) but not deleted.
 - **Dates are years.** Days and months are not stored on the timeline.
-- **Context lanes are fixed** to the built-in Romanian sample; the other "Context source" options are placeholders.
+- **Wikidata knows little about small places.** The Local lane of a village may show only what you add yourself and notable things founded nearby.
 - **One browser, one device.** There is no sync. Move data with bundles.
 - **Desktop only.** The board needs a mouse or trackpad and a wide window.
 

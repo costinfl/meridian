@@ -20,6 +20,7 @@ old one rather than editing history.
 | [0004](0004-verified-sourcing-visual-affordance.md)              | Verified/unverified sourcing affordance                     | Accepted |
 | [0005](0005-evidence-layer-runs-client-side.md)                 | Evidence layer runs client-side                             | Accepted |
 | [0006](0006-native-bundle-carries-evidence.md)                  | Native bundle carries the evidence a project references     | Accepted |
+| [0007](0007-public-services-called-from-the-browser.md)         | Public services (Wikidata, Transkribus) called from the browser | Accepted |
 
 ## Adding a record
 

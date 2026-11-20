@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** context lanes B3 (lanes from the board, toggles, own events, places panel), then B4 and the PR.
-- **Last updated:** 2026-11-19 (Phase 9 review follow-up)
+- **Next action:** reviewer: review the context lanes PR.
+- **Last updated:** 2026-11-20 (context lanes)
 
 ## Phase overview
 
@@ -327,6 +327,29 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - Link a stamp / margin-note record to the main entry's record ("this stamp is about that child"), e.g. as an assertion relating the two subjects.
 
 ## Phase reports
+
+### Context lanes report (after Phase 9)
+- **Built:** the Local, National and Global lanes follow the people on the board instead of the fixed Hariton sample.
+  - *B1* a **Place** on life events, roles and groups (editor, GEDCOM `PLAC`); where a person lived as spans of years per place (`src/context/residence.js`).
+  - *B2* Wikidata (`src/context/wikidata.js`): place search, a place's states over time (P17 with dates), local events and notable foundings, state events within each state's years, world events by class and notability; cached 30 days on the device, spaced calls, backoff on 429/503. Country at the time: Wikidata's dated P17 first, else a built-in table by Romanian county and region, else today's country; lines of succession make one chip (`src/context/historicalStates.js`).
+  - *B3* lanes from the board (`src/context/lanes.js`): Local chips per place, National chips per line of succession (states and years in the chip's title), Global over the combined range; events dimmed outside the years someone on the board was there; chips fade on click (`settings.ctxFilters`); your own context events (click/drag a context lane; `project.contextEvents`); the **Context source** switch (Wikidata + built-in / Built-in only); a **Places** panel to check or change matches; labels only where they fit; lookups progressive, failures isolated and retried.
+- **IndexedDB:** no change (the cache uses the existing settings store). Project data: `contextEvents`, `settings.contextPlaces`, `ctxFilters`, `ctxSource`. ADR-0007 records that the page calls Wikidata (and Transkribus) directly.
+- **Tests:** 555 → **577**. Build passes.
+- **Real browser (dev server; Wikidata live, relayed through Node because the sandbox browser has no direct internet):**
+  - sample family (Dumitru, Dumitru S., Gheorghe): Local chips Săhăteni, Ploiești; National "Romania" titled Principality of Wallachia 1818–1859 · United Principalities 1859–1881 · Kingdom of Romania 1881–1947 · Romanian People's Republic 1947–1952; 53 events; ready in 23–30 s the first time;
+  - turning Ploiești off faded its 13 events;
+  - a board with Ana (born in Cluj 1880) and Ion (București 1885): Local Cluj-Napoca, București; National Austria-Hungary (1880–1918, 22 events), Hungary (1940–1944), Romania; first events within a quarter of a second (built-in and cached), 103–125 events after 95–145 s the first time, depending on how busy Wikidata was;
+  - a reload: 1.7 s from the cache, no network (when a lookup had failed, it was retried then);
+  - Built-in only: no network calls; no page errors.
+- **Known limitations:**
+  1. Wikidata is thin on local events for small places; Local adds foundings, the built-in sample and your own events.
+  2. The first lookup is slow for big countries (Romania-wide queries take 20 s or more; it comes last); Wikidata sometimes answers 502, and the lookup is retried later.
+  3. Labels are from Wikidata in Romanian or English; some items are not events in the strict sense (e.g. a currency as a period).
+  4. A place mentioned without a year (a role without dates) is not used.
+- **Questions for the reviewer:**
+  - (a) Is the Local lane useful for your villages, or should it also take events of the county (e.g. Prahova) when the town has few?
+  - (b) Should notable people born in a place (Wikidata) be offered as context too, or only events?
+  - (c) Is the 30-day cache right, or should there be a "Refresh history" button?
 
 ### Phase 9 report
 - **Built:** entity resolution, proposing who in the records is who in the tree, on this device and without AI.
