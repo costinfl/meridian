@@ -41,7 +41,7 @@ export default function SearchSection({ library, project, onOpen, client: inject
   const [status, setStatus] = useState(null);       // { docCount, builtAt, ... } | { error }
   const [busy, setBusy] = useState("");
   const [q, setQ] = useState("");
-  const [f, setF] = useState({ fromYear: "", toYear: "", place: "", kind: "", projectOnly: false, confirmedOnly: false });
+  const [f, setF] = useState({ fromYear: "", toYear: "", place: "", kind: "", projectOnly: false, confirmedOnly: false, onlyDated: false });
   const [result, setResult] = useState(null);        // { hits, ms, placeNotFound } | { error }
   const projectSourceIds = useMemo(() => (project?.sources ?? []).map((s) => s.librarySourceId).filter(Boolean), [project]);
 
@@ -65,7 +65,7 @@ export default function SearchSection({ library, project, onOpen, client: inject
     try {
       const r = await call("Searching…", "query", {
         q, fromYear: int(f.fromYear), toYear: int(f.toYear), place: f.place, sourceKinds: f.kind ? [f.kind] : [],
-        sourceIds: f.projectOnly ? projectSourceIds : null, confirmedOnly: f.confirmedOnly, limit: 100,
+        sourceIds: f.projectOnly ? projectSourceIds : null, confirmedOnly: f.confirmedOnly, onlyDated: f.onlyDated, limit: 100,
       });
       setResult(r);
     } catch (err) { setResult({ error: err.message }); }
@@ -91,6 +91,7 @@ export default function SearchSection({ library, project, onOpen, client: inject
         <label>Source <select aria-label="Source kind" value={f.kind} onChange={set("kind")} style={input}><option value="">any kind</option>{SOURCE_KINDS.map((k) => <option key={k}>{k}</option>)}</select></label>
         <label title={projectSourceIds.length ? "" : "This project has no sources linked to the library yet"}><input type="checkbox" checked={f.projectOnly} onChange={set("projectOnly")} disabled={!projectSourceIds.length} /> only this project's sources</label>
         <label><input type="checkbox" checked={f.confirmedOnly} onChange={set("confirmedOnly")} /> confirmed only</label>
+        <label title="With a year range, text with no known date is kept and marked undated; tick to leave it out"><input type="checkbox" checked={f.onlyDated} onChange={set("onlyDated")} /> only dated</label>
       </div>
 
       <div data-testid="index-status" style={{ ...mono, display: "flex", gap: 8, alignItems: "center", margin: "8px 0" }}>
@@ -103,7 +104,7 @@ export default function SearchSection({ library, project, onOpen, client: inject
       {result?.placeNotFound && <div role="status" style={small}>No place with that name in the library.</div>}
       {result?.hits && (
         <div data-testid="search-results">
-          <div role="status" style={{ ...small, marginBottom: 6 }}>{result.hits.length === 0 ? "Nothing found." : `${result.hits.length} result${result.hits.length === 1 ? "" : "s"}${result.hits.length >= 100 ? " (first 100)" : ""}`}</div>
+          <div role="status" style={{ ...small, marginBottom: 6 }}>{result.hits.length === 0 ? "Nothing found." : `${result.hits.length} result${result.hits.length === 1 ? "" : "s"}${result.hits.length >= 100 ? " (first 100)" : ""}${result.hits.some((h) => h.undated) ? ` (${result.hits.filter((h) => h.undated).length} undated, kept because no date is known)` : ""}`}</div>
           <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
             {result.hits.map((h) => (
               <li key={h.id} data-testid="search-hit" style={{ display: "flex", gap: 10, padding: "8px 0", borderTop: `1px solid ${C.ruleFaint}`, cursor: "pointer" }}
@@ -122,6 +123,7 @@ export default function SearchSection({ library, project, onOpen, client: inject
                     {h.reasons.map((r) => <span key={r} style={badge(C.slate)}>{r}</span>)}
                     {h.hasProposed && <span style={badge(C.rel[1])}>proposed values</span>}
                     {h.hasConfirmed && <span style={badge(C.rel[2])}>confirmed values</span>}
+                    {h.undated && <span data-testid="hit-undated" style={badge(C.inkSoft)} title="No date is known for this text; it is kept under the year filter">undated</span>}
                   </div>
                 </div>
               </li>
