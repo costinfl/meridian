@@ -46,7 +46,7 @@ export default function TranskribusImport({ library, copies, disabled, onDone })
       const r = await importTranskribus({ library, matches: chosen, exportName: state.files.map((f) => f.name).join(", ") });
       const notImported = state.match.unmatched.length + (state.match.matched.length - chosen.length);
       setState(null);
-      onDone(describeImport(r, notImported));
+      onDone(`${describeImport(r, notImported)}${r.imported ? " In Review text you can start your reading from it." : ""}`);
     } catch (e) { setError(e.message); }
     finally { setBusy(""); }
   };

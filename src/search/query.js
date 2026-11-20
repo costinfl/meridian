@@ -77,8 +77,10 @@ export function snippetOf(source, terms, { radius = 9 } = {}) {
 
 /**
  * Search an index. `filters`: { fromYear, toYear, placeIds (Set|array; the place and places below it, resolved by
- * the caller), sourceKinds (array), sourceIds (Set|array|null: the scope; null = whole library), confirmedOnly }.
- * Returns [{ regionId, score, reasons, snippet, ...stored fields }], best first.
+ * the caller), sourceKinds (array), sourceIds (Set|array|null: the scope; null = whole library), confirmedOnly,
+ * onlyDated }. With a year range, text with no date at all is kept (marked `undated`, after the dated hits) unless
+ * `onlyDated` (reviewer decision); text dated outside the range is excluded.
+ * Returns [{ regionId, score, reasons, snippet, undated?, ...stored fields }], best first.
  */
 export function runQuery(index, q, { filters = {}, nameVariants = [], limit = 50 } = {}) {
   const { expansions, expr } = expandQuery(q, variantMap(nameVariants));
@@ -91,14 +93,18 @@ export function runQuery(index, q, { filters = {}, nameVariants = [], limit = 50
     if (filters.confirmedOnly && !r.hasConfirmed) return false;
     if (kinds && !kinds.has(r.sourceKind)) return false;
     if (scope && !scope.has(r.sourceId)) return false;
-    if (dated && (r.earliestDay == null || r.latestDay < d0 || r.earliestDay > d1)) return false;
+    if (dated && r.earliestDay == null && filters.onlyDated) return false;
+    if (dated && r.earliestDay != null && (r.latestDay < d0 || r.earliestDay > d1)) return false;
     if (places && !(r.placeIds ?? []).some((id) => places.has(id))) return false;
     return true;
   };
   if (!expr) return [];
   const terms = expansions.flatMap((e) => [e.word, ...e.variants]);
-  return index.search(expr, { filter: keep }).slice(0, Math.min(limit, MAX_RESULTS)).map((h) => ({
+  let found = index.search(expr, { filter: keep });
+  if (dated) found = [...found.filter((h) => h.earliestDay != null), ...found.filter((h) => h.earliestDay == null)];   // undated after the dated
+  return found.slice(0, Math.min(limit, MAX_RESULTS)).map((h) => ({
     ...h,
+    ...(dated && h.earliestDay == null ? { undated: true } : {}),
     regionId: h.id,
     reasons: reasonsOf(h, expansions),
     snippet: snippetOf(h.snippetSource, [...terms, ...Object.keys(h.match ?? {})]),

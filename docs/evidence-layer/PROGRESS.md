@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** reviewer: review the context lanes PR.
-- **Last updated:** 2026-11-20 (context lanes review follow-up)
+- **Next action:** reviewer: review the PR settling the Phase 7/7b questions.
+- **Last updated:** 2026-11-20 (Phase 7/7b questions settled)
 
 ## Phase overview
 
@@ -272,6 +272,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-20 | Phase 7/7b questions | Ranking kept (names 3×, variants 2×, sound-alikes less). A year range keeps undated text, marked "undated", after the dated hits ("only dated" excludes it). A Name variants screen (list, filter, add, remove; removing drops the search index so it rebuilds). When Transkribus text arrives and there is no reading, Review text offers "Start my reading from the Transkribus text" (one click; `startReading` takes a chosen transcription). Search quality on real documents and matching of a real Transkribus export stay to be judged on the reviewer's data | Reviewer answers 2026-11-20 | Exclude undated text; variants only from Matches; start the reading automatically |
 | 2026-11-20 | Context lanes review | (a) No county events in Local: a county (Prahova) belongs to the national level; Local stays the town. (b) Notable people of a place: a switch, on demand, off by default (born or died there, from Wikidata; looked up only while on). (c) A Refresh history button (re-fetches everything from Wikidata, keeps your place matches) | Reviewer answers on PR #16 | County events in Local; people always shown |
 | 2026-11-19 | Context lanes start | Reviewer request: Local = the places the people on the board lived in (their spans of years), National = their countries as they were at the time, Global = the same for everyone over the combined range; each place or country a toggle chip (fade in/out). Data: Wikidata plus your own events, the built-in sample as offline fallback. Checked live: Wikidata gives dated country histories for Romanian places (P17 with start/end: Ploiești Wallachia → United Principalities → Kingdom of Romania…; Cluj Austrian Empire → Austria-Hungary → Kingdom of Romania, Hungary 1940–44), so a built-in table by county is only a fallback; dated events at one town are few, so Local also shows notable things founded there; national events are queried per state within its years (fast), global by class (wars, revolutions, treaties, disasters, epidemics) and notability; the search API rate-limits bursts, so calls are spaced and cached 30 days | Reviewer request on PR #15 | A fixed sample; today's country |
 | 2026-11-19 | P9 review | (a) Keep the 0.80 threshold (fewer proposals, mostly right). (b) Keep godparents and witnesses: they carry useful details (godparents: baptism, adoption, religious wedding, places; witnesses: age, place, work, sometimes relatives); they are proposed when the names agree **and one detail agrees**: a stated age, the same place, or the same work (new `occupation` signal against the person's roles). (c) Matches lists accepted links with undo. (d) Next: Julian/Gregorian helpers, the Transkribus API (CORS checked: direct browser calls allowed), editing parents and spouses. Context lanes follow the people (separate PR, after this one) | Reviewer answers on PR #15 | Names and dates alone for godparents |
@@ -519,7 +520,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
   - (c) Should the Transkribus API be planned (it needs your account and key), or is file import enough?
 
 **Review**
-- Approved: yes (PR #13 merged 2026-11-17; questions (a)-(c) not answered yet, kept open)
+- Approved: yes (PR #13 merged 2026-11-17). Questions answered 2026-11-20: (a) on your data: try a real export; (b) offer starting the reading from the Transkribus text, one click (done); (c) the Transkribus API was built (PR #15).
 - Reviewer notes:
 
 ### Phase 7 report
@@ -551,7 +552,7 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - **Questions for the reviewer:** (a) Is the default ranking right (names count three times text; variants twice; sound-alike less)? (b) Should undated text be kept when a year range is set (marked "undated") rather than excluded? (c) Should a screen to pair name variants (Ioan – Iohannes) come before Phase 9, or with it? (d) Search speed and quality on your real documents.
 
 **Review**
-- Approved: yes (PR #12 merged 2026-11-17; questions (a)-(d) not answered yet, kept open)
+- Approved: yes (PR #12 merged 2026-11-17). Questions answered 2026-11-20: (a) keep the ranking; (b) keep undated text under a year range, marked "undated", after the dated hits (done; "only dated" for the old behaviour); (c) a Name variants screen in Settings & tools (done); (d) on your data.
 - Reviewer notes:
 
 ### Phase 6 report

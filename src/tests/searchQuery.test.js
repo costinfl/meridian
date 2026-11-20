@@ -57,6 +57,20 @@ describe("search queries (P7.T3)", () => {
     expect(hit.shownNames).toContain("Șfatu Loti");
   });
 
+  it("a year range keeps undated text, marked and after the dated hits; 'only dated' leaves it out (Phase 7 review)", async () => {
+    const { q } = await setup();
+    const all = await q("Hariton");
+    const undatedIds = all.filter((h) => h.earliestDay == null).map((h) => h.regionId);
+    expect(undatedIds.length).toBeGreaterThan(0);
+    const ranged = await q("Hariton", { fromYear: 1700, toYear: 2000 });
+    const firstUndated = ranged.findIndex((h) => h.undated);
+    expect(firstUndated).toBeGreaterThanOrEqual(0);
+    expect(ranged.slice(firstUndated).every((h) => h.undated)).toBe(true);            // undated after the dated
+    expect(ranged.filter((h) => h.undated).map((h) => h.regionId).sort()).toEqual([...undatedIds].sort());
+    expect((await q("Hariton", { fromYear: 1700, toYear: 2000, onlyDated: true })).some((h) => h.undated || h.earliestDay == null)).toBe(false);
+    expect(all.some((h) => h.undated)).toBe(false);                                     // no range: nothing is marked
+  });
+
   it("OCR noise: a misspelt word still finds the page (fuzzy), and every word must match", async () => {
     const { q } = await setup();
     expect((await q("Haritun")).map((h) => h.pageLabel)).toContain("f. 23v");
@@ -65,8 +79,10 @@ describe("search queries (P7.T3)", () => {
 
   it("filters: years, place (and places below it), source kind, scope, confirmed only; rejected values are never found", async () => {
     const { q, library, sources } = await setup();
-    expect((await q("Maria", { fromYear: 1849, toYear: 1851 })).map((h) => h.shownNames)).toEqual([["Maria Ionescu"]]);
-    expect(await q("Maria", { fromYear: 1900, toYear: 1950 })).toEqual([]);
+    expect((await q("Maria", { fromYear: 1849, toYear: 1851, onlyDated: true })).map((h) => h.shownNames)).toEqual([["Maria Ionescu"]]);
+    expect(await q("Maria", { fromYear: 1900, toYear: 1950, onlyDated: true })).toEqual([]);
+    expect((await q("Maria", { fromYear: 1849, toYear: 1851 })).map((h) => [h.shownNames, !!h.undated])).toEqual([[["Maria Ionescu"], false], [[], true]]);
+    expect((await q("Maria", { fromYear: 1900, toYear: 1950 })).every((h) => h.undated)).toBe(true);   // the dated record is out of range
     expect((await q("Maria", { place: "Ploiești" })).length).toBe(1);
     expect((await q("Maria", { place: "Județul Prahova" })).length).toBe(1);        // the county contains the town
     expect((await q("Maria", { place: "Atlantis" }))).toEqual([]);

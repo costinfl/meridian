@@ -9,6 +9,7 @@ import DocumentsSection from "./DocumentsSection.jsx";
 import AiSettings from "./AiSettings.jsx";
 import DateConverter from "./DateConverter.jsx";
 import TranskribusSettings from "./TranskribusSettings.jsx";
+import NameVariants from "./NameVariants.jsx";
 import SearchSection from "./SearchSection.jsx";
 import PeopleSection from "./PeopleSection.jsx";
 import MatchesSection from "./MatchesSection.jsx";
@@ -108,7 +109,7 @@ export default function EvidencePage({ onClose, storage, project, onProjectChang
         {section === "matches" && library && <MatchesSection library={library} project={project} onProjectChange={onProjectChange} onOpen={openRecord} />}
         {section === "people" && library && <PeopleSection library={library} project={project} onOpen={openRecord} />}
         {section === "documents" && library && <DocumentsSection storage={storage} library={library} inlineWorkspace openAt={openAt} />}
-        {section === "ai" && library && storage?.getSetting && <><AiSettings storage={storage} /><TranskribusSettings storage={storage} /><DateConverter /></>}
+        {section === "ai" && library && storage?.getSetting && <><AiSettings storage={storage} /><TranskribusSettings storage={storage} /><NameVariants library={library} /><DateConverter /></>}
         {section === "legacy" && (
           <>
         {report && (

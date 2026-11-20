@@ -25,6 +25,10 @@ export function createNameVariantStore(storage) {
       return rec;
     },
     list: () => storage.dbGetAll(STORE),
+    /** Remove a pair (the researcher's choice). Callers drop the search index so it is rebuilt without the pair. */
+    async remove(id) {
+      await storage.dbTransact([STORE], "readwrite", (o) => o.delete(STORE, id));
+    },
     /**
      * Search expansion: the folded spellings that were explicitly paired with `name` (either direction),
      * plus its own key. ONE HOP ONLY: if Ioan~Ion and Ioan~Iohannes were entered, searching "Ion" finds
