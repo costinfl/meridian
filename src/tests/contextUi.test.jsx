@@ -18,6 +18,8 @@ function fakeWikidata() {
     placeEvents: async (q, f, t) => { log("place", q, f, t); return [{ id: "wd:Q1", label: "Cluj bombing", year: 1944, source: "wikidata" }]; },
     stateEvents: async (q, f, t) => { log("state", q, f, t); return q === "Q28513" ? [{ id: "wd:Q2", label: "Hungarian law", year: 1890, source: "wikidata" }] : [{ id: "wd:Q3", label: "Great Union (wd)", year: 1918, source: "wikidata" }]; },
     globalEvents: async (f, t) => { log("global", f, t); return [{ id: "wd:Q4", label: "First World War", year: 1914, end: 1918, source: "wikidata" }]; },
+    placePeople: async (q, f, t) => { log("people", q, f, t); return [{ id: "wdp:Q9", name: "Emil Racoviță", born: 1868, died: 1947, how: ["died"], links: 40, kind: "person", source: "wikidata" }]; },
+    refresh: async () => { log("refresh"); },
   };
 }
 
@@ -26,7 +28,9 @@ function Harness({ initial, wikidata }) {
   const ctx = useContextLanes({ project, people: project.people, storage: null, updateProject: (fn) => setProject((p) => fn(p)), wikidata, debounceMs: 0 });
   return (
     <div>
-      {ctx.lanes.map((l) => <div key={l.id} data-testid={`lane-${l.id}`}>{l.chips.map((c) => `[${c.label}]`).join("")} {l.items.map((i) => `${i.label}@${i.opacity}`).join("|")}</div>)}
+      <button onClick={() => setProject((p) => ({ ...p, settings: { ...p.settings, ctxNotablePeople: !p.settings.ctxNotablePeople } }))}>people</button>
+      <button onClick={() => ctx.refresh()}>refresh</button>
+      {ctx.lanes.map((l) => <div key={l.id} data-testid={`lane-${l.id}`}>{l.chips.map((c) => `[${c.label}]`).join("")} {l.items.map((i) => `${i.kind === "person" ? "*" : ""}${i.label}@${i.opacity}`).join("|")}</div>)}
       <output data-testid="resolved">{JSON.stringify(project.settings.contextPlaces ?? {})}</output>
       <output data-testid="loading">{String(ctx.loading)}</output>
     </div>
@@ -62,6 +66,26 @@ describe("Context lanes looked up from the board (B3)", () => {
     expect(screen.getByTestId("loading").textContent).toBe("false");
     expect(wd.calls.filter((c) => c[0] === "state-fail")).toHaveLength(1);
     void rerender;
+  });
+
+  it("notable people only while switched on; Refresh history looks everything up again and keeps the place matches", async () => {
+    const wd = fakeWikidata();
+    const initial = { ...createProject("T"), people: [{ id: "a", name: "Ana Pop", birth: { year: 1880, place: "Cluj" }, death: { year: 1950 } }] };
+    render(<Harness initial={initial} wikidata={wd} />);
+    await waitFor(() => expect(screen.getByTestId("loading").textContent).toBe("false"));
+    await waitFor(() => expect(screen.getByTestId("lane-national").textContent).toMatch(/Hungarian law/));
+    expect(wd.calls.some((c) => c[0] === "people")).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "people" }));
+    await waitFor(() => expect(screen.getByTestId("lane-local").textContent).toMatch(/\*Emil Racoviță \(1868–1947\)@1/));
+    expect(wd.calls.filter((c) => c[0] === "people")).toHaveLength(1);
+    fireEvent.click(screen.getByRole("button", { name: "people" }));                  // off: hidden, no new calls
+    await waitFor(() => expect(screen.getByTestId("lane-local").textContent).not.toMatch(/Racoviță/));
+    const before = wd.calls.length;
+    const resolvedBefore = screen.getByTestId("resolved").textContent;
+    fireEvent.click(screen.getByRole("button", { name: "refresh" }));
+    await waitFor(() => expect(wd.calls.slice(before).map((c) => c[0])).toEqual(["refresh", "history", "place", "global", "state", "state"]));
+    expect(screen.getByTestId("resolved").textContent).toBe(resolvedBefore);          // your place matches kept
+    expect(wd.calls.slice(before).some((c) => c[0] === "search")).toBe(false);
   });
 
   it("Built-in only makes no calls", async () => {

@@ -40,9 +40,15 @@ export function createWikidata({ fetchImpl = (...a) => fetch(...a), cache = null
       throw new WikidataError(`Wikidata answered ${res.status}`);
     }
   }
+  // "Refresh history": answers cached before this mark are fetched again
+  let refreshedAt = null;
+  const refreshMark = async () => {
+    if (refreshedAt == null) refreshedAt = (cache ? (await cache.get("wd:refreshedAt"))?.value : null) ?? 0;
+    return refreshedAt;
+  };
   async function cached(key, fn) {
     const hit = cache ? await cache.get(key) : null;
-    if (hit && now() - hit.at < TTL_DAYS * 86400000) return hit.value;
+    if (hit && now() - hit.at < TTL_DAYS * 86400000 && hit.at >= (await refreshMark())) return hit.value;
     const value = await queued(fn);
     if (cache) await cache.set(key, { at: now(), value });
     return value;
@@ -50,6 +56,31 @@ export function createWikidata({ fetchImpl = (...a) => fetch(...a), cache = null
   const sparql = async (query) => (await getJson(`${SPARQL_URL}?query=${encodeURIComponent(query)}&format=json`)).results.bindings;
 
   return {
+    /** Look everything up again: cached answers older than now are fetched anew (the place matches are not touched). */
+    async refresh() { refreshedAt = now(); if (cache) await cache.set("wd:refreshedAt", { at: refreshedAt, value: refreshedAt }); },
+    /**
+     * Notable people of a place (on demand): born there with a birth year in [from - 80, to], or died there within
+     * [from, to]; most notable first, at most 15. Only the place id and years are sent.
+     */
+    placePeople: (qid, from, to) => cached(`wd:people:${qid}:${from}:${to}`, async () => {
+      const lab = 'SERVICE wikibase:label { bd:serviceParam wikibase:language "ro,en". }';
+      const born = await sparql(`SELECT ?p ?pLabel ?b ?d ?links WHERE { ?p wdt:P19 wd:${qid}; wdt:P569 ?b. FILTER(YEAR(?b) >= ${from - 80} && YEAR(?b) <= ${to})
+        OPTIONAL { ?p wdt:P570 ?d } ?p wikibase:sitelinks ?links. ${lab} } ORDER BY DESC(?links) LIMIT 15`);
+      const died = await sparql(`SELECT ?p ?pLabel ?b ?d ?links WHERE { ?p wdt:P20 wd:${qid}; wdt:P570 ?d. FILTER(YEAR(?d) >= ${from} && YEAR(?d) <= ${to})
+        OPTIONAL { ?p wdt:P569 ?b } ?p wikibase:sitelinks ?links. ${lab} } ORDER BY DESC(?links) LIMIT 15`);
+      const by = new Map();
+      const add = (rows, how) => {
+        for (const b of rows) {
+          const id = qidOf(b.p?.value), name = b.pLabel?.value ?? "";
+          if (!id || /^Q\d+$/.test(name)) continue;
+          const cur = by.get(id) ?? { id: `wdp:${id}`, name, born: null, died: null, how: new Set(), links: Number(b.links?.value ?? 0), kind: "person", source: "wikidata" };
+          cur.born = cur.born ?? yearOf(b.b?.value); cur.died = cur.died ?? yearOf(b.d?.value); cur.how.add(how);
+          by.set(id, cur);
+        }
+      };
+      add(born, "born"); add(died, "died");
+      return [...by.values()].map((x) => ({ ...x, how: [...x.how] })).sort((a, b) => b.links - a.links).slice(0, 15);
+    }),
     /** Candidate items for a place name: [{ qid, label, description, settlement, sitelinks, country }] best first. */
     searchPlace: (text) => cached(`wd:search:${String(text).toLowerCase().trim()}`, async () => {
       const found = new Map();

@@ -251,9 +251,14 @@ function ContextLane({ lane, x, ppy, viewRange, onHover, onLeave, onOpenOwn }) {
       ))}
       {points.filter((e) => visible(e.year, e.year)).map((e) => (
         <React.Fragment key={"e" + e.id}>
+          {e.kind === "person" ? (
+            <div data-testid="ctx-person" onMouseEnter={(ev) => onHover(ev, [e.label, "notable person of this place (Wikidata)"])} onMouseLeave={onLeave}
+              style={{ position: "absolute", left: x(e.year) - 5, top: CTX_H - 22, font: "500 11px Archivo, sans-serif", lineHeight: "12px", color: C.rel[1], opacity: e.opacity, zIndex: 2 }}>☆</div>
+          ) : (
           <div data-testid="ctx-event" onMouseEnter={(ev) => onHover(ev, [e.label, String(e.year), e.source === "wikidata" ? "Wikidata" : e.own ? "your event" : ""])} onMouseLeave={onLeave}
             onPointerDown={e.own ? stopPD : undefined} onClick={open(e)}
             style={{ position: "absolute", left: x(e.year) - 3, top: CTX_H - 17, width: 6, height: 6, borderRadius: "50%", background: tone(e), opacity: e.opacity, zIndex: 2, cursor: e.own ? "pointer" : "default" }} />
+          )}
           {labelled.has(e.id) && (
             <div style={{ position: "absolute", left: x(e.year) + 6, top: CTX_H - 21, font: "500 9px Archivo, sans-serif", color: e.own ? C.focus : C.inkSoft, whiteSpace: "nowrap", opacity: e.opacity, pointerEvents: "none" }}>
               <span style={{ font: "500 8.5px 'IBM Plex Mono', monospace", color: tone(e), marginRight: 3 }}>{e.year}</span>{e.label}
@@ -1023,6 +1028,7 @@ export default function App() {
       {/* places of the context lanes */}
       {placesOpen && project && (
         <PlacesPanel lanes={ctx.lanes} resolved={ctx.resolved} wikidata={ctx.wikidata} error={ctx.error} onClose={() => setPlacesOpen(false)}
+          notablePeople={ctx.notablePeople} onToggleNotable={(on) => setCtxSetting("ctxNotablePeople", on)} onRefresh={ctx.refresh}
           onChoose={(key, choice) => setCtxSetting("contextPlaces", (m = {}) => ({ ...m, [key]: choice }))} />
       )}
 

@@ -99,6 +99,10 @@ Each place or country is a **chip** in the lane's header; click it to fade its e
 
 **Places** (in the Local header) shows how each place was matched on Wikidata and the countries it belonged to; **Change…** picks another match, **None** keeps it off Wikidata. In research mode, click a context lane to add **your own context event** (or drag for a period) and choose its place or country; your events are drawn in the focus colour.
 
+**Notable people.** In **Places**, tick **Show notable people of these places** to see people born or who died in the places on the board, as a ☆ at their birth (hover for the name and years). It is off by default and looked up only while it is on; the first time can take a couple of minutes for a large town.
+
+**Refresh history** (in **Places**) looks everything up again on Wikidata instead of using what this device remembers, for example after Wikidata was corrected. Your place matches are kept.
+
 **Where the history comes from.** With **Wikidata + built-in** (the default), Meridian looks the places up on Wikidata: only place names and years are sent, never anything about your people. Answers are kept on this device for 30 days, so the second time is instant and works offline. The first look-up can take a minute or two (Wikidata is slow for big countries); events appear as they arrive, with "looking up… 3/14" in the Local header, and "partly offline" if Wikidata did not answer (it is tried again next time). **Built-in only (offline)** uses no network: the built-in Romanian history (Ploiești, Săhăteni, Romania, the world) and your own events.
 
 ## Editing: research mode

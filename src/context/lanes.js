@@ -57,13 +57,14 @@ export function chipsOfBoard(people, { resolved = {}, histories = {}, thisYear }
 export function lookupsFor(people, { resolved = {}, histories = {}, thisYear } = {}) {
   const places = placesOfBoard(people, { thisYear });
   const unresolved = [...places.values()].filter((p) => !(p.key in resolved)).map((p) => ({ key: p.key, place: p.place }));
-  const history = [], placeEvents = [], stateEvents = new Map();
+  const history = [], placeEvents = [], placePeople = [], stateEvents = new Map();
   for (const [key, p] of places) {
     const r = resolved[key];
     if (!r || r === "none") continue;
     if (!histories[r.qid]) { history.push(r.qid); continue; }
     const from = decadeDown(Math.min(...p.spans.map((s) => s.from))), to = decadeUp(Math.max(...p.spans.map((s) => s.to)));
     placeEvents.push({ qid: r.qid, from, to });
+    placePeople.push({ qid: r.qid, from, to });
     for (const span of p.spans) for (const part of statesDuring(statesOfPlace(histories[r.qid]), span.from, span.to)) {
       const k = part.state.qid;
       const cur = stateEvents.get(k) ?? { qid: k, from: part.from, to: part.to };
@@ -73,7 +74,7 @@ export function lookupsFor(people, { resolved = {}, histories = {}, thisYear } =
   }
   const range = boardRange(people, thisYear);
   return {
-    unresolved, history, placeEvents,
+    unresolved, history, placeEvents, placePeople,
     stateEvents: [...stateEvents.values()].map((s) => ({ ...s, from: decadeDown(s.from), to: decadeUp(s.to) })),
     global: range ? { from: decadeDown(range[0]), to: decadeUp(range[1]) } : null,
   };
@@ -93,7 +94,7 @@ const presentIn = (spans, item) => spans.some((s) => overlaps(item, s.from, s.to
  * @param {string} a.source        "wikidata" | "builtin"
  * @returns {{ id, label, sub, chips: [{ key, label, people, on, count }], items: [...], empty }[]}
  */
-export function buildLanes({ people, resolved = {}, histories = {}, fetched = {}, own = [], filters = {}, source = "wikidata", thisYear = THIS_YEAR }) {
+export function buildLanes({ people, resolved = {}, histories = {}, fetched = {}, own = [], filters = {}, source = "wikidata", notablePeople = false, thisYear = THIS_YEAR }) {
   const board = people.filter(Boolean);
   const names = Object.fromEntries(board.map((p) => [p.id, firstName(p)]));
   const { local, national } = chipsOfBoard(board, { resolved, histories, thisYear });
@@ -114,7 +115,8 @@ export function buildLanes({ people, resolved = {}, histories = {}, fetched = {}
       seen.add(it.id);
       const spans = chipSpans(it.chip);
       // your own events are never dimmed by time (you put them there); a switched-off chip fades everything on it
-      const opacity = it.chip && on[it.chip] === false ? OPACITY.off : it.own || spans === null || presentIn(spans, it) ? OPACITY.present : OPACITY.absent;
+      const probe = it.presence ?? it;   // a notable person: their life, not the year they are drawn at
+      const opacity = it.chip && on[it.chip] === false ? OPACITY.off : it.own || spans === null || presentIn(spans, probe) ? OPACITY.present : OPACITY.absent;
       items.push({ ...it, opacity });
     }
     for (const c of chips) c.count = items.filter((x) => x.chip === c.key).length;
@@ -127,6 +129,13 @@ export function buildLanes({ people, resolved = {}, histories = {}, fetched = {}
     const raw = [];
     for (const c of local.values()) {
       if (useWd && c.qid) for (const e of fetched.place?.[c.qid] ?? []) raw.push({ ...e, chip: c.key });
+      // notable people of the place (on demand): drawn at their birth there (or their death, if they only died there)
+      if (useWd && c.qid && notablePeople) for (const p of fetched.people?.[c.qid] ?? []) {
+        const year = p.how.includes("born") && p.born ? p.born : p.died ?? p.born;
+        if (year == null) continue;
+        raw.push({ id: `${p.id}:${c.key}`, label: `${p.name} (${p.born ?? "?"}–${p.died ?? ""})`, year, end: null, links: p.links, kind: "person", source: "wikidata", chip: c.key,
+          presence: { year: p.born ?? year, end: p.died ?? (p.born ? p.born + 80 : year) } });
+      }
       for (const e of BUILTIN.local.filter((x) => x.chip === c.key)) raw.push(e);
     }
     for (const e of own.filter((x) => x.lane === "local")) raw.push({ ...e, own: true, end: e.end ?? null });

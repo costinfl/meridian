@@ -61,6 +61,34 @@ describe("Wikidata for the context lanes (B2)", () => {
     expect(ev.map((e) => [e.label, e.year])).toEqual([["Bombardarea Ploieștiului", 1943], ["founded: Muzeul Județean", 1867]]);
   });
 
+  it("refresh: answers cached before it are fetched again", async () => {
+    const f = fakeWikidata();
+    let t = 1000;
+    const cache = memCache();
+    const wd = createWikidata({ fetchImpl: f.fetchImpl, cache, now: () => t, sleep: async () => {}, gapMs: 0 });
+    await wd.placeHistory("Q179585");
+    const n = f.calls.length;
+    t += 10; await wd.placeHistory("Q179585");
+    expect(f.calls.length).toBe(n);
+    t += 10; await wd.refresh();
+    t += 10; await wd.placeHistory("Q179585");
+    expect(f.calls.length).toBe(n + 1);
+    // a new client on the same device sees the mark too
+    const wd2 = createWikidata({ fetchImpl: f.fetchImpl, cache, now: () => t, sleep: async () => {}, gapMs: 0 });
+    await wd2.placeHistory("Q179585");
+    expect(f.calls.length).toBe(n + 1);                                    // the re-fetched answer is newer than the mark
+  });
+
+  it("notable people: born or died there, one entry each, most notable first", async () => {
+    const rows = (how) => ({ results: { bindings: how === "born"
+      ? [{ p: lit(uri("Q1")), pLabel: lit("Take Ionescu"), b: lit("1858-10-25T00:00:00Z"), d: lit("1922-06-21T00:00:00Z"), links: lit(20) }]
+      : [{ p: lit(uri("Q1")), pLabel: lit("Take Ionescu"), b: lit("1858-10-25T00:00:00Z"), d: lit("1922-06-21T00:00:00Z"), links: lit(20) }, { p: lit(uri("Q2")), pLabel: lit("Addison Baker"), b: lit("1907-01-11T00:00:00Z"), d: lit("1943-08-01T00:00:00Z"), links: lit(7) }] } });
+    const fetchImpl = async (url) => json(rows(decodeURIComponent(url).includes("wdt:P19") ? "born" : "died"));
+    const wd = createWikidata({ fetchImpl, sleep: async () => {}, gapMs: 0 });
+    const people = await wd.placePeople("Q179585", 1850, 1950);
+    expect(people.map((p) => [p.name, p.born, p.died, p.how])).toEqual([["Take Ionescu", 1858, 1922, ["born", "died"]], ["Addison Baker", 1907, 1943, ["died"]]]);
+  });
+
   it("backs off on 429 and retries", async () => {
     const f = fakeWikidata({ throttleFirst: true });
     const sleep = vi.fn(async () => {});

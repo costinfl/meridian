@@ -13,9 +13,11 @@ export const wikidataFor = (storage) => (shared ??= createWikidata({ cache: stor
 
 export function useContextLanes({ project, people, storage, updateProject, wikidata = null, debounceMs = 600 }) {
   const source = project?.settings?.ctxSource ?? "wikidata";
+  const notablePeople = !!project?.settings?.ctxNotablePeople;   // on demand: looked up only when switched on
+  const [refreshing, setRefreshing] = useState(0);              // "Refresh history": a run that ignores what it knows
   const resolved = useMemo(() => project?.settings?.contextPlaces ?? {}, [project?.settings?.contextPlaces]);
   const [histories, setHistories] = useState({});
-  const [fetched, setFetched] = useState({ place: {}, state: {}, global: [] });
+  const [fetched, setFetched] = useState({ place: {}, state: {}, people: {}, global: [] });
   const [status, setStatus] = useState({ loading: false, error: "" });
   const done = useRef(new Set());   // lookups already made in this page session
   const board = people.filter(Boolean);
@@ -29,7 +31,10 @@ export function useContextLanes({ project, people, storage, updateProject, wikid
     const fresh = (key) => !done.current.has(key);
     const timer = setTimeout(async () => {
       const need = lookupsFor(board, { resolved, histories });
-      const pending = [...need.unresolved.map((u) => `search:${u.key}`), ...need.history.map((q) => `history:${q}`), ...need.placeEvents.map((q) => `place:${q.qid}:${q.from}:${q.to}`),
+      // after Refresh history, the places' histories are looked up again too (the old ones stay on screen until then)
+      if (refreshing) need.history = [...new Set(Object.values(resolved).filter((r) => r && r !== "none").map((r) => r.qid))];
+      if (!notablePeople) need.placePeople = [];
+      const pending = [...need.unresolved.map((u) => `search:${u.key}`), ...need.history.map((q) => `history:${q}`), ...need.placeEvents.map((q) => `place:${q.qid}:${q.from}:${q.to}`), ...need.placePeople.map((q) => `people:${q.qid}:${q.from}:${q.to}`),
         ...need.stateEvents.map((q) => `state:${q.qid}:${q.from}:${q.to}`), ...(need.global ? [`global:${need.global.from}:${need.global.to}`] : [])].filter(fresh);
       if (!pending.length) return;
       setStatus({ loading: true, error: "", done: 0, total: pending.length });
@@ -62,17 +67,27 @@ export function useContextLanes({ project, people, storage, updateProject, wikid
       // 3. events, each shown as it comes
       const put = (kind, qid) => (events) => setFetched((f) => ({ ...f, [kind]: { ...f[kind], [qid]: events } }));
       for (const q of need.placeEvents) await step(`place:${q.qid}:${q.from}:${q.to}`, () => wd.placeEvents(q.qid, q.from, q.to), put("place", q.qid));
+      for (const q of need.placePeople) await step(`people:${q.qid}:${q.from}:${q.to}`, () => wd.placePeople(q.qid, q.from, q.to), put("people", q.qid));
       if (need.global) await step(`global:${need.global.from}:${need.global.to}`, () => wd.globalEvents(need.global.from, need.global.to), (g) => setFetched((f) => ({ ...f, global: g })));
       // today's Romania (Q218) has so many items that its query is the slowest: it comes last
       const states = [...need.stateEvents].sort((a, b) => (a.qid === "Q218") - (b.qid === "Q218"));
       for (const q of states) await step(`state:${q.qid}:${q.from}:${q.to}`, () => wd.stateEvents(q.qid, q.from, q.to), put("state", q.qid));
+      if (alive && refreshing) setRefreshing(0);
       if (alive) setStatus({ loading: false, error: failed ? `Wikidata did not answer ${failed} lookup${failed === 1 ? "" : "s"} (busy or offline); they are tried again next time. Showing what arrived, the cache and the built-in history.` : "", done: count, total: pending.length });
     }, debounceMs);
     return () => { alive = false; clearTimeout(timer); };
-  }, [source, boardKey, resolved, histories]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [source, boardKey, resolved, histories, notablePeople, refreshing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /** Look everything up again on Wikidata (the place matches you chose are kept). */
+  const refresh = async () => {
+    if (source !== "wikidata") return;
+    await (wikidata ?? wikidataFor(storage)).refresh();
+    done.current.clear();
+    setRefreshing((n) => n + 1);
+  };
 
   const lanes = useMemo(() => buildLanes({
-    people: board, resolved, histories, fetched, own: project?.contextEvents ?? [], filters: project?.settings?.ctxFilters ?? {}, source,
-  }), [boardKey, resolved, histories, fetched, project?.contextEvents, project?.settings?.ctxFilters, source]); // eslint-disable-line react-hooks/exhaustive-deps
-  return { lanes, source, resolved, loading: status.loading, error: status.error, progress: status.loading ? { done: status.done ?? 0, total: status.total ?? 0 } : null, wikidata: source === "wikidata" ? (wikidata ?? wikidataFor(storage)) : null };
+    people: board, resolved, histories, fetched, own: project?.contextEvents ?? [], filters: project?.settings?.ctxFilters ?? {}, source, notablePeople,
+  }), [boardKey, resolved, histories, fetched, project?.contextEvents, project?.settings?.ctxFilters, source, notablePeople]); // eslint-disable-line react-hooks/exhaustive-deps
+  return { lanes, source, resolved, notablePeople, refresh, loading: status.loading, error: status.error, progress: status.loading ? { done: status.done ?? 0, total: status.total ?? 0 } : null, wikidata: source === "wikidata" ? (wikidata ?? wikidataFor(storage)) : null };
 }

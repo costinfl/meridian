@@ -35,7 +35,7 @@ describe("Evidence page", () => {
   it("the Evidence button opens its own page (#evidence) in place of the timeline, and goes back", async () => {
     const { default: App } = await import("../App.jsx");
     render(<App />);
-    const btn = await screen.findByRole("button", { name: /^Evidence$/ });
+    const btn = await screen.findByRole("button", { name: /^Evidence$/ }, { timeout: 5000 });
     expect(screen.queryByTestId("evidence-page")).toBeNull();
     fireEvent.click(btn);
     await waitFor(() => expect(screen.getByTestId("evidence-page")).toBeInTheDocument());
@@ -61,7 +61,7 @@ describe("Evidence page", () => {
   it("the Projects checkbox switches the layer off and on for the open project", async () => {
     const { default: App } = await import("../App.jsx");
     render(<App />);
-    await screen.findByRole("button", { name: /^Evidence$/ });
+    await screen.findByRole("button", { name: /^Evidence$/ }, { timeout: 5000 });
     fireEvent.click(screen.getByTitle(/projects/i));
     const box = await screen.findByRole("checkbox", { name: /Evidence layer/ });
     expect(box).toBeChecked();

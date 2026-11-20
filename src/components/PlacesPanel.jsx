@@ -37,7 +37,8 @@ function ChangePlace({ place, wikidata, onChoose }) {
 }
 
 /** @param {{ lanes, resolved, wikidata, error, onChoose: (placeKey, choice | "none") => void, onClose }} props */
-export default function PlacesPanel({ lanes, resolved, wikidata, error, onChoose, onClose }) {
+export default function PlacesPanel({ lanes, resolved, wikidata, error, onChoose, onClose, notablePeople = false, onToggleNotable, onRefresh }) {
+  const [refreshed, setRefreshed] = useState("");
   const [changing, setChanging] = useState(null);
   const local = lanes.find((l) => l.id === "local");
   const national = lanes.find((l) => l.id === "national");
@@ -50,6 +51,17 @@ export default function PlacesPanel({ lanes, resolved, wikidata, error, onChoose
           and years are sent to Wikidata.{!wikidata && " The context source is Built-in only: nothing is looked up."}
         </div>
         {error && <div role="alert" style={{ ...small, color: C.focus, marginTop: 4 }}>{error}</div>}
+        {wikidata && (
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center", margin: "8px 0 0" }}>
+            <label style={{ ...small, color: C.ink }}>
+              <input type="checkbox" checked={notablePeople} onChange={(e) => onToggleNotable?.(e.target.checked)} />{" "}
+              Show notable people of these places <span style={small}>(born or died there, from Wikidata; looked up only while this is on)</span>
+            </label>
+            <button style={mini} onClick={async () => { setRefreshed("Looking everything up again…"); await onRefresh?.(); setRefreshed("History refreshed: new answers replace the old ones as they arrive."); }}
+              title="Look everything up again on Wikidata instead of using what this device remembers (your place matches are kept)">Refresh history</button>
+            {refreshed && <span role="status" style={small}>{refreshed}</span>}
+          </div>
+        )}
         <ul style={{ listStyle: "none", margin: "8px 0", padding: 0 }}>
           {(local?.chips ?? []).map((c) => {
             const r = resolved[c.key];
