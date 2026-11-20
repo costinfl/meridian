@@ -120,13 +120,17 @@ export function createTextLayerStore(storage) {
 
     /**
      * USER ACTION: start the modern reading of a region, as a copy of its current transcription (empty if the region
-     * has none, e.g. a handwritten page waiting for HTR). The transcription itself is never changed.
+     * has none, e.g. a handwritten page waiting for HTR), or of the transcription `fromLayerId`. The transcription
+     * itself is never changed.
      */
-    async startReading({ regionId } = {}) {
+    async startReading({ regionId, fromLayerId = null } = {}) {
       requireString(regionId, "regionId");
       const all = await storage.dbGetAllByIndex(LAYERS, "byRegion", regionId);
       if (pickCurrent(all, "reading")) throw new EvidenceError("conflict", "this region already has a reading");
-      const from = pickCurrent(all, "transcription");
+      // from a chosen transcription of this region (e.g. the Transkribus one), else the current transcription
+      const chosen = fromLayerId ? all.find((l) => l.id === fromLayerId && l.kind === "transcription") : null;
+      if (fromLayerId && !chosen) throw invalid("fromLayerId is not a transcription of this region");
+      const from = chosen ?? pickCurrent(all, "transcription");
       const run = manualRun({ action: "start", fromLayerId: from?.id ?? null });
       const text = from?.originalText ?? "";
       const layer = {

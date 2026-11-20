@@ -61,3 +61,22 @@ describe("Transkribus import (P7b.T3)", () => {
     expect(checkUserActionOnly({ "ingest/transkribus/x.js": "await library.textLayers.startReading({ regionId })" })).toHaveLength(1);
   });
 });
+
+describe("Start the reading from the Transkribus text (Phase 7b review, b)", () => {
+  it("startReading from a chosen transcription; refused for another region's layer or when a reading exists", async () => {
+    const r = await importTranskribus({ library, matches: await matchesFor(), exportName: "x.zip" });
+    expect(r.imported).toBe(1);
+    // the OCR layer is chosen explicitly: the reading starts from it, not from the newer Transkribus text
+    const fromOcr = await library.textLayers.startReading({ regionId: whole.id, fromLayerId: ocr.id });
+    expect(fromOcr.originalText).toBe("REGISTRU STAREKI CIVILE noise");
+    expect(fromOcr.startedFromLayerId).toBe(ocr.id);
+    await expect(library.textLayers.startReading({ regionId: whole.id })).rejects.toThrow(/already has a reading/);
+  });
+
+  it("by default the newest (Transkribus) transcription; a foreign layer id is refused", async () => {
+    await importTranskribus({ library, matches: await matchesFor(), exportName: "x.zip" });
+    await expect(library.textLayers.startReading({ regionId: whole.id, fromLayerId: "nope" })).rejects.toThrow(/not a transcription of this region/);
+    const reading = await library.textLayers.startReading({ regionId: whole.id });
+    expect(reading.originalText).toMatch(/^Actu de încetare din viață/);
+  });
+});

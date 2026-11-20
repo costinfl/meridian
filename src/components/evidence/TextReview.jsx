@@ -189,7 +189,11 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
     select(Math.min(a, b), Math.max(a, b));
   };
 
-  const start = () => act(() => library.textLayers.startReading({ regionId: data.region.id }), "Reading started from the transcription. The transcription itself is unchanged.");
+  // the reading starts from the transcription shown (by default the current one); a Transkribus text is named as such
+  const startFrom = () => data?.transcriptions?.find((t) => t.layer.id === shownLayerId) ?? (data?.transcription ? { layer: data.transcription, run: data.transcriptionRun } : null);
+  const fromTranskribus = startFrom()?.run?.processor === "transkribus";
+  const start = () => act(() => library.textLayers.startReading({ regionId: data.region.id, fromLayerId: startFrom()?.layer.id ?? null }),
+    `Reading started from the ${fromTranskribus ? "Transkribus text" : "transcription"}. The transcription itself is unchanged.`);
   const saveCorrection = async () => {
     const ok = await act(() => library.textLayers.correctReading({ readingId: reading.id, start: selection.start, end: selection.end, after: form.after, url: form.url, note: form.note }),
       "Correction saved as a new version.");
@@ -246,7 +250,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
           const ctl = new AbortController(); setTkReading(ctl); setMessage("Sending the page image to Transkribus…");
           try {
             const r = await runTranskribus({ copy, pageIds: [page.id], signal: ctl.signal, onProgress: (p) => setMessage(`Transkribus: ${p.stage}…`) });
-            await load(); setShownLayerId(null); setMessage(r.message);
+            await load(); setShownLayerId(null); setMessage(`${r.message}${!reading && r.imported ? " You can start your reading from it below." : ""}`);
           } catch (e) { setMessage(`Failed: ${e.message}`); }
           finally { setTkReading(null); }
         },
@@ -396,7 +400,7 @@ export default function TextReview({ library, copy, loadImage, onClose, runExtra
                 </div>
                 {doubtful && <div style={{ ...small, color: C.focus, marginTop: 6 }}>The transcription of this page looks doubtful (confidence {pct(data.transcription?.confidence)}).</div>}
                 <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center" }}>
-                  <button style={primary} disabled={busy} onClick={start}>Start reading from transcription</button>
+                  <button style={primary} disabled={busy} onClick={start}>{fromTranskribus ? "Start my reading from the Transkribus text" : "Start reading from transcription"}</button>
                   {tkButton}{aiButton}
                 </div>
                 {proposalPanel}

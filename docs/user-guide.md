@@ -277,7 +277,7 @@ A document already read is not read again unless you click **Read again**. **Can
 **Review text.** OCR is not perfect, and on handwriting it mostly fails. A document marked **needs review** has pages where the OCR confidence is low or the text does not look like words. Click **Review text** to see the page image next to its text:
 
 - **Transcription (as read)** is exactly what the machine read. It is never changed.
-- **Modern reading** is your own text for the page. Click **Start reading from transcription** to begin with a copy of the machine text (a page without text starts empty). Write uncertain parts in [square brackets]; they are highlighted.
+- **Modern reading** is your own text for the page. Click **Start reading from transcription** to begin with a copy of the machine text shown in **Transcription (as read)** (a page without text starts empty); when that text came from Transkribus, the button says **Start my reading from the Transkribus text**. Write uncertain parts in [square brackets]; they are highlighted.
 - To correct a fragment, click a [bracketed] part or select any text with the mouse. Type the correct text, and if you know it from another source (an archive index, another record), paste its web link and an optional note. **Save correction**. The corrected text is underlined with a ↗ link to the source, and the **Corrections** list shows what it was before.
 - **Edit whole text** lets you type freely (for example a full transcription of a handwritten page); typed changes have no source link.
 - Every save is kept as a version; **History** shows them all. Use **+** and **−** to zoom the page image, and **‹ ›** to move between pages.
@@ -339,7 +339,7 @@ Dates before 1919 are read as Julian-calendar dates (Romania's civil and church 
 - Spelling does not need to be exact: **Stefan** finds *Ştefan* and *Ștefan*; a word misread by OCR is still found (**Haritun** finds *Hariton*); names that **sound alike** are found too (Daitch–Mokotoff: **Szvet** finds *Șfatu*).
 - **Name variants** you paired (for example Ioan – Iohannes) are used one step only: **Ioan** finds *Iohannes*, but a pair is never chained to another.
 - Values found by the AI that you have not confirmed are found and marked **proposed values**; values you **rejected are never found**. Tick **confirmed only** to see only regions with confirmed values.
-- Filters: **Years** (records dated in that range), **Place** (a place and the places below it, e.g. a county finds its towns), **Source** kind, and **only this project's sources** (by default the whole library on this device is searched).
+- Filters: **Years** (records dated in that range; text with no known date is kept, marked **undated**, after the dated results; tick **only dated** to leave it out), **Place** (a place and the places below it, e.g. a county finds its towns), **Source** kind, and **only this project's sources** (by default the whole library on this device is searched).
 - Each result shows a crop of the page, the source and page, the text with the matching words marked, the people named, and why it matched. Click it to open the page: records open on the **Records** tab with their box selected.
 
 The search index lives in this browser. It is brought up to date each time you open Search (only what changed is re-read); **Rebuild index** builds it again from everything. Searching works offline.
@@ -366,6 +366,10 @@ Instead of exporting from Transkribus, Meridian can send a page to Transkribus a
 3. Open a page (Documents → **Review text**) and click **Read with Transkribus**. You see what will be sent (the page image, the model) and confirm; Transkribus counts it against your plan's credits.
 
 The text arrives as a new **Transkribus** transcription with positioned lines, exactly as with an imported export. Your account must include the Transkribus processing API (Scholar plan or above). Meridian talks to Transkribus directly from your browser; nothing goes through another server.
+
+### Name variants
+
+**Settings & tools → Name variants** lists the spellings and language forms you paired (Ioan – Iohannes, Hariton – Haritonu): your own, and those you added from Matches. **Add pair** adds one, **Remove** takes one away, and the filter box finds a name. Search and Matches treat a pair as one name, one step only: Ion – Ioan and Ioan – Iohannes do not make Ion – Iohannes. A pair is about spelling; it never says two people are the same.
 
 ### Julian and Gregorian dates
 

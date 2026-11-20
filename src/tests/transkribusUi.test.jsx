@@ -46,7 +46,7 @@ describe("Transkribus import UI (P7b.T4)", () => {
     expect(matched.textContent).toMatch(/0001_pag32-upright\.xml → pag32-upright\.png, page 1 \(file name, 4 lines\)/);
     expect(within(matched).getByRole("checkbox").checked).toBe(true);
     fireEvent.click(within(panel).getByRole("button", { name: "Import 1 page" }));
-    await status(/^Imported 1 page\.$/);
+    await status(/^Imported 1 page\. In Review text you can start your reading from it\.$/);
     expect(screen.queryByTestId("transkribus-panel")).toBeNull();
 
     // re-import: skipped
@@ -64,6 +64,11 @@ describe("Transkribus import UI (P7b.T4)", () => {
     fireEvent.click(within(ws).getByLabelText(/Show line boxes on the image \(4\)/));
     expect(within(ws).getAllByTestId("line-box")).toHaveLength(4);
     expect(within(ws).getAllByTestId("line-box")[1].title).toMatch(/^Anulu una mie/);
+
+    // no reading yet: it is offered from the Transkribus text, one click (Phase 7b review)
+    fireEvent.click(within(ws).getByRole("tab", { name: "Modern reading" }));
+    fireEvent.click(await within(ws).findByRole("button", { name: "Start my reading from the Transkribus text" }));
+    await waitFor(() => expect(within(ws).getByText(/Reading started from the Transkribus text/)).toBeTruthy());
   });
 
   it("a different-shaped image is listed unticked; unmatched pages show the reason; page order onto a chosen document", async () => {
