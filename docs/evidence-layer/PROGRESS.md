@@ -6,8 +6,8 @@ The agent keeps this file up to date after every task. The reviewer approves pha
 
 - **Current phase:** 8 — Graph projection
 - **Phase status:** in progress  <!-- not started | in progress | awaiting review | approved -->
-- **Next action:** reviewer: review PR #15 (Phase 9 and the follow-up). Then: context lanes that follow the people (next PR).
-- **Last updated:** 2026-11-19 (Phase 9 review follow-up)
+- **Next action:** reviewer: review the context lanes PR.
+- **Last updated:** 2026-11-20 (context lanes review follow-up)
 
 ## Phase overview
 
@@ -272,6 +272,8 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 | 2026-11-02 | P0 | Phase 0 work done on the session-designated branch `ccr-adaa4345-wbnkkm` (synced to master `8bd5f41`), not on `evidence/p0`; no pull request opened | The cloud session may push only to the designated branch; the system rules say not to open a PR unless asked | Create `evidence/p0` and open a PR (needs push permission and your go-ahead) |
 | 2026-11-02 | P0 | Earlier Phase 0 draft (Java/Postgres assumptions) and its `tech-stack-assessment.md` discarded; superseded by the reviewed plan | Reviewer replaced the stack; started over | none |
 | 2026-11-14 | P6 start | Reviewer decisions: (1) LLM provider: both Anthropic and OpenAI, selectable, own key per provider (Open question 2); (2) the LLM receives the page image plus the current text (the modern reading if any, else the transcription); (3) new task P6.T6: the LLM may propose a page transcription and modern reading, applied only by a user click | Reviewer answers at the start of Phase 6 | One provider; text only; LLM reading in Backlog |
+| 2026-11-20 | Context lanes review | (a) No county events in Local: a county (Prahova) belongs to the national level; Local stays the town. (b) Notable people of a place: a switch, on demand, off by default (born or died there, from Wikidata; looked up only while on). (c) A Refresh history button (re-fetches everything from Wikidata, keeps your place matches) | Reviewer answers on PR #16 | County events in Local; people always shown |
+| 2026-11-19 | Context lanes start | Reviewer request: Local = the places the people on the board lived in (their spans of years), National = their countries as they were at the time, Global = the same for everyone over the combined range; each place or country a toggle chip (fade in/out). Data: Wikidata plus your own events, the built-in sample as offline fallback. Checked live: Wikidata gives dated country histories for Romanian places (P17 with start/end: Ploiești Wallachia → United Principalities → Kingdom of Romania…; Cluj Austrian Empire → Austria-Hungary → Kingdom of Romania, Hungary 1940–44), so a built-in table by county is only a fallback; dated events at one town are few, so Local also shows notable things founded there; national events are queried per state within its years (fast), global by class (wars, revolutions, treaties, disasters, epidemics) and notability; the search API rate-limits bursts, so calls are spaced and cached 30 days | Reviewer request on PR #15 | A fixed sample; today's country |
 | 2026-11-19 | P9 review | (a) Keep the 0.80 threshold (fewer proposals, mostly right). (b) Keep godparents and witnesses: they carry useful details (godparents: baptism, adoption, religious wedding, places; witnesses: age, place, work, sometimes relatives); they are proposed when the names agree **and one detail agrees**: a stated age, the same place, or the same work (new `occupation` signal against the person's roles). (c) Matches lists accepted links with undo. (d) Next: Julian/Gregorian helpers, the Transkribus API (CORS checked: direct browser calls allowed), editing parents and spouses. Context lanes follow the people (separate PR, after this one) | Reviewer answers on PR #15 | Names and dates alone for godparents |
 | 2026-11-19 | P9 tuning | Tightened after a synthetic benchmark with known answers (8,320 people, 22,137 personas; 60% in the tree; spelling noise, missing surnames, stated ages off by a year): the first version was slow (56 s) and loose (best proposal right 45%). Now: blocks on surname sound **and** the given name's first letter (with variants); a woman also under her husband's (or children's) surname; a tree person without years gets a birth window from relatives' years; relatives are compared by name and by their own dates; a proposal needs corroboration (a close date, two agreeing relatives, a relative with agreeing dates or the same linked person, or a shared associate), else it is capped at 0.65; relatives named differently pull the score down; default threshold 0.80 (every 0.70–0.80 proposal was wrong in the benchmark). Result: 6–8 s, best proposal right 83–85%, true person proposed for 67–69% | Benchmark (see report) | Keep the looser rules and let review filter |
 | 2026-11-19 | P9 start | Reviewer decisions: match personas to tree persons and also group unlinked personas that look like one person; run on demand (Find matches; incremental by default, Recheck everything); use confirmed and proposed values (candidates marked when they rest on proposed values; rejected never used); review in a new Matches section | Reviewer answers at the start of Phase 9 | Tree only; automatic runs; confirmed only; review inside People |
@@ -326,6 +328,34 @@ Run on 2026-11-02 at commit `8bd5f41` (docs-only changes since `243bf1c`), Node 
 - Link a stamp / margin-note record to the main entry's record ("this stamp is about that child"), e.g. as an assertion relating the two subjects.
 
 ## Phase reports
+
+### Context lanes report (after Phase 9)
+- **Built:** the Local, National and Global lanes follow the people on the board instead of the fixed Hariton sample.
+  - *B1* a **Place** on life events, roles and groups (editor, GEDCOM `PLAC`); where a person lived as spans of years per place (`src/context/residence.js`).
+  - *B2* Wikidata (`src/context/wikidata.js`): place search, a place's states over time (P17 with dates), local events and notable foundings, state events within each state's years, world events by class and notability; cached 30 days on the device, spaced calls, backoff on 429/503. Country at the time: Wikidata's dated P17 first, else a built-in table by Romanian county and region, else today's country; lines of succession make one chip (`src/context/historicalStates.js`).
+  - *B3* lanes from the board (`src/context/lanes.js`): Local chips per place, National chips per line of succession (states and years in the chip's title), Global over the combined range; events dimmed outside the years someone on the board was there; chips fade on click (`settings.ctxFilters`); your own context events (click/drag a context lane; `project.contextEvents`); the **Context source** switch (Wikidata + built-in / Built-in only); a **Places** panel to check or change matches; labels only where they fit; lookups progressive, failures isolated and retried.
+- **IndexedDB:** no change (the cache uses the existing settings store). Project data: `contextEvents`, `settings.contextPlaces`, `ctxFilters`, `ctxSource`. ADR-0007 records that the page calls Wikidata (and Transkribus) directly.
+- **Tests:** 555 → **577**. Build passes.
+- **Real browser (dev server; Wikidata live, relayed through Node because the sandbox browser has no direct internet):**
+  - sample family (Dumitru, Dumitru S., Gheorghe): Local chips Săhăteni, Ploiești; National "Romania" titled Principality of Wallachia 1818–1859 · United Principalities 1859–1881 · Kingdom of Romania 1881–1947 · Romanian People's Republic 1947–1952; 53 events; ready in 23–30 s the first time;
+  - turning Ploiești off faded its 13 events;
+  - a board with Ana (born in Cluj 1880) and Ion (București 1885): Local Cluj-Napoca, București; National Austria-Hungary (1880–1918, 22 events), Hungary (1940–1944), Romania; first events within a quarter of a second (built-in and cached), 103–125 events after 95–145 s the first time, depending on how busy Wikidata was;
+  - a reload: 1.7 s from the cache, no network (when a lookup had failed, it was retried then);
+  - Built-in only: no network calls; no page errors.
+- **Known limitations:**
+  1. Wikidata is thin on local events for small places; Local adds foundings, the built-in sample and your own events.
+  2. The first lookup is slow for big countries (Romania-wide queries take 20 s or more; it comes last); Wikidata sometimes answers 502, and the lookup is retried later.
+  3. Labels are from Wikidata in Romanian or English; some items are not events in the strict sense (e.g. a currency as a period).
+  4. A place mentioned without a year (a role without dates) is not used.
+- **Review follow-up (2026-11-20, same PR #16):**
+  - **(a)** decided: Local stays the town; no county events.
+  - **(b) Notable people of a place**: a switch in **Places** ("Show notable people of these places", off by default). While on, Meridian asks Wikidata for people born in each place (birth year within the board's years, or up to 80 years before) or who died there, the 15 most notable per place; they are drawn as a ☆ at their birth there (or death), dimmed outside the years someone on the board was there. Nothing is looked up while it is off. Browser check: Ploiești gave 15 people (Take Ionescu, Lazăr Șăineanu, Nichita Stănescu, Liviu Librescu…); the first lookup took about 2.5 minutes (the "born in" query is heavy), then cached.
+  - **(c) Refresh history** in **Places**: everything is looked up again on Wikidata (a device-wide mark makes older cached answers stale); your place matches are kept, old answers stay on screen until new ones arrive. Browser check: 15 lookups, no place searches, 51 s.
+  - Tests 577 → **580**.
+- **Questions for the reviewer** (answered 2026-11-20, see the follow-up above):
+  - (a) Is the Local lane useful for your villages, or should it also take events of the county (e.g. Prahova) when the town has few?
+  - (b) Should notable people born in a place (Wikidata) be offered as context too, or only events?
+  - (c) Is the 30-day cache right, or should there be a "Refresh history" button?
 
 ### Phase 9 report
 - **Built:** entity resolution, proposing who in the records is who in the tree, on this device and without AI.

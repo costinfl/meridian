@@ -94,7 +94,7 @@ Known gaps in the current app:
 
 - People cannot yet be created or deleted in the interface; they come from the sample, a GEDCOM import or a bundle import.
 - Parents, spouses and children are edited in a person's family panel (click their name); GEDCOM import reads families too.
-- The context lanes (local, national, world history) are the built-in sample only.
+- The context lanes follow the people on the board: local history of the places they lived in, the countries those places belonged to at the time, and world history, from Wikidata (cached, place names only) or the built-in sample offline.
 
 ## Browser support
 

@@ -75,6 +75,7 @@ export function exportGedcom(people, { sources = [] } = {}) {
     // roles / occupations → OCCU with a date range
     (p.periods || []).filter((r) => r.verified).forEach((r) => {
       L.push(`1 OCCU ${r.label}`, `2 DATE FROM ${r.start} TO ${r.end}`);
+      if (r.place) L.push(`2 PLAC ${r.place}`);
       if (r.note) pushText(L, 2, "NOTE", r.note);
       cite(r.sourceId);
     });
@@ -82,6 +83,7 @@ export function exportGedcom(people, { sources = [] } = {}) {
     // events → generic EVEN + TYPE
     (p.events || []).filter((e) => e.verified).forEach((e) => {
       L.push(`1 EVEN ${e.label}`, `2 TYPE ${e.type || "note"}`, `2 DATE ${e.year}`);
+      if (e.place) L.push(`2 PLAC ${e.place}`);
       if (e.note) pushText(L, 2, "NOTE", e.note);
       cite(e.sourceId);
     });
@@ -133,10 +135,10 @@ export function parseGedcom(text) {
   const flushSub = () => {
     if (cur && sub) {
       if (sub.tag === "OCCU") {
-        const r = createPeriod({ start: sub.start ?? sub.year, end: sub.end ?? sub.year, label: sub.label || "", note: sub.note || "" });
+        const r = createPeriod({ start: sub.start ?? sub.year, end: sub.end ?? sub.year, label: sub.label || "", note: sub.note || "", place: sub.place || "" });
         r._srcXref = sub.srcXref; cur.periods.push(r);
       } else if (sub.tag === "EVEN") {
-        const e = createEvent({ year: sub.year, label: sub.label || "", type: sub.type || "note", note: sub.note || "" });
+        const e = createEvent({ year: sub.year, label: sub.label || "", type: sub.type || "note", note: sub.note || "", place: sub.place || "" });
         e._srcXref = sub.srcXref; cur.events.push(e);
       } else if (sub.tag === "NOTE") {
         const m = String(sub.text || "").match(/^(.*?)\s*\((\d{3,4})\s*[–-]\s*(\d{3,4})\)\s*\.?\s*(.*)$/);
@@ -221,6 +223,7 @@ export function parseGedcom(text) {
         }
       } else if (tag === "PLAC") {
         if (sub.tag === "BIRT" || sub.tag === "DEAT") cur[sub.tag === "BIRT" ? "birth" : "death"].place = val;
+        else if (sub.tag === "OCCU" || sub.tag === "EVEN") sub.place = val.trim();
       } else if (tag === "TYPE" && sub.tag === "EVEN") { sub.type = val.trim(); }
       else if (tag === "NOTE") { sub.note = val; last = { obj: sub, key: "note" }; }
       else if (tag === "SOUR") { sub.srcXref = val.replace(/@/g, "").trim(); }

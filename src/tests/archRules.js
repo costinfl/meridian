@@ -13,6 +13,7 @@ export const ALLOWED = {
   search: ["evidence"],
   graph: ["evidence"],
   resolve: ["evidence", "graph"],
+  context: ["evidence", "models"],
   storage: [],
   workers: ["evidence", "conclusions", "ingest", "extract", "search", "graph", "resolve", "models", "storage"],
   // models, ui, and top-level modules (share.js, gedcom.js, theme.js, sampleData.js) are unrestricted
